@@ -1,0 +1,138 @@
+@charset "UTF-8";
+/**
+ * 这里是uni-app内置的常用样式变量
+ *
+ * uni-app 官方扩展插件及插件市场（https://ext.dcloud.net.cn）上很多三方插件均使用了这些样式变量
+ * 如果你是插件开发者，建议你使用scss预处理，并在插件代码中直接使用这些变量（无需 import 这个文件），方便用户通过搭积木的方式开发整体风格一致的App
+ *
+ */
+/**
+ * 如果你是App开发者（插件使用者），你可以通过修改这些变量来定制自己的插件主题，实现自定义主题功能
+ *
+ * 如果你的项目同样使用了scss预处理，你也可以直接在你的 scss 代码中使用如下变量，同时无需 import 这个文件
+ */
+/* 颜色变量 */
+/* 行为相关颜色 */
+/* 文字基本颜色 */
+/* 背景颜色 */
+/* 边框颜色 */
+/* 尺寸变量 */
+/* 文字尺寸 */
+/* 图片尺寸 */
+/* Border Radius */
+/* 水平间距 */
+/* 垂直间距 */
+/* 透明度 */
+/* 文章场景相关 */
+.index.data-v-d056d3f4 {
+  padding-bottom: 100rpx;
+}
+.index image.data-v-d056d3f4 {
+  width: 100%;
+}
+.index .contant.data-v-d056d3f4 {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 0rpx;
+}
+.index .contant .countdown.data-v-d056d3f4 {
+  position: absolute;
+  top: 750rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 85%;
+  height: 350rpx;
+  background-color: #171719;
+  border-radius: 50rpx;
+}
+.index .contant .countdown .title.data-v-d056d3f4 {
+  padding: 40rpx;
+  color: #fff;
+  font-size: 55rpx;
+}
+.index .contant .countdown .buttom.data-v-d056d3f4 {
+  padding-top: 25rpx;
+}
+.index .contant .countdown .buttom .btn.data-v-d056d3f4 {
+  font-size: 28rpx;
+  color: #7e7e7e;
+}
+.index .contant .card.data-v-d056d3f4 {
+  width: 85%;
+  height: 280rpx;
+  display: flex;
+  background-color: #171719;
+  border-radius: 20rpx;
+  margin-top: 35rpx;
+  position: relative;
+}
+.index .contant .card .tag.data-v-d056d3f4 {
+  position: absolute;
+  left: 0rpx;
+  top: -5rpx;
+}
+.index .contant .card .state.data-v-d056d3f4 {
+  position: absolute;
+  right: 20rpx;
+  bottom: 20rpx;
+}
+.index .contant .card .left image.data-v-d056d3f4 {
+  border-radius: 20rpx 0rpx 0rpx 20rpx;
+  width: 240rpx;
+  height: 280rpx;
+}
+.index .contant .card .right.data-v-d056d3f4 {
+  display: flex;
+  margin-left: 30rpx;
+  flex-direction: column;
+  align-items: center;
+  width: 55%;
+}
+.index .contant .card .right .name.data-v-d056d3f4 {
+  margin-top: 20rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ffffff;
+  font-size: 18px;
+  height: 80rpx;
+}
+.index .contant .card .right .time.data-v-d056d3f4 {
+  padding-top: 10rpx;
+  height: 80rpx;
+}
+.index .contant .card .right .date.data-v-d056d3f4 {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #7e7e7e;
+  font-size: 14px;
+}
+.index .contant .card .right .date .detail.data-v-d056d3f4 {
+  color: #7e7e7e;
+}
+.index .contant .card .remind.data-v-d056d3f4 {
+  position: absolute;
+  bottom: 0rpx;
+  right: 0rpx;
+  background-color: #3978bb;
+  color: #fff;
+  width: 140rpx;
+  height: 40rpx;
+  border-radius: 20rpx 0 20rpx 0;
+  font-size: 24rpx;
+  text-align: center;
+  padding-top: 6rpx;
+}
+.index .contant .previous.data-v-d056d3f4 {
+  padding-top: 50rpx;
+  color: #7e7e7e;
+  font-size: 30rpx;
+  text-align: right;
+}
+

@@ -1,0 +1,45 @@
+{
+  "pages": [
+    "pages/upcoming/upcoming",
+    "pages/upcoming/upcomingInfo",
+    "pages/agencies/agencies",
+    "pages/previous/previous",
+    "pages/previous/previousInfo",
+    "pages/event/event"
+  ],
+  "subPackages": [],
+  "window": {
+    "backgroundColor": "#000000",
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#000000",
+    "navigationBarTitleText": "Space Launch",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "backgroundColor": "#222",
+    "selectedColor": "#3978bb",
+    "color": "#A0A0A0",
+    "borderStyle": "black",
+    "list": [
+      {
+        "text": "即将发射",
+        "pagePath": "pages/upcoming/upcoming",
+        "iconPath": "static/image/tabbar/huojian1.png",
+        "selectedIconPath": "static/image/tabbar/huojian2.png"
+      },
+      {
+        "text": "已发射",
+        "pagePath": "pages/previous/previous",
+        "iconPath": "static/image/tabbar/fashe1.png",
+        "selectedIconPath": "static/image/tabbar/fashe2.png"
+      },
+      {
+        "text": "活动",
+        "pagePath": "pages/event/event",
+        "iconPath": "static/image/tabbar/guanyu1.png",
+        "selectedIconPath": "static/image/tabbar/guanyu2.png"
+      }
+    ]
+  },
+  "usingComponents": {}
+}

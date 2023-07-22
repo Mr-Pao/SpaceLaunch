@@ -1,0 +1,24 @@
+{
+    "name": "Request",
+    "dependencies": {
+        "request": "^2.88.2",
+        "request-promise": "^4.2.6"
+    },
+    "extensions": {
+        "uni-cloud-jql": []
+    },
+    "cloudfunction-config": {
+        "memorySize": 2048,
+        "timeout": 20,
+        "triggers": [
+            {
+                "name": "myTrigger",
+                "type": "timer",
+                "config": "0 0 * * * * *"
+            }
+        ],
+        "path": "",
+        "runtime": "Nodejs8",
+        "concurrency": 1
+    }
+}

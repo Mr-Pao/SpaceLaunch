@@ -1,0 +1,12 @@
+{
+  "navigationBarTitleText": "",
+  "navigationStyle": "custom",
+  "enablePullDownRefresh": false,
+  "usingComponents": {
+    "uni-dateformat": "/uni_modules/uni-dateformat/components/uni-dateformat/uni-dateformat",
+    "uni-tag": "/uni_modules/uni-tag/components/uni-tag/uni-tag",
+    "u-tag": "/uni_modules/uview-ui/components/u-tag/u-tag",
+    "u-back-top": "/uni_modules/uview-ui/components/u-back-top/u-back-top",
+    "uni-load-more": "/uni_modules/uni-load-more/components/uni-load-more/uni-load-more"
+  }
+}
