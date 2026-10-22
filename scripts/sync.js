@@ -10,9 +10,11 @@
  *   node sync.js --dataset=previous     只同步历史发射
  *   node sync.js --dataset=agencies     只同步机构（4 页）
  *   node sync.js --dataset=all          全部同步（调试用，会消耗 7 个请求）
+ *   node sync.js --dataset=all --base=dev   走开发端点，不消耗正式配额
  *
  * 环境变量：
  *   LL2_TOKEN        可选，LL2 免费 token，可提升限额
+ *   LL2_BASE         设为 dev 等价于 --base=dev
  *   COS_SECRET_ID / COS_SECRET_KEY / COS_BUCKET / COS_REGION   配置了才上传
  */
 
@@ -76,10 +78,12 @@ const DATASETS = {
 }
 
 function parseArgs(argv) {
-	const out = { dataset: 'all' }
+	const out = { dataset: 'all', base: 'prod' }
 	for (const a of argv.slice(2)) {
-		const m = a.match(/^--dataset=(.+)$/)
+		let m = a.match(/^--dataset=(.+)$/)
 		if (m) out.dataset = m[1]
+		m = a.match(/^--base=(dev|prod)$/)
+		if (m) out.base = m[1]
 	}
 	return out
 }
@@ -152,12 +156,18 @@ async function runDataset(name) {
 }
 
 (async () => {
-	const { dataset } = parseArgs(process.argv)
+	const { dataset, base } = parseArgs(process.argv)
 	const targets = dataset === 'all' ? Object.keys(DATASETS) : [dataset]
 
 	if (targets.some((t) => !DATASETS[t])) {
 		console.error(`未知数据集: ${dataset}，可选 ${Object.keys(DATASETS).join(' / ')} / all`)
 		process.exit(2)
+	}
+
+	// 切到开发端点：本地反复调试不消耗正式配额（15 次/小时按 IP 计，很容易烧光）
+	if (base === 'dev') {
+		process.env.LL2_BASE = 'dev'
+		console.log('\n⚠️  使用开发端点 lldev（不限速，但数据可能陈旧），仅用于联调')
 	}
 
 	fs.mkdirSync(OUT_DIR, { recursive: true })

@@ -5,7 +5,10 @@
   "description": "抓取 LL2 数据并生成精简静态 JSON 快照",
   "main": "sync.js",
   "scripts": {
-    "sync": "node sync.js --dataset=all"
+    "sync": "node sync.js --dataset=all",
+    "sync:dev": "node sync.js --dataset=all --base=dev",
+    "upload": "node upload.js",
+    "verify": "node verify-slim.js"
   },
   "dependencies": {
     "cos-nodejs-sdk-v5": "^2.14.6"

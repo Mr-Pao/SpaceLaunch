@@ -40,18 +40,19 @@ async function upload(localPath, key, cacheControl) {
 
 	const body = fs.readFileSync(localPath)
 
+	// COS_ACL=public-read 时给单个对象打公有读，这样不必把整个桶改成公有读
+	const params = {
+		Bucket: process.env.COS_BUCKET,
+		Region: process.env.COS_REGION,
+		Key: key,
+		Body: body,
+		ContentType: 'application/json; charset=utf-8',
+		CacheControl: cacheControl || 'public, max-age=300'
+	}
+	if (process.env.COS_ACL) params.ACL = process.env.COS_ACL
+
 	await new Promise((resolve, reject) => {
-		cos.putObject(
-			{
-				Bucket: process.env.COS_BUCKET,
-				Region: process.env.COS_REGION,
-				Key: key,
-				Body: body,
-				ContentType: 'application/json; charset=utf-8',
-				CacheControl: cacheControl || 'public, max-age=300'
-			},
-			(err) => (err ? reject(err) : resolve())
-		)
+		cos.putObject(params, (err) => (err ? reject(err) : resolve()))
 	})
 
 	console.log(`  ↑ 已上传 ${key}`)

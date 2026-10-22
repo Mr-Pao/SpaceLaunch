@@ -5,16 +5,27 @@
  *
  * 关键约束（实测得出，勿随意修改）：
  * - 必须用 mode=normal，mode=detailed 实测 72 秒超时，mode=list 又缺 rocket/pad/mission 字段
- * - mode=normal & limit=50 实测耗时约 28 秒，所以超时不能小于 120 秒
- * - 未认证限额 15 次/小时，重试次数必须保守
+ * - mode=normal & limit=50 实测耗时 27–120 秒（随网络波动很大），超时不能小于 120 秒
+ * - 未认证限额 15 次/小时，且是**按 IP** 计。本地调试和 CI 各算各的
+ * - 本地反复调试很容易把配额烧光，调试请用 --base=dev
  */
 
 const https = require('https')
 
-const BASE = 'https://ll.thespacedevs.com/2.3.0'
+// 正式端点：受限 15 次/小时（未认证）
+const PROD_BASE = 'https://ll.thespacedevs.com/2.3.0'
+// 开发端点：官方文档说明不受速率限制，代价是"数据陈旧且有限"
+// 只能用于本地联调，不要用于生产快照
+const DEV_BASE = 'https://lldev.thespacedevs.com/2.3.0'
+
 const TIMEOUT_MS = 120000
 const UA = 'SpaceLaunch/1.1 (+https://github.com/Mr-Pao/SpaceLaunch)'
 const TOKEN = process.env.LL2_TOKEN || ''
+
+// 每次请求时现算，这样 --base=dev 能在进程内切换而不必重新加载模块
+function base() {
+	return process.env.LL2_BASE === 'dev' ? DEV_BASE : PROD_BASE
+}
 
 function request(url) {
 	return new Promise((resolve, reject) => {
@@ -50,7 +61,8 @@ function request(url) {
 }
 
 async function getJson(pathOrUrl, { retries = 1 } = {}) {
-	const url = /^https?:\/\//.test(pathOrUrl) ? pathOrUrl : BASE + pathOrUrl
+	const b = base()
+	const url = /^https?:\/\//.test(pathOrUrl) ? pathOrUrl : b + pathOrUrl
 	let lastErr
 
 	for (let i = 0; i <= retries; i++) {
@@ -58,12 +70,12 @@ async function getJson(pathOrUrl, { retries = 1 } = {}) {
 		try {
 			const json = await request(url)
 			const cost = Date.now() - started
-			console.log(`  ✓ ${url.replace(BASE, '')} → ${json.count ?? '-'} 条 / ${cost}ms`)
+			console.log(`  ✓ ${url.replace(b, '')} → ${json.count ?? '-'} 条 / ${cost}ms`)
 			return json
 		} catch (e) {
 			lastErr = e
 			console.warn(`  ! 第 ${i + 1} 次失败: ${e.message}`)
-			// 429 不要重试，等下一轮定时任务
+			// 429 不要重试，重试只会继续消耗并且仍然失败，等下一轮定时任务
 			if (e.message.includes('429')) break
 			if (i < retries) await new Promise((r) => setTimeout(r, 3000))
 		}
@@ -72,4 +84,4 @@ async function getJson(pathOrUrl, { retries = 1 } = {}) {
 	throw lastErr
 }
 
-module.exports = { getJson, BASE }
+module.exports = { getJson, base, PROD_BASE, DEV_BASE }
