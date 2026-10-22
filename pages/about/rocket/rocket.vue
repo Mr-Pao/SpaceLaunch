@@ -89,9 +89,10 @@
 			};
 		},
 		onLoad(option) {
-			this.Rockets = getApp().globalData.Rockets[option.id];
+			// 原来读 getApp().globalData.Rockets，这个变量全项目从未被赋值，
+			// 一旦该页面被注册就会立刻抛 TypeError。数据本来就在本页 list 里，直接取
 			this.id = option.id
-			console.log(this.Rockets);
+			this.Rockets = this.list[option.id] || null
 		}
 	}
 </script>

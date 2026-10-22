@@ -1,9 +1,13 @@
 <template>
 	<view class="index">
-		<view class="contant" >
-			<view class="card" v-for="(item,index) in LaunchPrevious.slice(0,listNum)" @click="goLaunchInfo(index)">
+		<view class="hint" v-if="freshText">
+			<text class="hint-text">已发射 {{ total }} 次 · {{ freshText }}</text>
+		</view>
+
+		<view class="contant">
+			<view class="card" v-for="item in visible" :key="item.id" @click="goLaunchInfo(item.id)">
 				<view class="left">
-					<image :src="item.image" mode="scaleToFill" />
+					<image :src="item.image" mode="aspectFill" />
 				</view>
 				<view class="right">
 					<view class="name">
@@ -12,85 +16,114 @@
 					<view class="date">
 						<uni-dateformat :date="item.net"></uni-dateformat>
 					</view>
-					<view class="tag">
-						<uni-tag :mark="true" :text="'#'+item.orbital_launch_attempt_count_year" type="primary"
-							size="small" />
+					<view class="tag" v-if="item.orbital_launch_attempt_count_year">
+						<text class="tag-text">#{{ item.orbital_launch_attempt_count_year }}</text>
 					</view>
 					<view class="state">
-						<u-tag v-if="item.status?.id == 3" text="成功" type="success" shape="circle"></u-tag>
+						<!-- 用 abbrev 判断，比 status.id 稳：id 是内部编号，可能变 -->
+						<text class="state-text" v-if="item.status.abbrev === 'Success'">成功</text>
+						<text class="state-text failure" v-else-if="item.status.abbrev === 'Failure'">失败</text>
 					</view>
 				</view>
 			</view>
 		</view>
-		<view class="wrap">
-			<u-back-top :scroll-top="scrollTop"></u-back-top>
+
+		<view class="loading" v-if="loading && visible.length === 0">
+			<text class="loading-text">加载中...</text>
 		</view>
-		<uni-load-more :status="status"></uni-load-more>
+
+		<view class="empty" v-else-if="!loading && visible.length === 0">
+			<text class="empty-text">暂无历史发射数据</text>
+		</view>
+
+		<uni-load-more v-if="visible.length > 0" :status="status"></uni-load-more>
 	</view>
 </template>
 
 <script>
+	import spaceData from '@/utils/data.js'
+
 	export default {
 		data() {
 			return {
-				LaunchPrevious: [],
-				scrollTop: 0,
+				list: [],
+				total: 0,
+				freshText: '',
+				loading: true,
 				status: 'more',
-				listNum: 6
+				listNum: 12
 			}
-		}, 
-		onLoad() {
-			this.getData();
+		},
+		computed: {
+			// 分页完全在本地切，不发请求 —— 快照就 50 条，没必要走网络分页
+			visible() {
+				return this.list.slice(0, this.listNum)
+			}
+		},
+		async onLoad() {
+			await this.getData()
+		},
+		onPullDownRefresh() {
+			this.getData(true).then(() => uni.stopPullDownRefresh())
 		},
 		onReachBottom() {
-			this.status = 'loading';
-			this.listNum = this.listNum+6;
-			console.log(this.listNum);
-			if (this.listNum >= this.LaunchPrevious.length) this.status = 'nomore';
-			else this.status = 'loading';
+			if (this.listNum >= this.list.length) {
+				this.status = 'nomore'
+				return
+			}
+			this.status = 'loading'
+			this.listNum += 12
+			if (this.listNum >= this.list.length) this.status = 'nomore'
 		},
 		methods: {
-			async getData() {
+			async getData(force) {
+				this.loading = true
 				try {
-					const result = await uniCloud.callFunction({
-						name: 'unionOp',
-						data: {
-							unionAction: 'queryLaunches',
-							page: 1,
-							size: 100
-						}
-					});
-
-					if (result.result && result.result.success) {
-						let data = result.result.data.list;
-						this.LaunchPrevious = data.filter(item => {
-							return new Date(item.net).getTime() < new Date().getTime();
-						}).sort((a, b) => new Date(b.net) - new Date(a.net));
-						getApp().globalData.LaunchPrevious = this.LaunchPrevious;
-						console.log('获取到历史发射数据:', this.LaunchPrevious);
-					} else {
-						console.error('获取历史发射数据失败:', result.result?.message || '未知错误');
-					}
-				} catch (error) {
-					console.error('调用云函数失败:', error);
+					const d = await spaceData.load('previous', {
+						force: !!force,
+						onUpdate: (fresh) => this.applyData(fresh)
+					})
+					this.applyData(d)
+				} catch (e) {
+					console.warn('获取历史发射失败', e)
+				} finally {
+					this.loading = false
 				}
 			},
-			goLaunchInfo(e) {
+
+			applyData(d) {
+				// 快照来自 /launches/previous/，本身已按 net 倒序，不需要再排序
+				this.list = d.list || []
+				this.total = d.count || this.list.length
+				this.freshText = spaceData.freshnessText(d.generatedAt)
+				if (this.listNum >= this.list.length) this.status = 'nomore'
+			},
+
+			goLaunchInfo(id) {
+				if (!id) return
 				uni.navigateTo({
-					url: '/pages/previous/previousInfo?id=' + e
+					// 传 id 不传下标：列表刷新后下标会错位
+					url: '/pages/previous/previousInfo?id=' + id
 				})
-			},
-			onPageScroll(e) {
-				this.scrollTop = e.scrollTop;
-			},
+			}
 		}
 	}
 </script>
 
 <style lang="scss" scoped>
 	.index {
-		padding-top: 150rpx;
-		padding-bottom: 100rpx;
+		padding-bottom: 60rpx;
+		min-height: 100vh;
+
+		.hint {
+			padding: 20rpx 40rpx 0;
+			text-align: right;
+		}
+
+		.hint-text {
+			color: #7e7e7e;
+			font-size: 24rpx;
+		}
 
 		.contant {
 			width: 100%;
@@ -111,12 +144,29 @@
 					position: absolute;
 					left: 0rpx;
 					top: -5rpx;
+					background: #3978bb;
+					border-radius: 10rpx 0 10rpx 0;
+					padding: 4rpx 14rpx;
+
+					.tag-text {
+						color: #fff;
+						font-size: 22rpx;
+					}
 				}
-				
+
 				.state {
 					position: absolute;
 					right: 20rpx;
 					bottom: 20rpx;
+
+					.state-text {
+						color: #34c759;
+						font-size: 24rpx;
+					}
+
+					.state-text.failure {
+						color: #ff3b30;
+					}
 				}
 
 				.left {
@@ -143,11 +193,6 @@
 						height: 80rpx;
 					}
 
-					.time {
-						padding-top: 20rpx;
-						height: 100rpx;
-					}
-
 					.date {
 						display: flex;
 						justify-content: space-between;
@@ -157,20 +202,21 @@
 						white-space: nowrap;
 						color: #7e7e7e;
 						font-size: 18px;
-
-						.detail {
-							color: #7e7e7e;
-						}
 					}
 				}
 			}
-			
-			.previous{
-				padding-top: 50rpx;
-				color: #7e7e7e;
-				font-size: 30rpx;
-				text-align: right;
-			}
+		}
+
+		.loading,
+		.empty {
+			padding: 150rpx 0;
+			text-align: center;
+		}
+
+		.loading-text,
+		.empty-text {
+			color: #7e7e7e;
+			font-size: 30rpx;
 		}
 	}
 </style>
