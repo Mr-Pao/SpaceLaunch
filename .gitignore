@@ -5,3 +5,5 @@ unpackage/
 .DS_Store
 .keepalive/
 .workbuddy/
+package.json.flip-countdown.bak
+node_modules/
