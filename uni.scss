@@ -75,5 +75,5 @@ $uni-font-size-subtitle:26px;
 $uni-color-paragraph: #3F536E; // 文章段落颜色
 $uni-font-size-paragraph:15px;
 
-/* uview-ui 主题变量：缺少这一行，u-* 组件编译时会报 Undefined variable */
-@import '@/uni_modules/uview-ui/theme.scss';
+/* 已移除 uview-ui 的 theme.scss 导入：该库 install 为 Vue2 API，在 Vue3 下会崩溃。
+   若将来要引入 Vue3 组件库，用 uview-plus，并按其文档重新引入主题变量。 */

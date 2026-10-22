@@ -42,7 +42,6 @@
 </script>
 
 <style lang="scss">
-	@import "@/uni_modules/uview-ui/index.scss";
 	@import "@/components/colorui/icon.css";
 	@import "@/components/colorui/main.css";
 

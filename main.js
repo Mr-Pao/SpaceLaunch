@@ -1,12 +1,15 @@
 import App from './App'
 import { createSSRApp } from 'vue'
-import uView from '@/uni_modules/uview-ui'
 import share from '@/utils/share.js'
+
+// 注意：已移除 uview-ui。
+// uview-ui 2.0.34 的 install 用的是 Vue2 API（Vue.filter / Vue.prototype），
+// 在 Vue3 下 app.use() 会直接抛 "Vue.filter is not a function"，导致 app.js 崩溃。
+// 本项目已注册的 6 个页面没有使用任何 u-* 组件，故整体摘除。
+// 若将来确实需要 Vue3 的组件库，请用 uview-plus（uview 的 Vue3 分支），不要再装回 uview-ui。
 
 export function createApp() {
 	const app = createSSRApp(App)
-
-	app.use(uView)
 
 	// 全局分享方法 挂载全局
 	app.mixin(share)
