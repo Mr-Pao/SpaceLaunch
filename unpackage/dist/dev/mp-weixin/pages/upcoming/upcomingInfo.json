@@ -1,8 +1,0 @@
-{
-  "navigationBarTitleText": "发射任务详情",
-  "navigationStyle": "custom",
-  "enablePullDownRefresh": false,
-  "usingComponents": {
-    "uni-dateformat": "/uni_modules/uni-dateformat/components/uni-dateformat/uni-dateformat"
-  }
-}

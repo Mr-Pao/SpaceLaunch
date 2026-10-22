@@ -1,6 +1,5 @@
 <template>
 	<view class="index">
-
 		<view class="contant" >
 			<view class="card" v-for="(item,index) in LaunchPrevious.slice(0,listNum)" @click="goLaunchInfo(index)">
 				<view class="left">
@@ -12,41 +11,36 @@
 					</view>
 					<view class="date">
 						<uni-dateformat :date="item.net"></uni-dateformat>
-						<!-- <text class="detail">任务详情</text> -->
 					</view>
 					<view class="tag">
 						<uni-tag :mark="true" :text="'#'+item.orbital_launch_attempt_count_year" type="primary"
 							size="small" />
 					</view>
 					<view class="state">
-						<u-tag v-if="item.status.id == 3" text="成功" type="success" shape="circle"></u-tag>
+						<u-tag v-if="item.status?.id == 3" text="成功" type="success" shape="circle"></u-tag>
 					</view>
 				</view>
 			</view>
 		</view>
-		<!-- 返回顶部 -->
 		<view class="wrap">
 			<u-back-top :scroll-top="scrollTop"></u-back-top>
 		</view>
-		<!-- 加载更多 -->
 		<uni-load-more :status="status"></uni-load-more>
 	</view>
 </template>
 
 <script>
-	const db = uniCloud.database();
 	export default {
 		data() {
 			return {
-				LaunchPrevious: '',
+				LaunchPrevious: [],
 				scrollTop: 0,
 				status: 'more',
 				listNum: 6
 			}
 		}, 
 		onLoad() {
-			this.LaunchPrevious = getApp().globalData.LaunchPrevious;
-			console.log(this.LaunchPrevious);
+			this.getData();
 		},
 		onReachBottom() {
 			this.status = 'loading';
@@ -56,18 +50,39 @@
 			else this.status = 'loading';
 		},
 		methods: {
-			//跳转
+			async getData() {
+				try {
+					const result = await uniCloud.callFunction({
+						name: 'unionOp',
+						data: {
+							unionAction: 'queryLaunches',
+							page: 1,
+							size: 100
+						}
+					});
+
+					if (result.result && result.result.success) {
+						let data = result.result.data.list;
+						this.LaunchPrevious = data.filter(item => {
+							return new Date(item.net).getTime() < new Date().getTime();
+						}).sort((a, b) => new Date(b.net) - new Date(a.net));
+						getApp().globalData.LaunchPrevious = this.LaunchPrevious;
+						console.log('获取到历史发射数据:', this.LaunchPrevious);
+					} else {
+						console.error('获取历史发射数据失败:', result.result?.message || '未知错误');
+					}
+				} catch (error) {
+					console.error('调用云函数失败:', error);
+				}
+			},
 			goLaunchInfo(e) {
 				uni.navigateTo({
 					url: '/pages/previous/previousInfo?id=' + e
 				})
 			},
-			//返回顶部
 			onPageScroll(e) {
 				this.scrollTop = e.scrollTop;
 			},
-			
-
 		}
 	}
 </script>
@@ -81,15 +96,12 @@
 			width: 100%;
 			display: flex;
 			flex-direction: column;
-			// justify-content: center;
 			align-items: center;
 
 			.card {
 				width: 85%;
 				height: 280rpx;
 				display: flex;
-				// align-items: center;
-				// flex-direction: row;
 				background-color: #171719;
 				border-radius: 20rpx;
 				margin-top: 35rpx;
@@ -99,16 +111,13 @@
 					position: absolute;
 					left: 0rpx;
 					top: -5rpx;
-
 				}
 				
 				.state {
 					position: absolute;
 					right: 20rpx;
 					bottom: 20rpx;
-				
 				}
-
 
 				.left {
 					image {
@@ -129,7 +138,6 @@
 						margin-top: 20rpx;
 						overflow: hidden;
 						text-overflow: ellipsis;
-						// white-space: nowrap;
 						color: #ffffff;
 						font-size: 18px;
 						height: 80rpx;

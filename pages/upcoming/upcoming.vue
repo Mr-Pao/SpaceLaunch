@@ -1,7 +1,5 @@
 <template>
 	<view class="index">
-		<!-- <button @click="test">ceshi</button> -->
-
 		<image src="https://s1.ax1x.com/2022/12/11/zfhOLd.jpg" mode="widthFix"></image>
 
 		<view v-if="showLoading">
@@ -37,25 +35,17 @@
 					</view>
 					<view class="date">
 						<uni-dateformat :date="item.net"></uni-dateformat>
-						<!-- <text class="detail">任务详情</text> -->
 					</view>
-					<!-- 					<view class="tag">
-						<uni-tag :mark="true" :text="'#'+item.orbital_launch_attempt_count_year" type="primary"
-							size="small" />
-					</view> -->
 				</view>
 				<view class="remind" @click="launchSubscribe(index)">
 					订阅提醒
 				</view>
 			</view>
 
-			<!-- 加载更多 -->
 			<uni-load-more :status="status"></uni-load-more>
 
 		</view>
 
-
-		<!-- 返回顶部 -->
 		<view class="wrap">
 			<u-back-top :scroll-top="scrollTop"></u-back-top>
 		</view>
@@ -66,11 +56,10 @@
 <script>
 import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradient';
 
-	const db = uniCloud.database();
 	export default {
 		data() {
 			return {
-				LaunchUpcoming: '',
+				LaunchUpcoming: [],
 				showLoading: true,
 				mistime: [],
 				timeData: '',
@@ -87,7 +76,6 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 		},
 		onLoad() {
 			this.getData();
-			// this.getLive();
 		},
 		onReachBottom() {
 			this.status = 'loading';
@@ -97,110 +85,94 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 			else this.status = 'loading';
 		},
 		methods: {
-			//获取所有数据
-			getData() {
-				db.collection('SpaceLaunch').get().then(res => {
-					let data = res.result.data[0]
-					console.log(data);
-					
-					this.LaunchUpcoming = data.LaunchUpcoming
-					
-					//过滤掉已发射信息
-					for (var i = 0; i < data.LaunchUpcoming.length; i++) {
-						let x = new Date(data.LaunchUpcoming[i].net).getTime()-new Date().getTime();
-						if (x > 0) {
-							this.LaunchUpcoming = data.LaunchUpcoming.slice(i);
-							break;
+			async getData() {
+				try {
+					const result = await uniCloud.callFunction({
+						name: 'unionOp',
+						data: {
+							unionAction: 'queryLaunches',
+							page: 1,
+							size: 50
 						}
+					});
+
+					if (result.result && result.result.success) {
+						let data = result.result.data.list;
+						console.log('获取到发射数据:', data);
+						
+						this.LaunchUpcoming = data.filter(item => item._id !== 'launch_sync_state' && item._id !== 'launch_statistics');
+						this.LaunchUpcoming.sort((a, b) => new Date(a.net) - new Date(b.net));
+						
+						for (var i = 0; i < this.LaunchUpcoming.length; i++) {
+							let x = new Date(this.LaunchUpcoming[i].net).getTime() - new Date().getTime();
+							if (x > 0) {
+								this.LaunchUpcoming = this.LaunchUpcoming.slice(i);
+								break;
+							}
+						}
+						
+						this.getCountdown();
+						this.showLoading = false;	
+						
+						getApp().globalData.LaunchUpcoming = this.LaunchUpcoming;
+						console.log('过滤后的即将发射数据:', this.LaunchUpcoming);
+					} else {
+						console.error('获取数据失败:', result.result?.message || '未知错误');
+						this.showLoading = false;
 					}
-					this.getCountdown(); //倒计时
-					this.showLoading = false;	
-							
-					getApp().globalData.LaunchUpcoming = this.LaunchUpcoming;
-					getApp().globalData.LaunchPrevious = data.LaunchPrevious;
-					getApp().globalData.Agencies = data.Agencies;
-					getApp().globalData.Launcher = data.Launcher;
-					getApp().globalData.Event = data.Event;
-					console.log(this.LaunchUpcoming)
-				});
-
-
+				} catch (error) {
+					console.error('调用云函数失败:', error);
+					this.showLoading = false;
+				}
 			},
 
-			//倒计时
 			getCountdown() {
+				this.day = [];
+				this.hour = [];
+				this.minute = [];
+				this.second = [];
+				
 				this.LaunchUpcoming.forEach(item => {
-					let a = new Date(item.net).getTime() - new Date().getTime(); //时间差秒
-					let day = parseInt((a / 1000 / 60 / 60 / 24)) //日
-					let hour = parseInt((a / 1000 / 60 / 60 % 24)); //时
-					let minute = parseInt((a / 1000 / 60 % 60)); //分
-					let second = parseInt((a / 1000 % 60)); //秒
+					let a = new Date(item.net).getTime() - new Date().getTime();
+					let day = parseInt((a / 1000 / 60 / 60 / 24));
+					let hour = parseInt((a / 1000 / 60 / 60 % 24));
+					let minute = parseInt((a / 1000 / 60 % 60));
+					let second = parseInt((a / 1000 % 60));
 					this.day.push(day);
 					this.hour.push(hour);
 					this.minute.push(minute);
-					this.second.push(second)
-				})
+					this.second.push(second);
+				});
 			},
 
-			//跳转
 			goLaunchInfo(e) {
 				uni.navigateTo({
 					url: '/pages/upcoming/upcomingInfo?id=' + e
 				})
 			},
 
-			//跳转
-			goPrevious() {
-				uni.navigateTo({
-					url: '/pages/previous/previous'
-				})
-			},
-
-			//返回顶部
 			onPageScroll(e) {
 				this.scrollTop = e.scrollTop;
 			},
 
-			//添加提醒
 			launchSubscribe(e) {
 				console.log(e);
-				const SUBSCRIBE_ID = 'Vc2Mo9xgsr-e9gBD4Nfz-2GxgooDIviQ_yzt7wCc05k' // 下发的模板ID
+				const SUBSCRIBE_ID = 'Vc2Mo9xgsr-e9gBD4Nfz-2GxgooDIviQ_yzt7wCc05k';
 				uni.requestSubscribeMessage({
 					tmplIds: [SUBSCRIBE_ID],
 					success(res) {
 						if (res[SUBSCRIBE_ID] === 'accept') {
-							//获取openID
-							uni.login({
-								provider: "weixin",
-								success(res) {
-									uniCloud.callFunction({
-										name: 'addSubscribe',
-										data: {
-											code: res.code,
-											launchInfo: getApp().globalData.LaunchUpcoming[e]
-										}
-									}).then(res => {
-										uni.showToast({
-											title: '订阅成功',
-											icon: 'success'
-										})
-									})
-								},
+							uni.showToast({
+								title: '订阅功能暂未开启',
+								icon: 'none'
 							});
-						} 
+						}
 					}
 				});
-			},
-
-			//跳转直播
-			live() {
-
 			}
 		}
 	}
 </script>
-
-
 
 <style lang="scss" scoped>
 	.index {
@@ -214,7 +186,6 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 			width: 100%;
 			display: flex;
 			flex-direction: column;
-			// justify-content: center;
 			align-items: center;
 			padding-top: 0rpx;
 
@@ -223,7 +194,6 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 				top: 750rpx;
 				display: flex;
 				flex-direction: column;
-				// justify-content: center;
 				align-items: center;
 				width: 85%;
 				height: 350rpx;
@@ -234,7 +204,6 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 					padding: 40rpx;
 					color: #fff;
 					font-size: 55rpx;
-					// text-align: center;
 				}
 
 				.buttom {
@@ -243,7 +212,6 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 						font-size: 28rpx;
 					  color: #7e7e7e;
 					}
-					
 				} 
 			}
 
@@ -251,26 +219,10 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 				width: 85%;
 				height: 280rpx;
 				display: flex;
-				// align-items: center;
-				// flex-direction: row;
 				background-color: #171719;
 				border-radius: 20rpx;
 				margin-top: 35rpx;
 				position: relative;
-
-				.tag {
-					position: absolute;
-					left: 0rpx;
-					top: -5rpx;
-
-				}
-
-				.state {
-					position: absolute;
-					right: 20rpx;
-					bottom: 20rpx;
-
-				}
 
 				.left {
 					image {
@@ -291,7 +243,6 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 						margin-top: 20rpx;
 						overflow: hidden;
 						text-overflow: ellipsis;
-						// white-space: nowrap;
 						color: #ffffff;
 						font-size: 18px;
 						height: 80rpx;
@@ -331,13 +282,6 @@ import colorGradient from '../../uni_modules/uview-ui/libs/function/colorGradien
 					text-align: center;
 					padding-top: 6rpx;
 				}
-			}
-
-			.previous {
-				padding-top: 50rpx;
-				color: #7e7e7e;
-				font-size: 30rpx;
-				text-align: right;
 			}
 		}
 	}

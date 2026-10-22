@@ -1,11 +1,8 @@
 <template>
 	<view class="LaunchesInfo">
-
-
 		<image :src="Agencies.image_url" mode="widthFix"></image>
 
 		<view class="contant">
-
 			<view class="name">
 				{{Agencies.name}}
 			</view>
@@ -58,54 +55,7 @@
 					</view>
 				</view>
 			</view>
-			
-			
-<!-- 			
-			<view class="cell-group">
-				<view class="cell-title">发射机构</view>
-				<view class="cell-picture">
-					<image :src="Agencies.logo_url" mode="widthFix"></image>
-				</view>
-				<view class="cell-item">
-					<view class="cell-item-title">
-						缩写
-					</view>
-					<view class="cell-item-desc">
-						{{Agencies.abbrev}}
-					</view>
-				</view>
-				<view class="cell-item">
-					<view class="cell-item-title">
-						类型
-					</view>
-					<view class="cell-item-desc">
-						{{detail.launch_service_provider.type}}
-					</view>
-				</view>
-				<view class="cell-item">
-					<view class="cell-item-title">
-						今年发射
-					</view>
-					<view class="cell-item-desc">
-						{{detail.agency_launch_attempt_count_year}}次
-					</view>
-				</view>
-				<view class="cell-item">
-					<view class="cell-item-title">
-						总发射
-					</view>
-					<view class="cell-item-desc">
-						{{detail.agency_launch_attempt_count}}次
-					</view>
-				</view>
-				<view class="cell-picture">
-					<image :src="Agencies.image_url" mode="widthFix"></image>
-				</view>
-			</view> -->
-
-			
 		</view>
-
 	</view>
 </template>
 
@@ -114,15 +64,36 @@
 		data() {
 			return {
 				detail: '',
-				Agencies: []
+				Agencies: {}
 			};
 		},
 		onLoad(e) {
-			this.Agencies = getApp().globalData.Agencies.filter(item => item.id == e.id)[0];
-			console.log(this.Agencies);
+			this.getAgencyById(e.id);
 		},
 		methods: {
+			async getAgencyById(agencyId) {
+				try {
+					const result = await uniCloud.callFunction({
+						name: 'unionOp',
+						data: {
+							unionAction: 'queryAgencies',
+							page: 1,
+							size: 100
+						}
+					});
 
+					if (result.result && result.result.success) {
+						const agencies = result.result.data.list;
+						this.Agencies = agencies.find(item => item.id == agencyId) || {};
+						getApp().globalData.Agencies = agencies;
+						console.log('获取到机构数据:', this.Agencies);
+					} else {
+						console.error('获取机构数据失败:', result.result?.message || '未知错误');
+					}
+				} catch (error) {
+					console.error('调用云函数失败:', error);
+				}
+			}
 		}
 	}
 </script>
@@ -137,7 +108,6 @@
 			padding: 40rpx;
 			color: #3978bb;
 			font-size: 2.125rem;
-			// font-weight: 600;
 		}
 		
 		.time {
@@ -169,7 +139,7 @@
 				}
 				
 				.cell-picture {
-					padding: 10rpx ;
+					padding: 10rpx;
 				}
 				
 				.cell-date {
@@ -203,7 +173,6 @@
 						text-align: right;
 					}
 				}
-
 			}
 		}
 	}
