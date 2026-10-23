@@ -79,7 +79,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { formatDateTime } from '@/utils/format.js'
+import { formatDateTime, rocketName as rocketNameOf } from '@/utils/format.js'
 
 export default {
 	data() {
@@ -96,8 +96,7 @@ export default {
 			if (this.rocketName) return this.rocketName
 			const first = this.records[0]
 			if (!first) return '运载火箭'
-			const c = first.rocket && first.rocket.configuration
-			return (c && (c.full_name || c.name)) || '运载火箭'
+			return rocketNameOf(first.rocket && first.rocket.configuration) || '运载火箭'
 		},
 		// 只统计已有结果的任务，未发射的不该算进成功率分母
 		successCount() {

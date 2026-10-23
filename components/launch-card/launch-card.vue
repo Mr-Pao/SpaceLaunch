@@ -23,7 +23,7 @@
 		</view>
 
 		<view class="info">
-			<text class="title">{{ item.name }}</text>
+			<text class="title">{{ title }}</text>
 
 			<view class="meta">
 				<text class="time">{{ timeText }}</text>
@@ -44,7 +44,7 @@
 </template>
 
 <script>
-import { relativeTime, formatShort, statusInfo } from '@/utils/format.js'
+import { relativeTime, formatShort, statusInfo, launchTitle, rocketName } from '@/utils/format.js'
 
 export default {
 	name: 'launch-card',
@@ -61,6 +61,10 @@ export default {
 	},
 	emits: ['select'],
 	computed: {
+		// 「长征四号乙 | 未知载荷」这种组合，任务名没翻出来时回退原始英文串
+		title() {
+			return launchTitle(this.item)
+		},
 		timeText() {
 			// 历史发射看「多久前」、未来发射看「多久后」，同一个函数两种语境都对
 			return relativeTime(this.item.net)
@@ -69,8 +73,7 @@ export default {
 			return formatShort(this.item.net)
 		},
 		rocketName() {
-			const c = this.item.rocket && this.item.rocket.configuration
-			return (c && (c.name || c.full_name)) || ''
+			return rocketName(this.item.rocket && this.item.rocket.configuration)
 		},
 		providerName() {
 			return (this.item.launch_service_provider && this.item.launch_service_provider.name) || ''

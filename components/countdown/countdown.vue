@@ -99,21 +99,26 @@ export default {
 <style lang="scss" scoped>
 .cd {
 	display: flex;
-	align-items: flex-end;
+	/* 四组数字均分整行宽度（参考站就是这么排的），
+	   不铺满的话右边会空出一大块，看着像没居中 */
+	align-items: flex-start;
 }
 
 .cd-t {
+	flex-shrink: 0;
 	color: #38bdf8;
 	font-weight: 600;
-	margin-right: 12rpx;
+	margin-right: 4rpx;
 }
 
 .cd-group {
+	flex: 1;
 	display: flex;
-	align-items: flex-end;
+	align-items: flex-start;
 }
 
 .cd-cell {
+	flex: 1;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -132,16 +137,9 @@ export default {
 
 /* 大号：首页卡片 */
 .cd-lg .cd-t {
+	margin-top: 12rpx;
 	font-size: 40rpx;
 	line-height: 1.1;
-}
-
-.cd-lg .cd-cell {
-	margin-right: 26rpx;
-}
-
-.cd-lg .cd-cell:last-child {
-	margin-right: 0;
 }
 
 .cd-lg .cd-num {
@@ -156,15 +154,8 @@ export default {
 
 /* 小号：详情页 */
 .cd-sm .cd-t {
+	margin-top: 6rpx;
 	font-size: 28rpx;
-}
-
-.cd-sm .cd-cell {
-	margin-right: 18rpx;
-}
-
-.cd-sm .cd-cell:last-child {
-	margin-right: 0;
 }
 
 .cd-sm .cd-num {

@@ -27,7 +27,7 @@
 
 			<view class="body">
 				<view class="head">
-					<text class="name">{{ detail.name }}</text>
+					<text class="name">{{ displayName }}</text>
 					<view class="badge" :class="statusClass">
 						{{ (detail.status && (detail.status.nameZh || detail.status.name)) || '未知' }}
 					</view>
@@ -53,9 +53,9 @@
 						<text class="label">任务名</text>
 						<text class="value">{{ missionName }}</text>
 					</view>
-					<view class="row" v-if="detail.mission.type">
+					<view class="row" v-if="missionType">
 						<text class="label">类型</text>
-						<text class="value">{{ detail.mission.type }}</text>
+						<text class="value">{{ missionType }}</text>
 					</view>
 					<view class="row" v-if="orbitText">
 						<text class="label">目标轨道</text>
@@ -86,7 +86,7 @@
 						<text class="label">型号</text>
 						<text class="value">{{ rocketName }}</text>
 					</view>
-					<view class="row" v-if="detail.rocket.configuration.name">
+					<view class="row" v-if="showConfig">
 						<text class="label">配置</text>
 						<text class="value">{{ detail.rocket.configuration.name }}</text>
 					</view>
@@ -191,7 +191,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { formatDateTime, relativeTime } from '@/utils/format.js'
+import { formatDateTime, relativeTime, launchTitle, rocketName as rocketNameOf, zhValue } from '@/utils/format.js'
 import * as fav from '@/utils/favorites.js'
 
 export default {
@@ -211,8 +211,18 @@ export default {
 			if (!abs) return '时间待定'
 			return abs + '（' + relativeTime(this.detail.net) + '）'
 		},
+		// 「长征四号乙 | 未知载荷」：型号和任务名都走中文，翻不出来才回退原串
+		displayName() {
+			return launchTitle(this.detail)
+		},
 		missionName() {
-			return (this.detail && this.detail.mission && this.detail.mission.name) || ''
+			const m = this.detail && this.detail.mission
+			if (!m) return ''
+			return m.nameZh || m.name || ''
+		},
+		missionType() {
+			const m = this.detail && this.detail.mission
+			return m ? zhValue(m.type) : ''
 		},
 		missionDesc() {
 			const m = this.detail && this.detail.mission
@@ -221,26 +231,38 @@ export default {
 		},
 		hasMission() {
 			const m = this.detail && this.detail.mission
-			return Boolean(m && (m.name || m.descriptionZh || m.description || m.type || (m.orbit && m.orbit.name)))
+			return Boolean(
+				m &&
+					(m.name || m.nameZh || m.descriptionZh || m.description || m.type || (m.orbit && m.orbit.name))
+			)
 		},
 		// 轨道：优先缩写（LEO / GTO 这种业内通用写法），没有就用全称
 		orbitText() {
 			const o = this.detail && this.detail.mission && this.detail.mission.orbit
 			if (!o) return ''
-			return o.abbrev || o.name || ''
+			return zhValue(o.abbrev) || zhValue(o.name) || ''
 		},
 		rocketName() {
-			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
-			return c ? c.full_name || c.name || '' : ''
+			return rocketNameOf(this.detail && this.detail.rocket && this.detail.rocket.configuration)
 		},
-		// 火箭所属系列 + 型号代号，比如「Falcon · Block 5」
+		// full_name 和 name 往往一模一样（"Long March 4B"），这时不重复摆一行
+		showConfig() {
+			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
+			if (!c || !c.name) return false
+			return c.name !== (c.full_name || c.name)
+		},
+		// 火箭所属系列 + 型号代号，比如「长征四号 · B」
+		// families 从大到小返回（Long March、Long March 4），只取最后一个更具体
 		rocketFamily() {
 			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
 			if (!c) return ''
-			const families = (c.families || []).join('、')
+
+			const fams = c.families || []
+			const last = fams.length ? fams[fams.length - 1] : ''
 			const variant = c.variant || ''
-			if (families && variant) return families + ' · ' + variant
-			return families || variant
+
+			if (last && variant) return last + ' · ' + variant
+			return last || variant
 		},
 		windowStart() {
 			const d = this.detail
@@ -313,7 +335,7 @@ export default {
 		},
 		// 分享出去时用任务名当标题，比「太空发射任务」有信息量得多
 		shareText() {
-			return (this.detail && this.detail.name) || '太空发射任务'
+			return this.displayName || '太空发射任务'
 		},
 		shareImg() {
 			return (this.detail && this.detail.image) || '/static/logo.png'

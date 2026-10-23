@@ -32,7 +32,8 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v4: launch 增加 mission.name / mission.orbit / probability / weather_concerns /
 //     failreason / infographic
 // v5: 增加发射窗口 window_start/end、四类累计发射次数、火箭系列与型号代号
-const DATA_VERSION = 5
+// v6: 增加 mission.nameZh（任务名中文），标题不再整行英文
+const DATA_VERSION = 6
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {

@@ -43,7 +43,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { relativeTime, formatShort } from '@/utils/format.js'
+import { relativeTime, formatShort, rocketName } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 
 const OK = ['Success', 'Deployed']
@@ -90,7 +90,7 @@ export default {
 					if (!row) {
 						row = {
 							id: c.id,
-							name: c.full_name || c.name || '未命名型号',
+							name: rocketName(c) || '未命名型号',
 							count: 0,
 							ok: 0,
 							bad: 0,

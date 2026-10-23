@@ -12,7 +12,7 @@
 		</view>
 
 		<view class="nl-body">
-			<text class="nl-title">{{ item.name }}</text>
+			<text class="nl-title">{{ title }}</text>
 
 			<view class="nl-meta" v-if="provider || padName">
 				<text class="nl-meta-text">{{ metaText }}</text>
@@ -31,7 +31,7 @@
 </template>
 
 <script>
-import { formatDateTime, statusInfo } from '@/utils/format.js'
+import { formatDateTime, statusInfo, launchTitle } from '@/utils/format.js'
 
 export default {
 	name: 'next-launch',
@@ -41,6 +41,9 @@ export default {
 	},
 
 	computed: {
+		title() {
+			return launchTitle(this.item)
+		},
 		status() {
 			return statusInfo(this.item.status)
 		},
@@ -166,6 +169,9 @@ export default {
 }
 
 .nl-meta-text {
+	/* text 默认是行内元素，不给 block 的话 text-overflow 不生效，会硬截断 */
+	display: block;
+	width: 100%;
 	color: #6b7891;
 	font-size: 24rpx;
 	white-space: nowrap;

@@ -129,6 +129,8 @@ function slimLaunch(l) {
 			// 载荷名，比如 "Starlink Group 15-16"。之前整个 mission 只留了描述和类型，
 			// 导致详情页根本看不到这次任务运的是什么
 			name: str(l.mission && l.mission.name),
+			// 任务名的中文，和描述一样由 localize 回填；翻不出来前端回退 name
+			nameZh: '',
 			description: str(l.mission && l.mission.description),
 			// 中文描述由 lib/localize.js 在同步阶段回填，翻不出来就留空，
 			// 前端用 descriptionZh || description 回退英文

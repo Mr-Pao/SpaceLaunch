@@ -44,6 +44,14 @@ async function fill(list, read, write) {
  *  顺带翻 weather_concerns / failreason：这两个量极小（只有临近发射和失败任务才有），
  *  走的是同一份永久缓存，不会额外占多少额度，但不翻就是纯英文长句摆在详情页上 */
 async function localizeLaunches(list) {
+	// 任务名优先翻：标题是「型号 | 任务名」，任务名是英文的话整行都是英文
+	await fill(
+		list,
+		(x) => x.mission && x.mission.name,
+		(x, zh) => {
+			if (x.mission) x.mission.nameZh = zh
+		}
+	)
 	await fill(
 		list,
 		(x) => x.mission && x.mission.description,
