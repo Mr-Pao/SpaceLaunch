@@ -13,7 +13,7 @@
 		<block v-else>
 			<view class="head">
 				<text class="year">{{ year }}</text>
-				<text class="year-label">年度发射统计</text>
+				<text class="year-label">年度航天回顾</text>
 			</view>
 
 			<!-- 主数字 -->
@@ -26,6 +26,10 @@
 					<text class="bad" v-if="failCount">失败 {{ failCount }}</text>
 					<text class="sep" v-if="failCount">·</text>
 					<text class="rate">成功率 {{ successRate }}</text>
+				</view>
+				<view class="hero-split">
+					<text class="split-text">轨道发射 {{ orbitalCount }}</text>
+					<text class="split-text" v-if="subCount"> · 亚轨道 {{ subCount }}</text>
 				</view>
 			</view>
 
@@ -40,6 +44,48 @@
 						</view>
 						<text class="bar-label">{{ m.label }}</text>
 					</view>
+				</view>
+			</view>
+
+			<!-- 火箭型号 TOP 10 -->
+			<view class="card" v-if="topRockets.length">
+				<view class="card-title">火箭型号 TOP 10</view>
+				<view class="rank" v-for="(r, i) in topRockets" :key="r.name">
+					<view class="rank-line">
+						<text class="rank-idx" :class="{ top: i === 0 }">{{ i + 1 }}</text>
+						<text class="rank-name">{{ r.name }}</text>
+						<text class="rank-count">{{ r.count }}</text>
+					</view>
+					<view class="rank-track">
+						<view class="rank-fill" :style="{ width: r.pct + '%' }"></view>
+					</view>
+				</view>
+			</view>
+
+			<!-- 发射场 TOP 10 -->
+			<view class="card" v-if="topSites.length">
+				<view class="card-title">发射场 TOP 10</view>
+				<view class="rank" v-for="(s, i) in topSites" :key="s.name">
+					<view class="rank-line">
+						<text class="rank-idx" :class="{ top: i === 0 }">{{ i + 1 }}</text>
+						<text class="rank-name">{{ s.name }}</text>
+						<text class="rank-count">{{ s.count }}</text>
+					</view>
+					<view class="rank-track">
+						<view class="rank-fill fill-amber" :style="{ width: s.pct + '%' }"></view>
+					</view>
+				</view>
+			</view>
+
+			<!-- 国家分布 -->
+			<view class="card" v-if="topCountries.length">
+				<view class="card-title">国家 / 地区</view>
+				<view class="country" v-for="c in topCountries" :key="c.name">
+					<text class="country-name">{{ c.name }}</text>
+					<view class="country-track">
+						<view class="country-fill" :style="{ width: c.pct + '%' }"></view>
+					</view>
+					<text class="country-count">{{ c.count }}</text>
 				</view>
 			</view>
 
@@ -70,8 +116,21 @@
 				</view>
 			</view>
 
+			<!-- 失败复盘 -->
+			<view class="card" v-if="failures.length">
+				<view class="card-title">失败 / 部分成功复盘</view>
+				<view class="fail" v-for="f in failures" :key="f.id" @click="goDetail(f)">
+					<view class="fail-top">
+						<text class="fail-date">{{ f.dateText }}</text>
+						<text class="fail-tag" :class="{ partial: f.isPartial }">{{ f.statusText }}</text>
+					</view>
+					<text class="fail-name">{{ f.title }}</text>
+					<text class="fail-meta">{{ f.meta }}</text>
+				</view>
+			</view>
+
 			<view class="footer-hint">
-				<text>统计范围：最近 {{ servedCount }} 次已发射任务 · 更新于 {{ freshText }}</text>
+				<text>统计范围：{{ year }} 年已发射任务 · 更新于 {{ freshText }}</text>
 			</view>
 		</block>
 	</view>
@@ -80,12 +139,35 @@
 <script>
 import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
+import { formatShort } from '@/utils/format.js'
 
 const MONTH_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
 // LL2 的状态码里，Deployed 表示载荷已成功部署，算成功
 const OK = ['Success', 'Deployed']
-const BAD = ['Failure', 'Partial']
+const BAD = ['Failure']
+const PARTIAL = ['Partial']
+
+/**
+ * 机构 → 国家/地区
+ *
+ * LL2 的 launch 没有国家字段，只能从发射服务商推断。
+ * 用「包含匹配」而不是精确匹配：LL2 的机构全名偶尔会变（加后缀、改大小写）。
+ */
+const COUNTRY_RULES = [
+	// 俄罗斯必须排在「美国」前面：「Russian Space Forces」里也含 space force
+	[/russian|roscosmos|kosmotras|khrunichev/i, '俄罗斯'],
+	[/china|cas space|galactic energy|landspace|expace|orienspace|space pioneer|kuaizhou/i, '中国'],
+	[/spacex|rocket lab|united launch|blue origin|firefly|virgin|astra|relativity|nasa|us space force/i, '美国'],
+	[/indian space|isro/i, '印度'],
+	[/japan|mitsubishi|jaxa|interstellar/i, '日本'],
+	[/korea|kari|defense development/i, '韩国'],
+	[/arianespace|european space|avio/i, '欧洲'],
+	[/isar/i, '德国'],
+	[/israel|iai/i, '以色列'],
+	[/iran/i, '伊朗'],
+	[/new zealand/i, '新西兰']
+]
 
 export default {
 	data() {
@@ -113,12 +195,21 @@ export default {
 			return this.yearList.filter((x) => OK.indexOf(x.status) !== -1).length
 		},
 		failCount() {
-			return this.yearList.filter((x) => BAD.indexOf(x.status) !== -1).length
+			return this.yearList.filter(
+				(x) => BAD.indexOf(x.status) !== -1 || PARTIAL.indexOf(x.status) !== -1
+			).length
 		},
 		successRate() {
 			const decided = this.successCount + this.failCount
 			if (!decided) return '—'
 			return ((this.successCount / decided) * 100).toFixed(1).replace(/\.0$/, '') + '%'
+		},
+		// 亚轨道在 LL2 里 orbit 标记为 Sub
+		subCount() {
+			return this.yearList.filter((x) => x.orbit === 'Sub').length
+		},
+		orbitalCount() {
+			return this.total - this.subCount
 		},
 		months() {
 			const buckets = new Array(12).fill(0)
@@ -131,8 +222,29 @@ export default {
 				month: i + 1,
 				label: MONTH_LABELS[i],
 				count,
-				// 最低留 4%，否则 0 次和 1 次在视觉上分不开
+				// 最低留 8%，否则 1 次和 0 次在视觉上分不开
 				pct: count ? Math.max(8, Math.round((count / max) * 100)) : 0
+			}))
+		},
+		topRockets() {
+			return rankBy(this.yearList, (x) => x.rocket, 10)
+		},
+		topSites() {
+			return rankBy(this.yearList, (x) => x.site, 10)
+		},
+		topCountries() {
+			// 先按机构聚合成国家，再排序
+			const map = new Map()
+			for (const x of this.yearList) {
+				const c = countryOf(x.agency)
+				map.set(c, (map.get(c) || 0) + 1)
+			}
+			const rows = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+			const max = rows.length ? rows[0][1] : 1
+			return rows.map(([name, count]) => ({
+				name,
+				count,
+				pct: Math.max(6, Math.round((count / max) * 100))
 			}))
 		},
 		topAgencies() {
@@ -140,6 +252,20 @@ export default {
 		},
 		topOrbits() {
 			return rankBy(this.yearList, (x) => x.orbit, 6)
+		},
+		failures() {
+			return this.yearList
+				.filter((x) => BAD.indexOf(x.status) !== -1 || PARTIAL.indexOf(x.status) !== -1)
+				.map((x) => ({
+					id: x.id,
+					dateText: formatShort(x.net),
+					statusText: x.status === 'Partial' ? '部分成功' : '发射失败',
+					isPartial: x.status === 'Partial',
+					title: x.name || '未知任务',
+					meta: [x.rocket, x.site].filter(Boolean).join(' · ')
+				}))
+				// 最近的排在前面
+				.sort((a, b) => (a.dateText < b.dateText ? 1 : -1))
 		}
 	},
 
@@ -168,6 +294,11 @@ export default {
 			} finally {
 				this.loading = false
 			}
+		},
+
+		goDetail(f) {
+			if (!f.id) return
+			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + f.id })
 		}
 	}
 }
@@ -187,6 +318,15 @@ function rankBy(list, pick, limit) {
 
 	const max = rows.length ? rows[0].count : 1
 	return rows.map((r) => ({ ...r, pct: Math.max(6, Math.round((r.count / max) * 100)) }))
+}
+
+/** 机构名 → 国家；匹配不上就归「其他」 */
+function countryOf(agency) {
+	if (!agency) return '未知'
+	for (const [re, name] of COUNTRY_RULES) {
+		if (re.test(agency)) return name
+	}
+	return '其他'
 }
 </script>
 
@@ -269,6 +409,15 @@ function rankBy(list, pick, limit) {
 	font-size: 22rpx;
 }
 
+.hero-split {
+	margin-top: 12rpx;
+}
+
+.split-text {
+	color: #4a5568;
+	font-size: 23rpx;
+}
+
 .card {
 	margin: 24rpx;
 	padding: 30rpx 28rpx;
@@ -325,7 +474,7 @@ function rankBy(list, pick, limit) {
 	font-size: 20rpx;
 }
 
-/* 机构排行 */
+/* 排行 */
 .rank {
 	margin-bottom: 24rpx;
 }
@@ -389,6 +538,51 @@ function rankBy(list, pick, limit) {
 	border-radius: 4rpx;
 }
 
+.fill-amber {
+	background: linear-gradient(to right, #7a5c14, #f5c33b);
+}
+
+/* 国家 */
+.country {
+	display: flex;
+	align-items: center;
+	margin-bottom: 20rpx;
+}
+
+.country:last-child {
+	margin-bottom: 0;
+}
+
+.country-name {
+	flex-shrink: 0;
+	width: 120rpx;
+	color: #cbd5e0;
+	font-size: 24rpx;
+}
+
+.country-track {
+	flex: 1;
+	height: 10rpx;
+	margin: 0 16rpx;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 5rpx;
+	overflow: hidden;
+}
+
+.country-fill {
+	height: 100%;
+	background: linear-gradient(to right, #4a2b5e, #a06bd8);
+	border-radius: 5rpx;
+}
+
+.country-count {
+	flex-shrink: 0;
+	width: 60rpx;
+	text-align: right;
+	color: #8a97a8;
+	font-size: 24rpx;
+}
+
 /* 轨道 */
 .orbit {
 	display: flex;
@@ -428,6 +622,60 @@ function rankBy(list, pick, limit) {
 	text-align: right;
 	color: #8a97a8;
 	font-size: 24rpx;
+}
+
+/* 失败复盘 */
+.fail {
+	padding: 20rpx 0;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.05);
+}
+
+.fail:first-of-type {
+	border-top: none;
+	padding-top: 0;
+}
+
+.fail-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.fail-date {
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.fail-tag {
+	padding: 2rpx 12rpx;
+	border-radius: 6rpx;
+	background: rgba(255, 59, 48, 0.14);
+	color: #ff3b30;
+	font-size: 20rpx;
+}
+
+.fail-tag.partial {
+	background: rgba(245, 195, 59, 0.14);
+	color: #f5c33b;
+}
+
+.fail-name {
+	display: block;
+	margin-top: 8rpx;
+	color: #e2e8f0;
+	font-size: 27rpx;
+	line-height: 1.5;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+.fail-meta {
+	display: block;
+	margin-top: 6rpx;
+	color: #4a5568;
+	font-size: 22rpx;
 }
 
 .footer-hint {

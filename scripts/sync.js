@@ -33,7 +33,8 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 //     failreason / infographic
 // v5: 增加发射窗口 window_start/end、四类累计发射次数、火箭系列与型号代号
 // v6: 增加 mission.nameZh（任务名中文），标题不再整行英文
-const DATA_VERSION = 6
+// v7: stats 增加 id / name / site（发射场），支撑年度回顾
+const DATA_VERSION = 7
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {

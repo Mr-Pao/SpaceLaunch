@@ -221,12 +221,16 @@ function slimAgency(a) {
 }
 
 /**
- * 统计用的极简裁剪：一条发射只留聚合需要的 5 个字段。
- * 统计页要按年份 / 机构 / 轨道 / 月份随便切维度，与其在 CI 里把结果算死，
- * 不如把「原料」压到最小传给前端，前端想加什么维度都不用改同步脚本。
+ * 统计用的极简裁剪：一条发射只留聚合需要的字段。
+ * 统计页要按年份 / 机构 / 火箭 / 发射场 / 轨道 随便切维度，
+ * 与其在 CI 里把结果算死，不如把「原料」压到最小传给前端，
+ * 前端想加什么维度都不用改同步脚本。
  */
 function slimStatLaunch(l) {
 	return {
+		// id 和 name 是给「失败复盘」列表用的，要能点进详情
+		id: l.id ?? null,
+		name: str(l.name),
 		net: str(l.net),
 		// 只存 abbrev，前端按 Success / Failure / Partial 归类
 		status: str(l.status && l.status.abbrev) || str(l.status && l.status.name),
@@ -234,7 +238,10 @@ function slimStatLaunch(l) {
 		rocket: str(l.rocket && l.rocket.configuration && l.rocket.configuration.name),
 		orbit:
 			str(l.mission && l.mission.orbit && l.mission.orbit.abbrev) ||
-			str(l.mission && l.mission.orbit && l.mission.orbit.name)
+			str(l.mission && l.mission.orbit && l.mission.orbit.name),
+		// pad.name 是工位（SLC-4E），location 才是发射场（范登堡太空军基地），
+		// 「发射场 TOP 10」要用后者
+		site: str(l.pad && l.pad.location && l.pad.location.name)
 	}
 }
 
