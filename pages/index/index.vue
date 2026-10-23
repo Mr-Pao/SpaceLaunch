@@ -79,9 +79,11 @@
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
+import { isStillUpcoming } from '@/utils/format.js'
 
 export default {
-	mixins: [createListMixin({ dataset: 'upcoming', pageSize: 12, favorite: true })],
+	// filter 用来剔掉 LL2 还挂在 upcoming 里的「已发射成功」任务
+	mixins: [createListMixin({ dataset: 'upcoming', pageSize: 12, favorite: true, filter: isStillUpcoming })],
 
 	data() {
 		return {

@@ -43,8 +43,9 @@ function favoriteIds(list) {
  * @param {string} dataset     数据集名，对应 utils/data.js 里的 FILES
  * @param {number} pageSize    每页条数
  * @param {boolean} favorite   是否把收藏的条目置顶（只有发射列表需要）
+ * @param {Function} filter    条目过滤，(item) => boolean，用来剔掉不该显示的条目
  */
-export function createListMixin({ dataset, pageSize = 12, favorite = false }) {
+export function createListMixin({ dataset, pageSize = 12, favorite = false, filter = null }) {
 	return {
 		data() {
 			return {
@@ -91,7 +92,10 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false }) {
 
 			applyData(d) {
 				if (!d) return
-				const raw = d.list || []
+
+				let raw = d.list || []
+				if (filter) raw = raw.filter(filter)
+
 				this.list = favorite ? favoriteFirst(raw) : raw
 				this.favIds = favorite ? favoriteIds(this.list) : []
 				this.total = d.count || this.list.length

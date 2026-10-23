@@ -153,3 +153,24 @@ export function zhValue(value) {
 	if (/^(unknown|n\/a|none|tbd|tbc)$/i.test(s)) return '未知'
 	return s
 }
+
+const FINAL_STATUS = ['Success', 'Failure', 'Deployed', 'Partial']
+
+/**
+ * 是否还该出现在「即将发射」列表里。
+ *
+ * LL2 的 /launches/upcoming/ 会把刚发射完的任务再挂一段时间（状态已经是 Success），
+ * 不过滤的话首页顶部会冒出「8 小时前 · 成功」的历史任务，看着像串台了。
+ *
+ * 但时间过了、状态还是 Go / TBD 的必须保留 —— 那多半是推迟了、LL2 还没更新 net。
+ */
+export function isStillUpcoming(item) {
+	if (!item) return false
+
+	const d = toDate(item.net)
+	if (!d) return true
+	if (d.getTime() > Date.now()) return true
+
+	const a = (item.status && item.status.abbrev) || ''
+	return FINAL_STATUS.indexOf(a) === -1
+}
