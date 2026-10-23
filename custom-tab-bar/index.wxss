@@ -1,7 +1,8 @@
 /* 外层透明，只让胶囊有底色，露出一圈页面背景形成浮动感 */
 .ctb-wrap {
 	padding: 8rpx 24rpx;
-	padding-top: 18rpx;
+	/* 中间鼓包要凸出胶囊，顶部得留够空间，否则会被容器裁掉 */
+	padding-top: 30rpx;
 	padding-bottom: calc(12rpx + env(safe-area-inset-bottom));
 	background: transparent;
 }
@@ -10,10 +11,15 @@
 	display: flex;
 	align-items: center;
 	height: 112rpx;
-	background: rgba(20, 26, 38, 0.94);
-	border: 1rpx solid rgba(255, 255, 255, 0.07);
+	/* 必须用不透明色：中间的圆要和它完全同色才能融成一体，
+	   半透明的话两层叠加会变深，接缝一眼就看出来 */
+	background: #141a26;
 	border-radius: 56rpx;
-	box-shadow: 0 10rpx 34rpx rgba(0, 0, 0, 0.45);
+	/* 描边用 inset 画在内侧，不会横穿中间的鼓包 */
+	box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.06);
+	/* drop-shadow 跟随「胶囊 + 鼓包」的整体轮廓投影；
+	   box-shadow 只认矩形，中间那块凸起不会有影子 */
+	filter: drop-shadow(0 10rpx 26rpx rgba(0, 0, 0, 0.55));
 }
 
 .ctb-tab {
@@ -43,22 +49,23 @@
 	font-weight: 600;
 }
 
-/* ---------- 中间「即将发射」凸起的圆按钮 ---------- */
-
-/* 圆形背景绝对定位，不参与 flex 排布，5 等分的宽度不会被它挤乱。
-   用实心深色 + 阴影做出「从胶囊里长出来」的立体感 ——
-   之前用半透明底 + 描边，看起来只是个圈套在图标上，和胶囊是两张皮 */
+/* ---------- 中间「即将发射」的鼓包 ----------
+ *
+ * 做法：一个与胶囊完全同色的圆，绝对定位在中间、向上偏移。
+ * 圆在胶囊内部的部分和底色一致 → 完全隐形；
+ * 只有凸出胶囊顶边的那一小段弧线露出来 → 看起来就是胶囊中间鼓了一块。
+ *
+ * 关键前提是胶囊不透明 + 圆与它同色，否则接缝会露出来。
+ */
 .ctb-mid-bg {
 	position: absolute;
 	left: 50%;
-	top: -18rpx;
-	width: 96rpx;
-	height: 96rpx;
-	margin-left: -48rpx;
+	top: -26rpx;
+	width: 130rpx;
+	height: 130rpx;
+	margin-left: -65rpx;
 	border-radius: 50%;
-	background: #1a2333;
-	border: 1rpx solid rgba(255, 255, 255, 0.09);
-	box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.55);
+	background: #141a26;
 	z-index: 0;
 }
 
@@ -67,18 +74,15 @@
 	z-index: 1;
 	width: 52rpx;
 	height: 52rpx;
-	/* 图标跟着圆形往上顶，标签位置不动 */
-	margin-top: -12rpx;
 }
 
 .ctb-mid .ctb-label {
 	position: relative;
 	z-index: 1;
-	margin-top: 10rpx;
 }
 
-.ctb-mid.ctb-on .ctb-mid-bg {
-	background: #1e2c42;
-	border-color: rgba(56, 189, 248, 0.5);
-	box-shadow: 0 6rpx 24rpx rgba(56, 189, 248, 0.32);
+/* 鼓包本身不能变色（否则就是另一块色块，接缝立刻显形），
+   选中态改用图标发光来表达 */
+.ctb-mid.ctb-on .ctb-icon {
+	filter: drop-shadow(0 0 10rpx rgba(56, 189, 248, 0.75));
 }
