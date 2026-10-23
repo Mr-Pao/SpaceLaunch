@@ -4,10 +4,13 @@
 			wx:for="{{list}}"
 			wx:for-index="idx"
 			wx:key="pagePath"
-			class="ctb-tab {{selected === idx ? 'ctb-on' : ''}}"
+			class="ctb-tab {{selected === idx ? 'ctb-on' : ''}} {{idx === 2 ? 'ctb-mid' : ''}}"
 			data-index="{{idx}}"
 			bindtap="go"
 		>
+			<!-- 中间「即将发射」凸起一个圆形按钮 -->
+			<view class="ctb-mid-bg" wx:if="{{idx === 2}}"></view>
+
 			<image
 				class="ctb-icon"
 				src="{{selected === idx ? item.iconActive : item.icon}}"
