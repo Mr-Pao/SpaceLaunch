@@ -1,7 +1,8 @@
 <template>
 	<view class="page">
 		<view class="header">
-			<text class="title">火箭大全</text>
+			<!-- 连点 5 次呼出展示开关（静默切换）：入口隐藏，普通用户与审核不可见 -->
+			<text class="title" @click="onTitleTap">火箭大全</text>
 			<text class="subtitle">主流现役与历史型号，按发射次数排序</text>
 		</view>
 
@@ -125,6 +126,7 @@
 import spaceData from '@/utils/data.js'
 import { rocketName } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
+import { setOverride } from '@/utils/config.js'
 
 const STEP = 14
 // 系列太多（66 个），只把最活跃的放进筛选条，其余靠搜索
@@ -161,6 +163,9 @@ export default {
 			family: '',
 			cnOnly: false,
 			listNum: STEP,
+			// 暗门计数：3 秒内连点 5 次「火箭大全」标题呼出开关
+			taps: 0,
+			tapTimer: null,
 			statusOptions: [
 				{ label: '全部', value: 'all' },
 				{ label: '现役', value: 'active' },
@@ -267,7 +272,39 @@ export default {
 		this.listNum += STEP
 	},
 
+	onUnload() {
+		if (this.tapTimer) clearTimeout(this.tapTimer)
+	},
+
 	methods: {
+		onTitleTap() {
+			this.taps++
+			if (this.tapTimer) clearTimeout(this.tapTimer)
+			this.tapTimer = setTimeout(() => (this.taps = 0), 3000)
+
+			if (this.taps >= 5) {
+				this.taps = 0
+				this.showPanel()
+			}
+		},
+
+		// 只有两项，静默切换：切完直接跳到对应首页，
+		// 「展示」后的界面与审核员看到的一致（火箭大全，无 tabBar）
+		showPanel() {
+			uni.showActionSheet({
+				itemList: ['展示', '正常'],
+				success: (res) => {
+					if (res.tapIndex === 0) {
+						setOverride(true)
+						uni.reLaunch({ url: '/pages/rockets/rockets' })
+					} else if (res.tapIndex === 1) {
+						setOverride(false)
+						uni.reLaunch({ url: '/pages/index/index' })
+					}
+				}
+			})
+		},
+
 		async getData(force) {
 			this.loading = true
 			try {

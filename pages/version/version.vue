@@ -1,8 +1,7 @@
 <template>
 	<view class="page">
 		<view class="head">
-			<!-- 连点 5 次呼出开发者面板（需口令）：入口隐藏，普通用户与审核不可见 -->
-			<text class="title" @click="onTitleTap">版本记录</text>
+			<text class="title">版本记录</text>
 			<text class="sub">当前版本 {{ current }}</text>
 		</view>
 
@@ -37,17 +36,8 @@
 
 <script>
 import { CHANGELOG } from '@/utils/changelog.js'
-import { setOverride } from '@/utils/config.js'
 
 export default {
-	data() {
-		return {
-			// 暗门计数：3 秒内连点 5 次「版本记录」标题才呼出开关
-			taps: 0,
-			tapTimer: null
-		}
-	},
-
 	computed: {
 		// 数组尾部是最新版，页面要从上往下显示「新 → 旧」
 		versions() {
@@ -56,40 +46,6 @@ export default {
 		current() {
 			const last = CHANGELOG[CHANGELOG.length - 1]
 			return last ? last.version : '—'
-		}
-	},
-
-	onUnload() {
-		if (this.tapTimer) clearTimeout(this.tapTimer)
-	},
-
-	methods: {
-		onTitleTap() {
-			this.taps++
-			if (this.tapTimer) clearTimeout(this.tapTimer)
-			this.tapTimer = setTimeout(() => (this.taps = 0), 3000)
-
-			if (this.taps >= 5) {
-				this.taps = 0
-				this.showPanel()
-			}
-		},
-
-		// 只有两项，静默切换：切完直接跳到对应首页，
-		// 「展示」后的界面与审核员看到的一致（火箭大全，无 tabBar）
-		showPanel() {
-			uni.showActionSheet({
-				itemList: ['展示', '正常'],
-				success: (res) => {
-					if (res.tapIndex === 0) {
-						setOverride(true)
-						uni.reLaunch({ url: '/pages/rockets/rockets' })
-					} else if (res.tapIndex === 1) {
-						setOverride(false)
-						uni.reLaunch({ url: '/pages/index/index' })
-					}
-				}
-			})
 		}
 	}
 }
