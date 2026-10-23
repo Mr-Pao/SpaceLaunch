@@ -43,6 +43,11 @@
 		</view>
 
 		<view class="content" v-else>
+			<!-- 最近一次发射 + 倒计时。放在列表上方当视觉焦点 -->
+			<view class="next-wrap" v-if="nextLaunch && visible.length">
+				<next-launch :item="nextLaunch" @select="goDetail" />
+			</view>
+
 			<view class="stat" v-if="list.length">
 				<text class="stat-main">共 {{ total }} 次发射</text>
 				<text class="stat-sub">{{ freshText }}</text>
@@ -83,6 +88,28 @@ export default {
 			rocketY: 0,
 			animationInterval: null,
 			stars: []
+		}
+	},
+
+	computed: {
+		/**
+		 * 最近一次（时间上最靠前且还没到）的发射。
+		 * 不能直接用 list[0]：收藏置顶会把顺序打乱，
+		 * 而且已经过点的任务也可能还留在快照里。
+		 */
+		nextLaunch() {
+			const now = Date.now()
+			let best = null
+			let bestAt = Infinity
+
+			for (const x of this.list) {
+				if (!x.net) continue
+				const at = new Date(x.net).getTime()
+				if (isNaN(at) || at <= now || at >= bestAt) continue
+				best = x
+				bestAt = at
+			}
+			return best
 		}
 	},
 
@@ -295,5 +322,9 @@ export default {
 	position: relative;
 	z-index: 1;
 	padding: 0 24rpx;
+}
+
+.next-wrap {
+	margin-bottom: 14rpx;
 }
 </style>

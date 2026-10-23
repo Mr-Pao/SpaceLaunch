@@ -33,6 +33,11 @@
 					</view>
 				</view>
 
+				<!-- 倒计时：发射前最有用的一行 -->
+				<view class="cd-row">
+					<countdown :net="detail.net" size="lg" />
+				</view>
+
 				<view class="meta-line">
 					<text class="time">{{ netText }}</text>
 					<view class="fav" :class="{ on: isFav }" @click="toggleFav">
@@ -85,6 +90,10 @@
 						<text class="label">配置</text>
 						<text class="value">{{ detail.rocket.configuration.name }}</text>
 					</view>
+					<view class="row" v-if="rocketFamily">
+						<text class="label">系列</text>
+						<text class="value">{{ rocketFamily }}</text>
+					</view>
 				</view>
 
 				<!-- 发射条件：概率和天气顾虑都是 LL2 的可选字段，没有就整块不显示 -->
@@ -124,6 +133,23 @@
 					</view>
 				</view>
 
+				<!-- 发射窗口：只给 net 一个点会让用户以为窗口就是那一秒 -->
+				<view class="card" v-if="windowEnd">
+					<view class="card-title">发射窗口</view>
+					<view class="row">
+						<text class="label">开始</text>
+						<text class="value">{{ windowStart }}</text>
+					</view>
+					<view class="row">
+						<text class="label">结束</text>
+						<text class="value">{{ windowEnd }}</text>
+					</view>
+					<view class="row" v-if="windowSpan">
+						<text class="label">窗口长度</text>
+						<text class="value">{{ windowSpan }}</text>
+					</view>
+				</view>
+
 				<!-- 发射机构：可点进机构详情 -->
 				<view class="card card-link" v-if="agency" @click="goAgency(agency.id)">
 					<view class="card-title">
@@ -141,6 +167,17 @@
 					<view class="row" v-if="agency.founding_year">
 						<text class="label">成立年份</text>
 						<text class="value">{{ agency.founding_year }} 年</text>
+					</view>
+				</view>
+
+				<!-- 发射统计：LL2 直接给了累计数，不用自己算 -->
+				<view class="card" v-if="countCells.length">
+					<view class="card-title">发射统计</view>
+					<view class="stat-grid">
+						<view class="stat-cell" v-for="c in countCells" :key="c.label">
+							<text class="stat-num">{{ c.value }}</text>
+							<text class="stat-label">{{ c.label }}</text>
+						</view>
 					</view>
 				</view>
 
@@ -195,6 +232,52 @@ export default {
 		rocketName() {
 			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
 			return c ? c.full_name || c.name || '' : ''
+		},
+		// 火箭所属系列 + 型号代号，比如「Falcon · Block 5」
+		rocketFamily() {
+			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
+			if (!c) return ''
+			const families = (c.families || []).join('、')
+			const variant = c.variant || ''
+			if (families && variant) return families + ' · ' + variant
+			return families || variant
+		},
+		windowStart() {
+			const d = this.detail
+			return d && d.window_start ? formatDateTime(d.window_start) : ''
+		},
+		windowEnd() {
+			const d = this.detail
+			return d && d.window_end ? formatDateTime(d.window_end) : ''
+		},
+		windowSpan() {
+			const d = this.detail
+			if (!d || !d.window_start || !d.window_end) return ''
+
+			const ms = new Date(d.window_end).getTime() - new Date(d.window_start).getTime()
+			if (!(ms > 0)) return ''
+
+			const min = Math.round(ms / 60000)
+			if (min < 60) return min + ' 分钟'
+
+			const h = Math.floor(min / 60)
+			const m = min % 60
+			return m ? h + ' 小时 ' + m + ' 分钟' : h + ' 小时'
+		},
+		// LL2 直接给了累计次数，四格统计不用自己算
+		countCells() {
+			const d = this.detail
+			if (!d) return []
+
+			const cells = []
+			const push = (value, label) => {
+				if (typeof value === 'number' && value > 0) cells.push({ value, label })
+			}
+			push(d.orbital_launch_attempt_count, '全球累计')
+			push(d.orbital_launch_attempt_count_year, '本年全球')
+			push(d.agency_launch_attempt_count_year, '本年本机构')
+			push(d.pad_launch_attempt_count_year, '本年本工位')
+			return cells
 		},
 		probabilityText() {
 			const p = this.detail && this.detail.probability
@@ -438,6 +521,37 @@ export default {
 	align-items: center;
 	justify-content: space-between;
 	margin-top: 16rpx;
+}
+
+.cd-row {
+	margin-top: 26rpx;
+}
+
+/* 四格统计 */
+.stat-grid {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.stat-cell {
+	width: 50%;
+	padding: 18rpx 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.stat-num {
+	color: #e2e8f0;
+	font-size: 40rpx;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.stat-label {
+	margin-top: 6rpx;
+	color: #6b7891;
+	font-size: 22rpx;
 }
 
 .time {

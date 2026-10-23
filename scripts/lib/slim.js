@@ -107,10 +107,13 @@ function slimLaunch(l) {
 			configuration: {
 				id: c.id ?? null,
 				name: str(c.name),
-				full_name: str(c.full_name)
-				// 长度 / 直径 / 起飞质量 / 运力这些参数**只有 mode=detailed 才返回**，
-				// 而 detailed 实测 72 秒超时，不可用。normal 模式下 c.length 等恒为 undefined，
-				// 取过来也是 null，所以不取 —— 免得前端摆一个永远空着的「火箭参数」卡片。
+				full_name: str(c.full_name),
+				// 型号（Block 5 / A / B 这种）和所属系列（Falcon / Long March），
+				// 详情页在型号名下面补一行，比只有一个型号名有信息量
+				variant: str(c.variant),
+				families: Array.isArray(c.families)
+					? c.families.map((f) => str(f && f.name)).filter(Boolean).slice(0, 2)
+					: []
 			}
 		},
 
@@ -151,9 +154,20 @@ function slimLaunch(l) {
 			name: str(l.launch_service_provider && l.launch_service_provider.name)
 		},
 
+		// 发射窗口。窗口有 4 小时的时候只给一个 net 会让用户以为整点发射
+		window_start: str(l.window_start),
+		window_end: str(l.window_end),
+
+		// LL2 直接给了各种累计次数，不用自己算，详情页拿来做「发射统计」四格
+		orbital_launch_attempt_count: num(l.orbital_launch_attempt_count),
+		orbital_launch_attempt_count_year: num(l.orbital_launch_attempt_count_year),
+		location_launch_attempt_count: num(l.location_launch_attempt_count),
+		location_launch_attempt_count_year: num(l.location_launch_attempt_count_year),
+		agency_launch_attempt_count: num(l.agency_launch_attempt_count),
+		agency_launch_attempt_count_year: num(l.agency_launch_attempt_count_year),
+
 		pad_launch_attempt_count: num(l.pad_launch_attempt_count),
-		pad_launch_attempt_count_year: num(l.pad_launch_attempt_count_year),
-		orbital_launch_attempt_count_year: num(l.orbital_launch_attempt_count_year)
+		pad_launch_attempt_count_year: num(l.pad_launch_attempt_count_year)
 	}
 }
 

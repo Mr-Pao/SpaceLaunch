@@ -30,8 +30,9 @@ const translate = require('./lib/translate')
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v3: 图片改为 COS 托管的缩略图地址，旧缓存里的原图 URL 真机加载不出来
 // v4: launch 增加 mission.name / mission.orbit / probability / weather_concerns /
-//     failreason / infographic / 火箭参数，旧缓存没有这些字段，必须整体失效
-const DATA_VERSION = 4
+//     failreason / infographic
+// v5: 增加发射窗口 window_start/end、四类累计发射次数、火箭系列与型号代号
+const DATA_VERSION = 5
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {
