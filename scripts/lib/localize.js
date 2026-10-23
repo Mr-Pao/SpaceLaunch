@@ -12,8 +12,12 @@
 
 const { translateTexts, getZh } = require('./translate')
 
-// 机构描述最多翻多少条，0 = 不翻
-const AGENCY_LIMIT = 0
+/**
+ * 机构简介一共 182 条、5.2 万字符，是一次性的大头。
+ * 但翻译结果按原文哈希永久缓存，实际只会翻一次，
+ * 之后 CI 每轮都是零命中新文本，所以放行全量。
+ */
+const AGENCY_LIMIT = 400
 
 async function fill(list, read, write) {
 	if (!Array.isArray(list) || list.length === 0) return

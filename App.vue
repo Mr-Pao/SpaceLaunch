@@ -42,13 +42,11 @@
 </script>
 
 <style lang="scss">
-	@import "@/components/colorui/icon.css";
-	@import "@/components/colorui/main.css";
+	/* 全局样式只留最必要的。
+	   原先这里 @import 了 colorui 的 icon.css + main.css（约 152KB），
+	   但全项目没有任何一处用到 cu-* 类名，等于每个页面都白白多加载 152KB 样式。 */
 
-	/*每个页面公共css */
 	page {
-		background-color: #000000;
+		background-color: #0a0e17;
 	}
-
-
 </style>

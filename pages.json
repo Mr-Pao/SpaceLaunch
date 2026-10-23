@@ -1,10 +1,6 @@
 {
 	"easycom": {
-		"autoscan": true,
-		"custom": {
-			"^u-(.*)": "@/uni_modules/uview-ui/components/u-$1/u-$1.vue",
-			"tui-(.*)": "@/components/thorui/tui-$1/tui-$1.vue"
-		}
+		"autoscan": true
 	},
 	"pages": [
 		{
@@ -32,13 +28,7 @@
 			}
 		},
 		{
-			"path": "pages/upcoming/upcomingInfo",
-			"style": {
-				"navigationBarTitleText": "发射任务详情"
-			}
-		},
-		{
-			"path": "pages/previous/previousInfo",
+			"path": "pages/launch/launchInfo",
 			"style": {
 				"navigationBarTitleText": "发射任务详情"
 			}
@@ -51,9 +41,9 @@
 		}
 	],
 	"tabBar": {
-		"backgroundColor": "#222",
-		"selectedColor": "#3978bb",
-		"color": "#A0A0A0",
+		"backgroundColor": "#141a26",
+		"selectedColor": "#38bdf8",
+		"color": "#6b7891",
 		"borderStyle": "black",
 		"list": [
 			{
@@ -77,10 +67,10 @@
 		]
 	},
 	"globalStyle": {
-		"backgroundColor": "#000000",
+		"backgroundColor": "#0a0e17",
 		"backgroundTextStyle": "light",
-		"navigationBarBackgroundColor": "#000000",
-		"navigationBarTitleText": "Space Launch",
+		"navigationBarBackgroundColor": "#0a0e17",
+		"navigationBarTitleText": "太空发射任务",
 		"navigationBarTextStyle": "white"
 	}
 }

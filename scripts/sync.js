@@ -67,6 +67,7 @@ const DATASETS = {
 		file: 'agencies.json',
 		// 机构图很少变，缓存一天；图片本身在 COS 上是一年
 		cacheControl: 'public, max-age=86400',
+		localize: localizeAgencies,
 		images: ['image_url', 'logo_url'],
 		// 机构是全项目唯一需要真翻页的：实测 count=350，limit=100 → 4 页
 		// 每天只跑一次，4 个请求可以接受

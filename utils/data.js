@@ -264,6 +264,39 @@ export function getAgencyById(id) {
 	return getById('agencies', id)
 }
 
+/**
+ * 跨 upcoming / previous 找一条发射
+ *
+ * 详情页不要直接调两次 getById：那样第一次 miss 就会 force 拉网络，
+ * 如果这条其实在另一个数据集里，等于白拉 55KB。
+ * 这里先扫两个数据集的缓存，都没命中才依次拉网络。
+ */
+export async function findLaunchById(id) {
+	if (id === undefined || id === null || id === '') return null
+	const target = String(id)
+	const names = ['upcoming', 'previous']
+
+	// 先看缓存，命中就零网络开销
+	for (const name of names) {
+		const hit = memory[name] || readStorage(name)
+		if (!hit) continue
+		const found = hit.data.list.find((x) => String(x.id) === target)
+		if (found) return found
+	}
+
+	// 缓存里都没有（冷启动直接进详情），按需拉一次
+	for (const name of names) {
+		try {
+			const d = await load(name, { force: true })
+			const found = d.list.find((x) => String(x.id) === target)
+			if (found) return found
+		} catch (e) {
+			// 一个数据集失败不影响另一个
+		}
+	}
+	return null
+}
+
 /** 下拉刷新：绕过缓存重新拉 */
 export function refresh(name) {
 	return load(name, { force: true })
@@ -304,6 +337,7 @@ export default {
 	load,
 	getById,
 	getAgencyById,
+	findLaunchById,
 	refresh,
 	freshnessText,
 	clear,

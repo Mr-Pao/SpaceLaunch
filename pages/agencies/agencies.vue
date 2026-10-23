@@ -1,164 +1,224 @@
 <template>
-	<view class="LaunchesInfo">
+	<view class="page">
 		<view class="loading" v-if="loading">
-			<text class="loading-text">加载中...</text>
+			<text class="hint-text">加载中...</text>
 		</view>
 
-		<view class="empty" v-else-if="!Agencies.id">
-			<text class="empty-text">未找到该机构信息</text>
+		<view class="empty" v-else-if="!agency.id">
+			<text class="empty-icon">🏢</text>
+			<text class="hint-text">未找到该机构信息</text>
 		</view>
 
 		<block v-else>
-			<!-- 实测 350 家里只有 44 家有 image_url、127 家有 logo_url，所以主图要兜底到 logo -->
-			<image
-				v-if="Agencies.image_url || Agencies.logo_url"
-				:src="Agencies.image_url || Agencies.logo_url"
-				mode="widthFix"
-			></image>
-
-			<view class="contant">
-				<view class="name">
-					{{ Agencies.name }}
+			<view class="hero">
+				<!-- 350 家里只有 44 家有 image_url、127 家有 logo_url，
+				     所以主图优先 logo（标识），缺失时再用 image -->
+				<image v-if="mainImage" class="hero-logo" :src="mainImage" mode="aspectFit"></image>
+				<view v-else class="hero-logo hero-empty">
+					<text class="hero-icon">🏢</text>
 				</view>
 
-				<view class="cell-group">
-					<!-- 主图已用 logo 兜底时就不再重复展示 -->
-					<view class="cell-picture" v-if="Agencies.logo_url && Agencies.image_url">
-						<image :src="Agencies.logo_url" mode="widthFix"></image>
-					</view>
-					<view class="cell-details" v-if="Agencies.descriptionZh || Agencies.description">
-						{{ Agencies.descriptionZh || Agencies.description }}
-					</view>
-					<view class="cell-item" v-if="Agencies.abbrev">
-						<view class="cell-item-title">缩写</view>
-						<view class="cell-item-desc">{{ Agencies.abbrev }}</view>
-					</view>
-					<view class="cell-item" v-if="Agencies.type">
-						<view class="cell-item-title">机构类型</view>
-						<view class="cell-item-desc">{{ Agencies.type }}</view>
-					</view>
-					<view class="cell-item" v-if="Agencies.founding_year">
-						<view class="cell-item-title">成立时间</view>
-						<view class="cell-item-desc">{{ Agencies.founding_year }}</view>
-					</view>
-					<view class="cell-item" v-if="Agencies.country_code">
-						<view class="cell-item-title">国家/地区</view>
-						<view class="cell-item-desc">{{ Agencies.country_code }}</view>
-					</view>
-					<view class="cell-item" v-if="Agencies.launchers">
-						<view class="cell-item-title">现有发射器</view>
-						<view class="cell-item-desc">{{ Agencies.launchers }}</view>
-					</view>
+				<text class="name">{{ agency.name }}</text>
+				<text class="sub" v-if="subline">{{ subline }}</text>
+			</view>
+
+			<view class="card" v-if="desc">
+				<view class="card-title">机构简介</view>
+				<text class="card-desc">{{ desc }}</text>
+			</view>
+
+			<view class="card">
+				<view class="card-title">基本信息</view>
+
+				<view class="row" v-if="agency.abbrev">
+					<text class="label">缩写</text>
+					<text class="value">{{ agency.abbrev }}</text>
 				</view>
+				<view class="row" v-if="agency.type">
+					<text class="label">机构类型</text>
+					<text class="value">{{ agency.type }}</text>
+				</view>
+				<view class="row" v-if="agency.founding_year">
+					<text class="label">成立年份</text>
+					<text class="value">{{ agency.founding_year }} 年</text>
+				</view>
+				<view class="row" v-if="agency.country_code">
+					<text class="label">国家/地区</text>
+					<text class="value">{{ agency.country_code }}</text>
+				</view>
+				<view class="row" v-if="agency.launchers">
+					<text class="label">现役火箭</text>
+					<text class="value">{{ agency.launchers }}</text>
+				</view>
+			</view>
+
+			<view class="footer-hint">
+				<text>数据来源 The Space Devs</text>
 			</view>
 		</block>
 	</view>
 </template>
 
 <script>
-	import spaceData from '@/utils/data.js'
+import spaceData from '@/utils/data.js'
 
-	export default {
-		data() {
-			return {
-				Agencies: {},
-				loading: true
-			};
-		},
-		async onLoad(e) {
-			const id = e && e.id
-			if (id) {
-				const found = await spaceData.getAgencyById(id)
-				if (found) this.Agencies = found
-			}
-			this.loading = false
+export default {
+	data() {
+		return {
+			agency: {},
+			loading: true
 		}
+	},
+	computed: {
+		mainImage() {
+			return this.agency.logo_url || this.agency.image_url || ''
+		},
+		desc() {
+			return this.agency.descriptionZh || this.agency.description || ''
+		},
+		subline() {
+			const parts = []
+			if (this.agency.abbrev) parts.push(this.agency.abbrev)
+			if (this.agency.country_code) parts.push(this.agency.country_code)
+			if (this.agency.founding_year) parts.push(this.agency.founding_year + ' 年成立')
+			return parts.join(' · ')
+		}
+	},
+	async onLoad(query) {
+		const id = query && query.id
+		if (id) {
+			const found = await spaceData.getAgencyById(id)
+			if (found) this.agency = found
+		}
+		this.loading = false
 	}
+}
 </script>
 
 <style lang="scss" scoped>
-	.LaunchesInfo {
-		min-height: 100vh;
-		padding-bottom: 40rpx;
+.page {
+	min-height: 100vh;
+	padding: 0 24rpx 60rpx;
+	background: #0a0e17;
+	box-sizing: border-box;
+}
 
-		image {
-			width: 100%;
-		}
+.loading,
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 240rpx 40rpx;
+}
 
-		.loading {
-			padding: 200rpx 0;
-			text-align: center;
-		}
+.empty-icon {
+	font-size: 72rpx;
+	margin-bottom: 24rpx;
+}
 
-		.loading-text {
-			color: #7e7e7e;
-			font-size: 30rpx;
-		}
+.hint-text {
+	color: #6b7891;
+	font-size: 28rpx;
+}
 
-		.empty {
-			padding: 200rpx 40rpx;
-			text-align: center;
-		}
+.hero {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 60rpx 20rpx 40rpx;
+}
 
-		.empty-text {
-			color: #7e7e7e;
-			font-size: 30rpx;
-		}
+.hero-logo {
+	width: 180rpx;
+	height: 180rpx;
+	border-radius: 24rpx;
+	background: rgba(255, 255, 255, 0.04);
+	padding: 20rpx;
+	box-sizing: border-box;
+}
 
-		.name {
-			padding: 40rpx;
-			color: #3978bb;
-			font-size: 2.125rem;
-		}
+.hero-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(135deg, #16233a 0%, #0d1420 100%);
+}
 
-		.contant {
-			width: 100%;
-			display: flex;
-			flex-direction: column;
-			justify-content: center;
-			align-items: center;
+.hero-icon {
+	font-size: 64rpx;
+	opacity: 0.35;
+}
 
-			.cell-group {
-				display: flex;
-				flex-direction: column;
-				width: 90%;
-				background-color: #282828;
-				border-radius: 30rpx;
-				margin-bottom: 30rpx;
-				padding: 30rpx;
+.name {
+	margin-top: 26rpx;
+	color: #ffffff;
+	font-size: 38rpx;
+	font-weight: 600;
+	text-align: center;
+	line-height: 1.4;
+}
 
-				.cell-picture {
-					padding: 10rpx;
-				}
+.sub {
+	margin-top: 12rpx;
+	color: #6b7891;
+	font-size: 26rpx;
+	text-align: center;
+}
 
-				.cell-details {
-					padding-top: 20rpx;
-					font-size: 32rpx;
-					color: #fff;
-					line-height: 1.6;
-				}
+.card {
+	margin-top: 24rpx;
+	padding: 28rpx 30rpx;
+	background: #141a26;
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+}
 
-				.cell-item {
-					padding: 20rpx 0;
-					display: flex;
-					justify-content: space-between;
-					align-items: center;
+.card-title {
+	color: #38bdf8;
+	font-size: 30rpx;
+	font-weight: 600;
+	margin-bottom: 20rpx;
+}
 
-					.cell-item-title {
-						font-size: 35rpx;
-						color: #3978bb;
-						font-weight: 550;
-						width: 300rpx;
-					}
+.card-desc {
+	display: block;
+	color: #cbd5e0;
+	font-size: 28rpx;
+	line-height: 1.8;
+}
 
-					.cell-item-desc {
-						font-size: 30rpx;
-						color: #fff;
-						width: 400rpx;
-						text-align: right;
-					}
-				}
-			}
-		}
-	}
+.row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 14rpx 0;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.04);
+}
+
+.row:first-of-type {
+	border-top: none;
+}
+
+.label {
+	flex-shrink: 0;
+	width: 170rpx;
+	color: #6b7891;
+	font-size: 28rpx;
+}
+
+.value {
+	flex: 1;
+	text-align: right;
+	color: #e2e8f0;
+	font-size: 28rpx;
+	line-height: 1.5;
+	word-break: break-all;
+}
+
+.footer-hint {
+	margin-top: 40rpx;
+	text-align: center;
+	color: #3d4a5c;
+	font-size: 22rpx;
+}
 </style>
