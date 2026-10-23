@@ -74,15 +74,23 @@ function parseArgs(argv) {
 	}
 
 	// 回填进度单独记，和归档的 state.json 分开，互不影响
-	let state = { cursor: 0, done: false, pages: 0 }
+	let state = { cursor: 0, pages: 0 }
 	try {
 		state = await fetchJson(`${base}/backfill.json`)
 	} catch (e) {
 		// 首次运行
 	}
 
+	/**
+	 * 注意这里**不能用 done 标记**：
+	 * 归档是每小时新增一片的，回填跑到当前末尾时后面还会有新片进来。
+	 * 一旦把 done 写成 true，后续新片就永远补不上了。
+	 * 每次跟 index.pages.length 比一下即可，空转一轮的成本可以忽略。
+	 */
 	if (state.cursor >= pageList.length) {
-		console.log(`回填已完成（${pageList.length} 片全部处理过），本轮跳过`)
+		console.log(
+			`没有待回填的分片（已处理 ${state.cursor}/${pageList.length} 片，归档${index.done ? '已完成' : '还在继续'}）`
+		)
 		return
 	}
 
@@ -150,14 +158,13 @@ function parseArgs(argv) {
 		console.log(`  ${page.file} 回填 ${filled} 处译文`)
 	}
 
-	state.done = state.cursor >= pageList.length
 	await putJson(state, `${PREFIX}/backfill.json`)
 
 	const t = translate.summary()
 	console.log(
 		`\n  本轮回填 ${touched} 处 | 新翻成功 ${t.ok} / 失败 ${t.fail} / 缓存池 ${t.cached} 条` +
 			(t.quotaExhausted ? '  ⚠️ 翻译接口限流，剩余下轮再补' : '') +
-			`\n  进度 ${state.cursor}/${pageList.length} 片${state.done ? ' ✓ 全部完成' : ''}\n`
+			`\n  进度 ${state.cursor}/${pageList.length} 片\n`
 	)
 
 	// 译文缓存必须回传，否则下一轮 CI 容器里零命中，等于白翻
