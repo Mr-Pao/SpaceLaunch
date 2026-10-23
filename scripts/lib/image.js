@@ -27,9 +27,12 @@ const { hasCosConfig, headObject, putBuffer } = require('./cos')
 const PREFIX = 'space-img'
 const MAX_WIDTH = 480
 const MAX_BYTES = 30 * 1024
-const MAX_SOURCE_BYTES = 8 * 1024 * 1024 // 原图上限，防止拿到异常大文件把 CI 拖死
+// 原图上限。LL2 里有单张 10.5MB 的图（long_march_4b_l），设 8MB 会直接把它砍掉，
+// 表现为列表里固定有一张图镜像失败。15MB 能覆盖目前见过的最大图。
+const MAX_SOURCE_BYTES = 15 * 1024 * 1024
 const CONCURRENCY = 4
-const TIMEOUT_MS = 20000
+// 大图在慢网络下要下很久，20 秒不够；CI 海外节点通常几秒就完
+const TIMEOUT_MS = 45000
 const UA = 'SpaceLaunch/1.1 (+https://github.com/Mr-Pao/SpaceLaunch)'
 
 const stats = { reuse: 0, uploaded: 0, skipped: 0, failed: 0 }
@@ -68,7 +71,7 @@ function download(url, depth = 0) {
 			res.on('data', (c) => {
 				size += c.length
 				if (size > MAX_SOURCE_BYTES) {
-					req.destroy(new Error('原图超过 8MB'))
+					req.destroy(new Error('原图超过 15MB'))
 					return
 				}
 				chunks.push(c)
