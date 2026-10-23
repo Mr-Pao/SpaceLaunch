@@ -84,12 +84,17 @@ function joinNames(arr) {
 }
 
 function slimLaunch(l) {
+	const c = (l.rocket && l.rocket.configuration) || {}
+	const orbit = (l.mission && l.mission.orbit) || {}
+
 	return {
 		id: l.id ?? null,
 		name: str(l.name),
 		net: str(l.net),
 		last_updated: str(l.last_updated),
 		image: imageUrl(l.image),
+		// 任务信息图（一张竖版长图）。LL2 里是 URL 字符串，也可能为 null
+		infographic: imageUrl(l.infographic),
 
 		status: {
 			name: str(l.status && l.status.name),
@@ -100,9 +105,14 @@ function slimLaunch(l) {
 
 		rocket: {
 			configuration: {
-				id: (l.rocket && l.rocket.configuration && l.rocket.configuration.id) ?? null,
-				name: str(l.rocket && l.rocket.configuration && l.rocket.configuration.name),
-				full_name: str(l.rocket && l.rocket.configuration && l.rocket.configuration.full_name)
+				id: c.id ?? null,
+				name: str(c.name),
+				full_name: str(c.full_name),
+				// 火箭参数，目前只用在详情页的「运载火箭」卡片里，没有就整行不显示
+				length: num(c.length),
+				diameter: num(c.diameter),
+				launch_mass: num(c.launch_mass),
+				leo_capacity: num(c.leo_capacity)
 			}
 		},
 
@@ -115,12 +125,28 @@ function slimLaunch(l) {
 		},
 
 		mission: {
+			// 载荷名，比如 "Starlink Group 15-16"。之前整个 mission 只留了描述和类型，
+			// 导致详情页根本看不到这次任务运的是什么
+			name: str(l.mission && l.mission.name),
 			description: str(l.mission && l.mission.description),
 			// 中文描述由 lib/localize.js 在同步阶段回填，翻不出来就留空，
 			// 前端用 descriptionZh || description 回退英文
 			descriptionZh: '',
-			type: str(l.mission && l.mission.type)
+			type: str(l.mission && l.mission.type),
+			orbit: {
+				name: str(orbit.name),
+				abbrev: str(orbit.abbrev)
+			}
 		},
+
+		// 发射概率（0-100 的整数）。LL2 只有部分任务会填，null 表示没有预报
+		probability: num(l.probability),
+		// 天气顾虑，英文长句；中文由 localize 回填 weather_concernsZh
+		weather_concerns: str(l.weather_concerns),
+		weather_concernsZh: '',
+		// 失败原因，只有历史发射里的失败任务有；同样回填 failreasonZh
+		failreason: str(l.failreason),
+		failreasonZh: '',
 
 		launch_service_provider: {
 			id: (l.launch_service_provider && l.launch_service_provider.id) ?? null,

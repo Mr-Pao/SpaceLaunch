@@ -40,13 +40,29 @@ async function fill(list, read, write) {
 	if (filled) console.log(`  ✓ 中文描述回填 ${filled}/${texts.length} 条`)
 }
 
-/** launch.mission.description → launch.mission.descriptionZh */
-function localizeLaunches(list) {
-	return fill(
+/** launch.mission.description → mission.descriptionZh
+ *  顺带翻 weather_concerns / failreason：这两个量极小（只有临近发射和失败任务才有），
+ *  走的是同一份永久缓存，不会额外占多少额度，但不翻就是纯英文长句摆在详情页上 */
+async function localizeLaunches(list) {
+	await fill(
 		list,
 		(x) => x.mission && x.mission.description,
 		(x, zh) => {
 			if (x.mission) x.mission.descriptionZh = zh
+		}
+	)
+	await fill(
+		list,
+		(x) => x.weather_concerns,
+		(x, zh) => {
+			x.weather_concernsZh = zh
+		}
+	)
+	await fill(
+		list,
+		(x) => x.failreason,
+		(x, zh) => {
+			x.failreasonZh = zh
 		}
 	)
 }

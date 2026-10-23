@@ -34,7 +34,8 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 
 // 数据结构变更时改这个值，所有旧缓存整体失效
 // v3: 图片换成 COS 缩略图地址（原图域名无备案，真机加载不出来）
-const DATA_VERSION = 3
+// v4: launch 增加任务名 / 轨道 / 发射概率 / 天气顾虑 / 失败原因 / 信息图 / 火箭参数
+const DATA_VERSION = 4
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {

@@ -14,7 +14,13 @@
 			<!-- 首图：固定高度裁切。原先是 mode=widthFix 让图片按原比例撑开，
 			     遇到竖图会占满整屏，用户得滑很久才能看到信息 -->
 			<view class="hero">
-				<image v-if="detail.image" class="hero-img" :src="detail.image" mode="aspectFill"></image>
+				<image
+					v-if="detail.image"
+					class="hero-img"
+					:src="detail.image"
+					mode="aspectFill"
+					@click="preview(detail.image)"
+				></image>
 				<view v-else class="hero-img hero-placeholder"></view>
 				<view class="hero-mask"></view>
 			</view>
@@ -34,11 +40,31 @@
 				<!-- 任务信息 -->
 				<view class="card" v-if="hasMission">
 					<view class="card-title">任务信息</view>
-					<text class="card-desc" v-if="missionDesc">{{ missionDesc }}</text>
+					<view class="row" v-if="missionName">
+						<text class="label">任务名</text>
+						<text class="value">{{ missionName }}</text>
+					</view>
 					<view class="row" v-if="detail.mission.type">
 						<text class="label">类型</text>
 						<text class="value">{{ detail.mission.type }}</text>
 					</view>
+					<view class="row" v-if="orbitText">
+						<text class="label">目标轨道</text>
+						<text class="value">{{ orbitText }}</text>
+					</view>
+					<text class="card-desc" v-if="missionDesc">{{ missionDesc }}</text>
+				</view>
+
+				<!-- 任务信息图：竖版长图，点开可双指放大 -->
+				<view class="card" v-if="detail.infographic">
+					<view class="card-title">任务信息图</view>
+					<image
+						class="infographic"
+						:src="detail.infographic"
+						mode="widthFix"
+						lazy-load
+						@click="preview(detail.infographic)"
+					></image>
 				</view>
 
 				<!-- 火箭 -->
@@ -52,6 +78,26 @@
 						<text class="label">配置</text>
 						<text class="value">{{ detail.rocket.configuration.name }}</text>
 					</view>
+					<view class="row" v-for="s in rocketSpecs" :key="s.label">
+						<text class="label">{{ s.label }}</text>
+						<text class="value">{{ s.value }}</text>
+					</view>
+				</view>
+
+				<!-- 发射条件：概率和天气顾虑都是 LL2 的可选字段，没有就整块不显示 -->
+				<view class="card" v-if="probabilityText || weatherText">
+					<view class="card-title">发射条件</view>
+					<view class="row" v-if="probabilityText">
+						<text class="label">预报概率</text>
+						<text class="value">{{ probabilityText }}</text>
+					</view>
+					<text class="card-desc" v-if="weatherText">{{ weatherText }}</text>
+				</view>
+
+				<!-- 失败原因：只有失败任务带这个字段 -->
+				<view class="card" v-if="failText">
+					<view class="card-title">失败原因</view>
+					<text class="card-desc">{{ failText }}</text>
 				</view>
 
 				<!-- 发射台 -->
@@ -110,6 +156,7 @@ import { formatDateTime, relativeTime } from '@/utils/format.js'
 export default {
 	data() {
 		return {
+			launchId: '',
 			detail: null,
 			agency: null,
 			loading: true
@@ -122,6 +169,9 @@ export default {
 			if (!abs) return '时间待定'
 			return abs + '（' + relativeTime(this.detail.net) + '）'
 		},
+		missionName() {
+			return (this.detail && this.detail.mission && this.detail.mission.name) || ''
+		},
 		missionDesc() {
 			const m = this.detail && this.detail.mission
 			if (!m) return ''
@@ -129,11 +179,46 @@ export default {
 		},
 		hasMission() {
 			const m = this.detail && this.detail.mission
-			return Boolean(m && (m.descriptionZh || m.description || m.type))
+			return Boolean(m && (m.name || m.descriptionZh || m.description || m.type || (m.orbit && m.orbit.name)))
+		},
+		// 轨道：优先缩写（LEO / GTO 这种业内通用写法），没有就用全称
+		orbitText() {
+			const o = this.detail && this.detail.mission && this.detail.mission.orbit
+			if (!o) return ''
+			return o.abbrev || o.name || ''
 		},
 		rocketName() {
 			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
 			return c ? c.full_name || c.name || '' : ''
+		},
+		// 火箭参数，只显示有值的项；LL2 里这些字段经常是 null
+		rocketSpecs() {
+			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
+			if (!c) return []
+
+			const specs = []
+			const m = (v) => v.toFixed(1).replace(/\.0$/, '') + ' 米'
+			const t = (kg) => (kg / 1000).toFixed(1).replace(/\.0$/, '') + ' 吨'
+
+			if (c.length) specs.push({ label: '长度', value: m(c.length) })
+			if (c.diameter) specs.push({ label: '直径', value: m(c.diameter) })
+			if (c.launch_mass) specs.push({ label: '起飞质量', value: t(c.launch_mass) })
+			if (c.leo_capacity) specs.push({ label: '近地运力', value: t(c.leo_capacity) })
+			return specs
+		},
+		probabilityText() {
+			const p = this.detail && this.detail.probability
+			return typeof p === 'number' ? p + '%' : ''
+		},
+		weatherText() {
+			const d = this.detail
+			if (!d) return ''
+			return d.weather_concernsZh || d.weather_concerns || ''
+		},
+		failText() {
+			const d = this.detail
+			if (!d) return ''
+			return d.failreasonZh || d.failreason || ''
 		},
 		padLocation() {
 			const loc = this.detail && this.detail.pad && this.detail.pad.location
@@ -152,10 +237,35 @@ export default {
 			if (a === 'Failure' || a === 'Partial') return 'failure'
 			if (a === 'In Flight') return 'flying'
 			return 'pending'
+		},
+		// 分享出去时用任务名当标题，比「太空发射任务」有信息量得多
+		shareText() {
+			return (this.detail && this.detail.name) || '太空发射任务'
+		},
+		shareImg() {
+			return (this.detail && this.detail.image) || '/static/logo.png'
 		}
 	},
+
+	// 详情页自己定义分享，路径里显式带上 id，不依赖全局 mixin 去猜参数
+	onShareAppMessage() {
+		return {
+			title: this.shareText,
+			path: '/pages/launch/launchInfo?id=' + this.launchId,
+			imageUrl: this.shareImg
+		}
+	},
+	onShareTimeline() {
+		return {
+			title: this.shareText,
+			query: 'id=' + this.launchId,
+			imageUrl: this.shareImg
+		}
+	},
+
 	async onLoad(query) {
 		const id = query && query.id
+		this.launchId = id || ''
 		if (!id) {
 			this.loading = false
 			return
@@ -178,6 +288,11 @@ export default {
 		goAgency(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/agencies/agencies?id=' + id })
+		},
+		// 点开图片能双指放大，长图信息不点开根本看不清
+		preview(url) {
+			if (!url) return
+			uni.previewImage({ urls: [url], current: url })
 		},
 		goBack() {
 			const pages = getCurrentPages()
@@ -346,10 +461,18 @@ export default {
 
 .card-desc {
 	display: block;
+	margin-top: 18rpx;
 	color: #cbd5e0;
 	font-size: 29rpx;
 	line-height: 1.75;
-	margin-bottom: 8rpx;
+}
+
+/* 任务信息图是竖版长图，用 widthFix 让它按原比例撑开，点开可放大 */
+.infographic {
+	display: block;
+	width: 100%;
+	border-radius: 12rpx;
+	background: #0f1520;
 }
 
 .row {
