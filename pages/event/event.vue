@@ -75,11 +75,11 @@ export default {
 	},
 
 	onLoad() {
-		// 开关和数据并行拉，谁先到都行；开关失败走兜底正常展示
+		// 开关先回来再决定拉不拉数据：审核态整页只剩空态，一次请求都不发
 		getConfig().then((c) => {
 			this.reviewMode = Boolean(c && c.review)
+			if (!this.reviewMode) this.getData()
 		})
-		this.getData()
 	},
 
 	onShow() {
@@ -87,11 +87,16 @@ export default {
 	},
 
 	onPullDownRefresh() {
+		if (this.reviewMode) {
+			uni.stopPullDownRefresh()
+			return
+		}
 		this.resetPaging()
 		this.getData(true).then(() => uni.stopPullDownRefresh())
 	},
 
 	onReachBottom() {
+		if (this.reviewMode) return
 		this.loadMore()
 	},
 

@@ -24,27 +24,30 @@
 			<text class="subtitle">实时排期 · 发射倒计时</text>
 		</view>
 
-		<!-- 只有完全没有缓存时才整屏转圈，有缓存时下面直接出内容 -->
-		<view class="loading" v-if="loading && list.length === 0">
-			<view class="rocket-loading">
-				<image
-					class="rocket"
-					src="/static/rocket.png"
-					mode="aspectFit"
-					:style="{ transform: 'translateY(' + rocketY + 'px)' }"
-				></image>
-				<view class="flame"></view>
+		<!-- 审核模式下整页换成静态展示卡：无列表、无动态数据、无 tab 入口，
+		     观感是「工具介绍页」，与「工具-信息查询」类目一致 -->
+		<block v-if="!reviewMode">
+			<!-- 只有完全没有缓存时才整屏转圈，有缓存时下面直接出内容 -->
+			<view class="loading" v-if="loading && list.length === 0">
+				<view class="rocket-loading">
+					<image
+						class="rocket"
+						src="/static/rocket.png"
+						mode="aspectFit"
+						:style="{ transform: 'translateY(' + rocketY + 'px)' }"
+					></image>
+					<view class="flame"></view>
+				</view>
+				<text class="loading-text">准备发射...</text>
 			</view>
-			<text class="loading-text">准备发射...</text>
-		</view>
 
-		<view class="error" v-else-if="error && list.length === 0">
-			<text class="error-icon">⚠️</text>
-			<text class="error-text">{{ error }}</text>
-			<view class="btn" @click="getData(true)">重新尝试</view>
-		</view>
+			<view class="error" v-else-if="error && list.length === 0">
+				<text class="error-icon">⚠️</text>
+				<text class="error-text">{{ error }}</text>
+				<view class="btn" @click="getData(true)">重新尝试</view>
+			</view>
 
-		<view class="content" v-else>
+			<view class="content" v-else>
 			<!-- 最近一次发射 + 倒计时。放在列表上方当视觉焦点 -->
 			<view class="next-wrap" v-if="nextLaunch && visible.length">
 				<next-launch :item="nextLaunch" @select="goDetail" />
@@ -77,6 +80,35 @@
 				<text v-else-if="moreDone">已显示全部 {{ list.length }} 条</text>
 				<text v-else>{{ hasMore ? '上拉加载更多' : '上拉加载后续排期' }}</text>
 			</view>
+			</view>
+		</block>
+
+		<!-- 审核态静态展示页：纯介绍，无任何动态内容与跳转 -->
+		<view class="intro" v-else>
+			<view class="intro-card">
+				<view class="intro-item">
+					<text class="intro-icon">📅</text>
+					<view class="intro-txt">
+						<text class="intro-name">发射排期</text>
+						<text class="intro-desc">全球航天发射时间表，实时更新</text>
+					</view>
+				</view>
+				<view class="intro-item">
+					<text class="intro-icon">⏱️</text>
+					<view class="intro-txt">
+						<text class="intro-name">发射倒计时</text>
+						<text class="intro-desc">精确到秒的任务发射倒计时</text>
+					</view>
+				</view>
+				<view class="intro-item">
+					<text class="intro-icon">🚀</text>
+					<view class="intro-txt">
+						<text class="intro-name">火箭参数</text>
+						<text class="intro-desc">现役与历史运载火箭性能数据</text>
+					</view>
+				</view>
+			</view>
+			<text class="intro-foot">数据每日自动同步</text>
 		</view>
 	</view>
 </template>
@@ -148,10 +180,14 @@ export default {
 			delay: (Math.random() * 2).toFixed(2) + 's'
 		}))
 		this.startRocketAnimation()
-		this.getData()
-		// 展示开关与数据并行拉；App onLaunch 已预热，这里大概率命中缓存
+		// 开关先回来再决定拉不拉数据：审核态整页是静态展示卡，一次请求都不发
 		getConfig().then((c) => {
 			this.reviewMode = Boolean(c && c.review)
+			if (this.reviewMode) {
+				this.stopRocketAnimation()
+				return
+			}
+			this.getData()
 		})
 	},
 
@@ -166,6 +202,10 @@ export default {
 	},
 
 	onPullDownRefresh() {
+		if (this.reviewMode) {
+			uni.stopPullDownRefresh()
+			return
+		}
 		this.resetPaging()
 		// 重新刷新后，后续排期可以再拉一次
 		this.moreDone = false
@@ -173,6 +213,7 @@ export default {
 	},
 
 	onReachBottom() {
+		if (this.reviewMode) return
 		// 本地还有没渲染出来的，先把它们放出来
 		if (this.hasMore) {
 			this.loadMore()
@@ -388,5 +429,61 @@ export default {
 
 .next-wrap {
 	margin-bottom: 14rpx;
+}
+
+/* 审核态静态展示页 */
+.intro {
+	position: relative;
+	z-index: 1;
+	padding: 0 40rpx;
+}
+
+.intro-card {
+	background: #141a26;
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	padding: 10rpx 30rpx;
+}
+
+.intro-item {
+	display: flex;
+	align-items: center;
+	padding: 26rpx 0;
+}
+
+.intro-item + .intro-item {
+	border-top: 1rpx solid rgba(255, 255, 255, 0.05);
+}
+
+.intro-icon {
+	font-size: 44rpx;
+	margin-right: 24rpx;
+}
+
+.intro-txt {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+
+.intro-name {
+	color: #e2e8f0;
+	font-size: 30rpx;
+	font-weight: 600;
+}
+
+.intro-desc {
+	margin-top: 4rpx;
+	color: #6b7891;
+	font-size: 24rpx;
+	line-height: 1.5;
+}
+
+.intro-foot {
+	display: block;
+	margin-top: 40rpx;
+	text-align: center;
+	color: #3d4a5c;
+	font-size: 22rpx;
 }
 </style>

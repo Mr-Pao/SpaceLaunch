@@ -71,26 +71,8 @@ export default {
 
 			if (this.taps >= 5) {
 				this.taps = 0
-				this.askPass()
+				this.showPanel()
 			}
-		},
-
-		// 口令先挡一层：审核就算误触连点也进不去
-		askPass() {
-			uni.showModal({
-				title: '开发者选项',
-				editable: true,
-				placeholderText: '请输入口令',
-				success: (res) => {
-					if (!res.confirm) return
-					// 口令改动只在这一处
-					if ((res.content || '').trim() !== 'pao2026') {
-						uni.showToast({ title: '口令不对', icon: 'none' })
-						return
-					}
-					this.showPanel()
-				}
-			})
 		},
 
 		async showPanel() {

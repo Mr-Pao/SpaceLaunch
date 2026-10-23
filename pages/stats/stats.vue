@@ -1,5 +1,6 @@
 <template>
 	<view class="page">
+		<block v-if="!reviewMode">
 		<view class="loading" v-if="loading">
 			<text class="hint-text">统计中...</text>
 		</view>
@@ -147,6 +148,12 @@
 				<text v-if="isEarliestYear" class="footer-note">该年度只覆盖到归档边界，非全年完整统计</text>
 			</view>
 		</block>
+
+		<!-- 审核模式：tabBar 已隐藏，本页正常情况到不了，留空态兜底 -->
+		<view class="empty" v-else>
+			<text class="empty-icon">📊</text>
+			<text class="hint-text">敬请期待</text>
+		</view>
 	</view>
 </template>
 
@@ -154,6 +161,7 @@
 import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort } from '@/utils/format.js'
+import { getConfig } from '@/utils/config.js'
 
 const MONTH_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -186,7 +194,9 @@ export default {
 			years: [],
 			year: new Date().getFullYear(),
 			sourceCount: 0,
-			freshText: ''
+			freshText: '',
+			// 审核模式：整页只显示空态
+			reviewMode: false
 		}
 	},
 
@@ -285,7 +295,11 @@ export default {
 	},
 
 	onLoad() {
-		this.getData()
+		// 审核态不拉任何数据
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+			if (!this.reviewMode) this.getData()
+		})
 	},
 
 	onShow() {
@@ -293,6 +307,10 @@ export default {
 	},
 
 	onPullDownRefresh() {
+		if (this.reviewMode) {
+			uni.stopPullDownRefresh()
+			return
+		}
 		this.getData(true).then(() => uni.stopPullDownRefresh())
 	},
 

@@ -1,5 +1,6 @@
 <template>
 	<view class="page">
+		<block v-if="!reviewMode">
 		<view class="header">
 			<text class="title">火箭大全</text>
 			<text class="subtitle">主流现役与历史型号，按发射次数排序</text>
@@ -118,6 +119,13 @@
 				<text v-else>已显示全部 {{ filtered.length }} 个型号</text>
 			</view>
 		</view>
+		</block>
+
+		<!-- 审核模式：tabBar 已隐藏，本页正常情况到不了，留空态兜底 -->
+		<view class="empty" v-else>
+			<text class="empty-icon">🚀</text>
+			<text class="hint-text">敬请期待</text>
+		</view>
 	</view>
 </template>
 
@@ -125,6 +133,7 @@
 import spaceData from '@/utils/data.js'
 import { rocketName } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
+import { getConfig } from '@/utils/config.js'
 
 const STEP = 14
 // 系列太多（66 个），只把最活跃的放进筛选条，其余靠搜索
@@ -161,6 +170,8 @@ export default {
 			family: '',
 			cnOnly: false,
 			listNum: STEP,
+			// 审核模式：整页只显示空态
+			reviewMode: false,
 			statusOptions: [
 				{ label: '全部', value: 'all' },
 				{ label: '现役', value: 'active' },
@@ -250,7 +261,11 @@ export default {
 	},
 
 	onLoad() {
-		this.getData()
+		// 审核态不拉任何数据
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+			if (!this.reviewMode) this.getData()
+		})
 	},
 
 	onShow() {
@@ -258,12 +273,16 @@ export default {
 	},
 
 	onPullDownRefresh() {
+		if (this.reviewMode) {
+			uni.stopPullDownRefresh()
+			return
+		}
 		this.listNum = STEP
 		this.getData(true).then(() => uni.stopPullDownRefresh())
 	},
 
 	onReachBottom() {
-		if (!this.hasMore) return
+		if (this.reviewMode || !this.hasMore) return
 		this.listNum += STEP
 	},
 

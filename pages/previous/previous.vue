@@ -1,5 +1,6 @@
 <template>
 	<view class="page">
+		<block v-if="!reviewMode">
 		<view class="stat" v-if="total">
 			<text class="stat-main">已发射 {{ total }} 次</text>
 			<text class="stat-sub">{{ progressText }}</text>
@@ -30,6 +31,13 @@
 			<text v-else-if="hasMore">上拉加载更多</text>
 			<text v-else>已显示全部 {{ list.length }} 条</text>
 		</view>
+		</block>
+
+		<!-- 审核模式：tabBar 已隐藏，本页正常情况到不了，留空态兜底 -->
+		<view class="empty" v-else>
+			<text class="empty-icon">🛰️</text>
+			<text class="hint-text">敬请期待</text>
+		</view>
 	</view>
 </template>
 
@@ -38,6 +46,7 @@ import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { loadIndex, loadPage, clearIndex } from '@/utils/history.js'
 import { snapshot as favSnapshot } from '@/utils/favorites.js'
+import { getConfig } from '@/utils/config.js'
 
 const STEP = 12
 
@@ -56,7 +65,9 @@ export default {
 			listNum: STEP,
 			// 归档索引与已加载到的分片
 			index: null,
-			pageIndex: 0
+			pageIndex: 0,
+			// 审核模式：整页只显示空态
+			reviewMode: false
 		}
 	},
 
@@ -88,8 +99,14 @@ export default {
 	},
 
 	onLoad() {
-		this.getData()
-		this.prepareArchive()
+		// 审核态不拉任何数据，页面只剩空态
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+			if (!this.reviewMode) {
+				this.getData()
+				this.prepareArchive()
+			}
+		})
 	},
 
 	onShow() {
@@ -97,6 +114,10 @@ export default {
 	},
 
 	onPullDownRefresh() {
+		if (this.reviewMode) {
+			uni.stopPullDownRefresh()
+			return
+		}
 		this.listNum = STEP
 		this.pageIndex = 0
 		this.index = null
@@ -104,6 +125,7 @@ export default {
 	},
 
 	onReachBottom() {
+		if (this.reviewMode) return
 		if (this.hasLocal) {
 			this.listNum += STEP
 			return
