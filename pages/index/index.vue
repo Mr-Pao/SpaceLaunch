@@ -83,33 +83,8 @@
 			</view>
 		</block>
 
-		<!-- 审核态静态展示页：纯介绍，无任何动态内容与跳转 -->
-		<view class="intro" v-else>
-			<view class="intro-card">
-				<view class="intro-item">
-					<text class="intro-icon">📅</text>
-					<view class="intro-txt">
-						<text class="intro-name">发射排期</text>
-						<text class="intro-desc">全球航天发射时间表，实时更新</text>
-					</view>
-				</view>
-				<view class="intro-item">
-					<text class="intro-icon">⏱️</text>
-					<view class="intro-txt">
-						<text class="intro-name">发射倒计时</text>
-						<text class="intro-desc">精确到秒的任务发射倒计时</text>
-					</view>
-				</view>
-				<view class="intro-item">
-					<text class="intro-icon">🚀</text>
-					<view class="intro-txt">
-						<text class="intro-name">火箭参数</text>
-						<text class="intro-desc">现役与历史运载火箭性能数据</text>
-					</view>
-				</view>
-			</view>
-			<text class="intro-foot">数据每日自动同步</text>
-		</view>
+		<!-- 审核态：整页不放内容，getConfig 回来后直接切到火箭大全页 -->
+		<view v-else></view>
 	</view>
 </template>
 
@@ -180,11 +155,13 @@ export default {
 			delay: (Math.random() * 2).toFixed(2) + 's'
 		}))
 		this.startRocketAnimation()
-		// 开关先回来再决定拉不拉数据：审核态整页是静态展示卡，一次请求都不发
+		// 审核态：首页不放内容，直接把入口切到火箭大全（tabBar 已隐藏，
+		// 审核员看到的就是一个纯粹的火箭参数查询工具）；本机切「展示」后也一样
 		getConfig().then((c) => {
 			this.reviewMode = Boolean(c && c.review)
 			if (this.reviewMode) {
 				this.stopRocketAnimation()
+				uni.switchTab({ url: '/pages/rockets/rockets' })
 				return
 			}
 			this.getData()
@@ -429,61 +406,5 @@ export default {
 
 .next-wrap {
 	margin-bottom: 14rpx;
-}
-
-/* 审核态静态展示页 */
-.intro {
-	position: relative;
-	z-index: 1;
-	padding: 0 40rpx;
-}
-
-.intro-card {
-	background: #141a26;
-	border-radius: 20rpx;
-	border: 1rpx solid rgba(255, 255, 255, 0.05);
-	padding: 10rpx 30rpx;
-}
-
-.intro-item {
-	display: flex;
-	align-items: center;
-	padding: 26rpx 0;
-}
-
-.intro-item + .intro-item {
-	border-top: 1rpx solid rgba(255, 255, 255, 0.05);
-}
-
-.intro-icon {
-	font-size: 44rpx;
-	margin-right: 24rpx;
-}
-
-.intro-txt {
-	flex: 1;
-	display: flex;
-	flex-direction: column;
-}
-
-.intro-name {
-	color: #e2e8f0;
-	font-size: 30rpx;
-	font-weight: 600;
-}
-
-.intro-desc {
-	margin-top: 4rpx;
-	color: #6b7891;
-	font-size: 24rpx;
-	line-height: 1.5;
-}
-
-.intro-foot {
-	display: block;
-	margin-top: 40rpx;
-	text-align: center;
-	color: #3d4a5c;
-	font-size: 22rpx;
 }
 </style>

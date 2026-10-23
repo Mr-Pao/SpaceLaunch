@@ -37,12 +37,12 @@
 
 <script>
 import { CHANGELOG } from '@/utils/changelog.js'
-import { getConfig, setOverride, refreshRemote } from '@/utils/config.js'
+import { setOverride } from '@/utils/config.js'
 
 export default {
 	data() {
 		return {
-			// 暗门计数：3 秒内连点 5 次「版本记录」标题才呼出口令框
+			// 暗门计数：3 秒内连点 5 次「版本记录」标题才呼出开关
 			taps: 0,
 			tapTimer: null
 		}
@@ -75,50 +75,18 @@ export default {
 			}
 		},
 
-		async showPanel() {
-			// 先拉一次远程最新状态，面板显示的才是 COS 上此刻的值
-			const remote = await refreshRemote()
-			const remoteText = remote ? (remote.review ? '审核态' : '正常') : '拉取失败'
-
-			// 本机是否设了覆盖（覆盖优先于远程，只影响这台手机）
-			const local = await getConfig()
-			const overridden = uni.getStorageSync('appReviewConfigOverride')
-			const localText =
-				overridden && typeof overridden.review === 'boolean'
-					? overridden.review
-						? '本机审核态'
-						: '本机正常态'
-					: '跟随远程（' + (local.review ? '审核态' : '正常') + '）'
-
-			uni.showModal({
-				title: '展示开关',
-				content: '远程：' + remoteText + '\n当前生效：' + localText,
-				showCancel: false,
-				confirmText: '调整',
-				success: () => this.showActions()
-			})
-		},
-
-		showActions() {
+		// 只有两项，静默切换：切完直接跳到对应首页，
+		// 「展示」后的界面与审核员看到的一致（火箭大全，无 tabBar）
+		showPanel() {
 			uni.showActionSheet({
-				itemList: [
-					'本机切到审核态',
-					'本机切到正常态',
-					'清除本机覆盖（跟随远程）',
-					'重新拉取远程状态'
-				],
+				itemList: ['展示', '正常'],
 				success: (res) => {
 					if (res.tapIndex === 0) {
 						setOverride(true)
-						uni.showToast({ title: '本机已切审核态', icon: 'none' })
+						uni.reLaunch({ url: '/pages/rockets/rockets' })
 					} else if (res.tapIndex === 1) {
 						setOverride(false)
-						uni.showToast({ title: '本机已切正常态', icon: 'none' })
-					} else if (res.tapIndex === 2) {
-						setOverride(null)
-						uni.showToast({ title: '已恢复跟随远程', icon: 'none' })
-					} else if (res.tapIndex === 3) {
-						this.showPanel()
+						uni.reLaunch({ url: '/pages/index/index' })
 					}
 				}
 			})
