@@ -1,22 +1,74 @@
 <template>
 	<view class="page">
 		<view class="header">
-			<text class="title">运载火箭</text>
-			<text class="subtitle">{{ all.length }} 个型号 · 现役优先</text>
+			<text class="title">火箭大全</text>
+			<text class="subtitle">主流现役与历史型号，按发射次数排序</text>
 		</view>
 
-		<!-- 532 个型号，没有搜索没法用 -->
+		<!-- 顶部统计 -->
+		<view class="stats">
+			<view class="stat-cell" v-for="s in stats" :key="s.label">
+				<text class="stat-num">{{ s.value }}</text>
+				<text class="stat-label">{{ s.label }}</text>
+			</view>
+		</view>
+
+		<!-- 搜索 -->
 		<view class="search">
 			<text class="search-icon">🔍</text>
 			<input
 				class="search-input"
 				v-model="keyword"
 				type="text"
-				placeholder="搜索型号、制造商，如 Falcon、长征"
+				placeholder="搜索型号、系列、制造商"
 				placeholder-class="search-ph"
 				confirm-type="search"
 			/>
 			<text class="search-clear" v-if="keyword" @click="keyword = ''">✕</text>
+		</view>
+
+		<!-- 状态筛选：只有三档，直接平铺；右侧加一个「中国火箭」快捷入口 -->
+		<view class="filter-row">
+			<view
+				class="chip"
+				v-for="s in statusOptions"
+				:key="s.value"
+				:class="{ on: status === s.value }"
+				@click="status = s.value"
+			>
+				{{ s.label }}
+			</view>
+			<view class="chip chip-cn" :class="{ on: cnOnly }" @click="cnOnly = !cnOnly">
+				中国火箭
+			</view>
+		</view>
+
+		<!-- 系列筛选：数量多，横向滚动 -->
+		<scroll-view class="family-scroll" scroll-x enable-flex :show-scrollbar="false">
+			<view class="family-inner">
+				<view
+					class="chip chip-sm"
+					:class="{ on: family === '' }"
+					@click="family = ''"
+				>
+					全部系列
+				</view>
+				<view
+					class="chip chip-sm"
+					v-for="f in topFamilies"
+					:key="f.name"
+					:class="{ on: family === f.name }"
+					@click="family = f.name"
+				>
+					{{ f.name }}
+					<text class="chip-count">{{ f.count }}</text>
+				</view>
+			</view>
+		</scroll-view>
+
+		<view class="result-line">
+			<text class="result-text">共 {{ filtered.length }} 个型号</text>
+			<text class="result-reset" v-if="hasFilter" @click="resetFilter">清空筛选</text>
 		</view>
 
 		<view class="loading" v-if="loading && !all.length">
@@ -31,7 +83,7 @@
 
 		<view class="empty" v-else-if="!filtered.length">
 			<text class="empty-icon">🔍</text>
-			<text class="hint-text">没有匹配「{{ keyword }}」的型号</text>
+			<text class="hint-text">没有符合条件的型号</text>
 		</view>
 
 		<view class="list" v-else>
@@ -75,6 +127,29 @@ import { rocketName } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 
 const STEP = 14
+// 系列太多（66 个），只把最活跃的放进筛选条，其余靠搜索
+const FAMILY_LIMIT = 20
+
+/**
+ * 中国火箭的系列名。
+ * LL2 的型号库**没有国家字段**（manufacturer 只是字符串），
+ * 所以用「系列白名单 + 制造商含 China」两条路一起判断 ——
+ * LandSpace、Galactic Energy 这类公司名里并没有 China。
+ */
+const CN_FAMILIES = [
+	'Long March',
+	'Zhuque',
+	'Ceres',
+	'Kuaizhou',
+	'Kinetica',
+	'Gravity',
+	'Pallas',
+	'Tianlong',
+	'Lijian',
+	'Hyperbola',
+	'Kaituo',
+	'Jielong'
+]
 
 export default {
 	data() {
@@ -82,27 +157,95 @@ export default {
 			all: [],
 			loading: true,
 			keyword: '',
-			listNum: STEP
+			status: 'all',
+			family: '',
+			cnOnly: false,
+			listNum: STEP,
+			statusOptions: [
+				{ label: '全部', value: 'all' },
+				{ label: '现役', value: 'active' },
+				{ label: '退役', value: 'retired' }
+			]
 		}
 	},
 
 	computed: {
+		stats() {
+			const list = this.all
+			if (!list.length) return []
+
+			const families = new Set()
+			const makers = new Set()
+			let active = 0
+
+			for (const x of list) {
+				if (x.active) active++
+				if (x.manufacturer) makers.add(x.manufacturer)
+				const fam = (x.families || [])[0]
+				if (fam) families.add(fam)
+			}
+
+			return [
+				{ label: '个型号', value: list.length },
+				{ label: '现役', value: active },
+				{ label: '个系列', value: families.size },
+				{ label: '家制造商', value: makers.size }
+			]
+		},
+
+		// 系列按「现役型号数」优先排序，再按总数。
+		// 纯按总数排的话，Delta / Thor / Titan 这些老系列会排在前面，
+		// 点进去全是退役型号，筛选条就失去意义了
+		topFamilies() {
+			const map = new Map()
+			for (const x of this.all) {
+				const fam = (x.families || [])[0]
+				if (!fam) continue
+				const cur = map.get(fam) || { total: 0, active: 0 }
+				cur.total++
+				if (x.active) cur.active++
+				map.set(fam, cur)
+			}
+
+			return [...map.entries()]
+				.sort((a, b) => b[1].active - a[1].active || b[1].total - a[1].total)
+				.slice(0, FAMILY_LIMIT)
+				.map(([name, v]) => ({ name, count: v.total }))
+		},
+
 		filtered() {
 			const q = this.keyword.trim().toLowerCase()
-			if (!q) return this.all
 
 			return this.all.filter((x) => {
+				if (this.status === 'active' && !x.active) return false
+				if (this.status === 'retired' && x.active) return false
+
+				if (this.cnOnly && !isChinese(x)) return false
+
+				if (this.family) {
+					const fams = x.families || []
+					if (fams.indexOf(this.family) === -1) return false
+				}
+
+				if (!q) return true
+
 				const hay = [x.zhName, x.name, x.full_name, x.manufacturer, (x.families || []).join(' ')]
 					.join(' ')
 					.toLowerCase()
 				return hay.indexOf(q) !== -1
 			})
 		},
+
 		visible() {
 			return this.filtered.slice(0, this.listNum)
 		},
+
 		hasMore() {
 			return this.listNum < this.filtered.length
+		},
+
+		hasFilter() {
+			return this.status !== 'all' || !!this.family || this.cnOnly || !!this.keyword.trim()
 		}
 	},
 
@@ -155,6 +298,13 @@ export default {
 			}
 		},
 
+		resetFilter() {
+			this.status = 'all'
+			this.family = ''
+			this.cnOnly = false
+			this.keyword = ''
+		},
+
 		goRocket(r) {
 			uni.navigateTo({
 				url: '/pages/rocket/rocket?id=' + r.id + '&name=' + encodeURIComponent(r.zhName || r.name)
@@ -163,11 +313,31 @@ export default {
 	},
 
 	watch: {
-		// 换关键词时重新从第一批开始渲染
 		keyword() {
+			this.listNum = STEP
+		},
+		status() {
+			this.listNum = STEP
+		},
+		family() {
+			this.listNum = STEP
+		},
+		cnOnly() {
 			this.listNum = STEP
 		}
 	}
+}
+
+/** 是否中国火箭：制造商含 China，或系列命中白名单 */
+function isChinese(x) {
+	const maker = (x.manufacturer || '').toLowerCase()
+	if (maker.indexOf('china') !== -1 || maker.indexOf('chinese') !== -1) return true
+
+	const fams = x.families || []
+	for (const f of fams) {
+		if (CN_FAMILIES.indexOf(f) !== -1) return true
+	}
+	return false
 }
 
 function leoOf(kg) {
@@ -189,7 +359,7 @@ function leoOf(kg) {
 }
 
 .header {
-	padding: 40rpx 8rpx 20rpx;
+	padding: 36rpx 8rpx 24rpx;
 }
 
 .title {
@@ -207,12 +377,47 @@ function leoOf(kg) {
 	font-size: 24rpx;
 }
 
+/* 顶部四格统计 */
+.stats {
+	display: flex;
+	margin-bottom: 22rpx;
+}
+
+.stat-cell {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 22rpx 0;
+	margin-right: 12rpx;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	border-radius: 16rpx;
+}
+
+.stat-cell:last-child {
+	margin-right: 0;
+}
+
+.stat-num {
+	color: #ffffff;
+	font-size: 38rpx;
+	font-weight: 600;
+	line-height: 1.15;
+}
+
+.stat-label {
+	margin-top: 6rpx;
+	color: #6b7891;
+	font-size: 20rpx;
+}
+
 /* 搜索 */
 .search {
 	display: flex;
 	align-items: center;
 	height: 76rpx;
-	margin: 0 0 20rpx;
+	margin-bottom: 18rpx;
 	padding: 0 24rpx;
 	background: #141a26;
 	border: 1rpx solid rgba(255, 255, 255, 0.06);
@@ -240,6 +445,86 @@ function leoOf(kg) {
 	padding: 0 8rpx;
 	color: #4a5568;
 	font-size: 26rpx;
+}
+
+/* 筛选项 */
+.filter-row {
+	display: flex;
+	margin-bottom: 14rpx;
+}
+
+.chip {
+	padding: 10rpx 26rpx;
+	margin-right: 14rpx;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.06);
+	border-radius: 30rpx;
+	color: #8a97a8;
+	font-size: 25rpx;
+}
+
+.chip.on {
+	background: rgba(56, 189, 248, 0.14);
+	border-color: rgba(56, 189, 248, 0.45);
+	color: #38bdf8;
+}
+
+/* 「中国火箭」用琥珀色区分：它是跨系列的快捷筛选，不是状态 */
+.chip-cn {
+	margin-left: auto;
+	margin-right: 0;
+}
+
+.chip-cn.on {
+	background: rgba(245, 195, 59, 0.14);
+	border-color: rgba(245, 195, 59, 0.45);
+	color: #f5c33b;
+}
+
+.chip-sm {
+	padding: 8rpx 20rpx;
+	font-size: 23rpx;
+}
+
+.chip-count {
+	margin-left: 8rpx;
+	color: #4a5568;
+	font-size: 20rpx;
+}
+
+.chip.on .chip-count {
+	color: rgba(56, 189, 248, 0.7);
+}
+
+/* 系列横向滚动。scroll-view 横向滚动必须有确定高度，否则会塌陷 */
+.family-scroll {
+	width: 100%;
+	height: 68rpx;
+	margin-bottom: 16rpx;
+	white-space: nowrap;
+}
+
+.family-inner {
+	display: flex;
+	align-items: center;
+	padding-bottom: 4rpx;
+}
+
+.result-line {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4rpx 8rpx 16rpx;
+}
+
+.result-text {
+	color: #6b7891;
+	font-size: 23rpx;
+}
+
+.result-reset {
+	color: #38bdf8;
+	font-size: 23rpx;
 }
 
 /* 卡片 */
