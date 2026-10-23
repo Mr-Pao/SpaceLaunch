@@ -36,6 +36,7 @@
 				<text class="tag tag-provider" v-if="providerName">{{ providerName }}</text>
 			</view>
 
+
 			<view class="foot">
 				<text class="status" :class="status.cls">{{ status.text }}</text>
 			</view>
@@ -181,17 +182,19 @@ export default {
 	font-size: 24rpx;
 }
 
+/* 型号和机构分两行：挤在一行时两个都会被截成「长…」「China Aerospace…」，
+   什么都看不出来。竖排后各自按内容宽度，超长才截断 */
 .tags {
-	margin-top: 12rpx;
 	display: flex;
-	flex-wrap: nowrap;
-	overflow: hidden;
+	flex-direction: column;
+	align-items: flex-start;
+	margin-top: 12rpx;
 }
 
 .tag {
 	max-width: 100%;
+	margin-bottom: 8rpx;
 	padding: 4rpx 14rpx;
-	margin-right: 10rpx;
 	background: rgba(56, 189, 248, 0.1);
 	color: #7bb8e0;
 	font-size: 22rpx;
@@ -199,6 +202,10 @@ export default {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.tag:last-child {
+	margin-bottom: 0;
 }
 
 .tag-provider {
