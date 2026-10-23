@@ -33,11 +33,11 @@
 
 			<view class="tags">
 				<text class="tag" v-if="rocketName">{{ rocketName }}</text>
-				<text class="tag tag-provider" v-if="providerName">{{ providerName }}</text>
 			</view>
 
-
+			<!-- 机构与状态同一行：机构名长了就截断，状态始终靠右完整显示 -->
 			<view class="foot">
+				<text class="tag tag-provider" v-if="providerName">{{ providerName }}</text>
 				<text class="status" :class="status.cls">{{ status.text }}</text>
 			</view>
 		</view>
@@ -182,8 +182,7 @@ export default {
 	font-size: 24rpx;
 }
 
-/* 型号和机构分两行：挤在一行时两个都会被截成「长…」「China Aerospace…」，
-   什么都看不出来。竖排后各自按内容宽度，超长才截断 */
+/* 型号单独一行，机构与状态合成一行 —— 省高度，且状态始终完整可见 */
 .tags {
 	display: flex;
 	flex-direction: column;
@@ -193,7 +192,6 @@ export default {
 
 .tag {
 	max-width: 100%;
-	margin-bottom: 8rpx;
 	padding: 4rpx 14rpx;
 	background: rgba(56, 189, 248, 0.1);
 	color: #7bb8e0;
@@ -204,22 +202,27 @@ export default {
 	text-overflow: ellipsis;
 }
 
-.tag:last-child {
-	margin-bottom: 0;
-}
-
+/* 机构名常常极长，让它吃掉剩余宽度、超出就省略，把右端留给状态 */
 .tag-provider {
+	flex: 1;
+	min-width: 0;
+	margin-right: 12rpx;
 	background: rgba(255, 255, 255, 0.06);
 	color: #8a97a8;
 }
 
 .foot {
+	/* auto 让它贴到卡片底部，标题只有一行时也不会浮在中间 */
 	margin-top: auto;
+	padding-top: 10rpx;
 	display: flex;
-	justify-content: flex-end;
+	align-items: center;
 }
 
 .status {
+	flex-shrink: 0;
+	/* 没有机构时也要靠右 */
+	margin-left: auto;
 	font-size: 22rpx;
 	padding: 4rpx 14rpx;
 	border-radius: 6rpx;
