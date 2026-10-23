@@ -45,37 +45,40 @@
 
 /* ---------- 中间「即将发射」凸起的圆按钮 ---------- */
 
-/* 圆形背景绝对定位，不参与 flex 排布，5 等分的宽度不会被它挤乱 */
+/* 圆形背景绝对定位，不参与 flex 排布，5 等分的宽度不会被它挤乱。
+   用实心深色 + 阴影做出「从胶囊里长出来」的立体感 ——
+   之前用半透明底 + 描边，看起来只是个圈套在图标上，和胶囊是两张皮 */
 .ctb-mid-bg {
 	position: absolute;
 	left: 50%;
-	top: -24rpx;
-	width: 104rpx;
-	height: 104rpx;
-	margin-left: -52rpx;
+	top: -18rpx;
+	width: 96rpx;
+	height: 96rpx;
+	margin-left: -48rpx;
 	border-radius: 50%;
-	background: rgba(56, 189, 248, 0.13);
-	border: 1rpx solid rgba(56, 189, 248, 0.3);
+	background: #1a2333;
+	border: 1rpx solid rgba(255, 255, 255, 0.09);
+	box-shadow: 0 6rpx 18rpx rgba(0, 0, 0, 0.55);
 	z-index: 0;
 }
 
 .ctb-mid .ctb-icon {
 	position: relative;
 	z-index: 1;
-	width: 58rpx;
-	height: 58rpx;
+	width: 52rpx;
+	height: 52rpx;
 	/* 图标跟着圆形往上顶，标签位置不动 */
-	margin-top: -16rpx;
+	margin-top: -12rpx;
 }
 
 .ctb-mid .ctb-label {
 	position: relative;
 	z-index: 1;
-	margin-top: 4rpx;
+	margin-top: 10rpx;
 }
 
 .ctb-mid.ctb-on .ctb-mid-bg {
-	background: rgba(56, 189, 248, 0.24);
-	border-color: rgba(56, 189, 248, 0.65);
-	box-shadow: 0 8rpx 26rpx rgba(56, 189, 248, 0.35);
+	background: #1e2c42;
+	border-color: rgba(56, 189, 248, 0.5);
+	box-shadow: 0 6rpx 24rpx rgba(56, 189, 248, 0.32);
 }
