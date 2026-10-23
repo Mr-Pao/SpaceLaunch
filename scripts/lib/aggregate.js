@@ -16,6 +16,37 @@ const OK = ['Success', 'Deployed']
 const BAD = ['Failure']
 const PARTIAL = ['Partial']
 
+/**
+ * 统一两种 launch 结构
+ *
+ * stats 的数据源有两个，字段形态不一样：
+ *   - launches-previous.json 用的是 slimLaunch（status 是对象、rocket.configuration、pad.location）
+ *   - history/pNN.json       用的是 slimStatLaunch（status 是字符串、rocket 是字符串、site）
+ * 必须先把字段拍平成同一种，否则聚合出来全是 `[object Object]`。
+ */
+function normalize(x) {
+	const status =
+		typeof x.status === 'string'
+			? x.status
+			: (x.status && (x.status.abbrev || x.status.name)) || ''
+
+	const rocket =
+		typeof x.rocket === 'string'
+			? x.rocket
+			: (x.rocket && x.rocket.configuration && x.rocket.configuration.name) || ''
+
+	const site = x.site || (x.pad && x.pad.location && x.pad.location.name) || ''
+
+	const orbit =
+		x.orbit ||
+		(x.mission && x.mission.orbit && (x.mission.orbit.abbrev || x.mission.orbit.name)) ||
+		''
+
+	const agency = x.agency || (x.launch_service_provider && x.launch_service_provider.name) || ''
+
+	return { status, rocket, site, orbit, agency }
+}
+
 function bump(map, key) {
 	if (!key) return
 	map.set(key, (map.get(key) || 0) + 1)
@@ -60,28 +91,30 @@ function aggregateByYear(list) {
 
 		row.total++
 
-		const s = x.status || ''
+		const f = normalize(x)
+		const s = f.status
+
 		if (OK.indexOf(s) !== -1) row.success++
 		else if (BAD.indexOf(s) !== -1) row.fail++
 		else if (PARTIAL.indexOf(s) !== -1) row.partial++
 
-		if (x.orbit === 'Sub') row.sub++
+		if (f.orbit === 'Sub') row.sub++
 
 		const m = at.getMonth()
 		if (m >= 0 && m < 12) row.months[m]++
 
-		bump(row.rockets, x.rocket)
-		bump(row.sites, x.site)
-		bump(row.agencies, x.agency)
-		bump(row.orbits, x.orbit || '未标注')
+		bump(row.rockets, f.rocket)
+		bump(row.sites, f.site)
+		bump(row.agencies, f.agency)
+		bump(row.orbits, f.orbit || '未标注')
 
 		if (BAD.indexOf(s) !== -1 || PARTIAL.indexOf(s) !== -1) {
 			row.failures.push({
 				id: x.id || '',
 				name: x.name || '',
 				net: x.net,
-				rocket: x.rocket || '',
-				site: x.site || '',
+				rocket: f.rocket,
+				site: f.site,
 				status: s
 			})
 		}

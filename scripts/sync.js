@@ -99,7 +99,9 @@ const DATASETS = {
 		localize: localizeLaunches,
 		images: ['image', { path: 'infographic', preset: 'large' }],
 		async fetch() {
-			const j = await getJson('/launches/previous/?limit=50&mode=normal&format=json')
+			// limit=100 仍是 1 个请求，和 limit=50 同价：已发射页首屏翻倍，
+			// stats 的数据源也随之变大（stats 会读这个文件）
+			const j = await getJson('/launches/previous/?limit=100&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
 		}
 	},
