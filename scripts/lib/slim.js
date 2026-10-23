@@ -23,18 +23,25 @@ const num = (v) => (typeof v === 'number' ? v : null)
  * 找不到就回退英文全称，前端不必再做判断。
  */
 const STATUS_ZH = {
+	// abbrev → 中文
 	Go: '就绪',
 	TBC: '待定',
 	TBD: '待定',
-	Scheduled: '已排期',
-	'In Flight': '飞行中',
 	Success: '成功',
 	Failure: '失败',
-	'Partial Failure': '部分失败',
+	Partial: '部分成功',
+	Deployed: '已部署',
+	'In Flight': '飞行中',
 	Hold: '暂停',
+	Scheduled: '已排期',
+	// name → 中文（LL2 的 abbrev 偶尔和 name 对不上，两套都兜住）
 	'Go for Launch': '就绪',
 	'To Be Confirmed': '待定',
-	'To Be Determined': '待定'
+	'To Be Determined': '待定',
+	'Launch Successful': '成功',
+	'Launch Failure': '失败',
+	'Payload Deployed': '已部署',
+	'Partial Failure': '部分成功'
 }
 
 function statusZh(status) {
