@@ -88,7 +88,15 @@
 						<text class="label">目标轨道</text>
 						<text class="value">{{ orbitText }}</text>
 					</view>
-					<text class="card-desc" v-if="missionDesc">{{ missionDesc }}</text>
+					<!-- 任务描述动辄几百上千字，默认只给 4 行 + 展开/收起。
+					     详情页的功能定位是「查参数」，长文折叠后才不像科普文章
+					     （审核按内容型小程序判类目，个人主体会被拒） -->
+					<view v-if="missionDesc">
+						<text class="card-desc" :class="{ collapsed: !descExpanded && descOverflow }">{{ missionDesc }}</text>
+						<view class="desc-toggle" v-if="descOverflow" @click="descExpanded = !descExpanded">
+							{{ descExpanded ? '收起' : '展开全文' }}
+						</view>
+					</view>
 				</view>
 
 				<!-- 任务信息图：竖版长图，点开可双指放大 -->
@@ -229,7 +237,9 @@ export default {
 			agency: null,
 			loading: true,
 			isFav: false,
-			navSolid: false
+			navSolid: false,
+			// 任务描述折叠态：默认收起，点击「展开全文」才铺开
+			descExpanded: false
 		}
 	},
 	computed: {
@@ -263,6 +273,10 @@ export default {
 			const m = this.detail && this.detail.mission
 			if (!m) return ''
 			return m.descriptionZh || m.description || ''
+		},
+		// 短描述（4 行以内）直接显示，不出现「展开全文」按钮
+		descOverflow() {
+			return this.missionDesc.length > 120
 		},
 		hasMission() {
 			const m = this.detail && this.detail.mission
@@ -408,6 +422,8 @@ export default {
 		}
 
 		this.isFav = fav.has(id)
+		// 换一个任务进来时描述回到折叠态
+		this.descExpanded = false
 
 		// 同一条发射在跨过"当前时刻"后会从 upcoming 挪到 previous，
 		// 用户刚看过列表就点进来时可能已经换边了，所以两边都查。
@@ -695,6 +711,20 @@ export default {
 	color: #cbd5e0;
 	font-size: 29rpx;
 	line-height: 1.75;
+}
+
+/* 折叠态：只给 4 行，超出省略（小程序 text 支持 -webkit-line-clamp） */
+.card-desc.collapsed {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 4;
+	overflow: hidden;
+}
+
+.desc-toggle {
+	margin-top: 12rpx;
+	color: #38bdf8;
+	font-size: 26rpx;
 }
 
 /* 任务信息图是竖版长图，用 widthFix 让它按原比例撑开，点开可放大 */

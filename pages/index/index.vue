@@ -19,7 +19,9 @@
 				@click="goVersion"
 			></image>
 			<text class="title">太空发射任务</text>
-			<text class="subtitle">探索宇宙的壮丽旅程</text>
+			<!-- 副标题写成功能描述而不是宣传语：
+			     审核按「内容型小程序」判定类目，文案越像口号越容易被归到资讯 -->
+			<text class="subtitle">实时排期 · 发射倒计时</text>
 		</view>
 
 		<!-- 只有完全没有缓存时才整屏转圈，有缓存时下面直接出内容 -->

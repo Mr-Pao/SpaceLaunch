@@ -81,9 +81,10 @@ export default {
 	methods: {
 		formatShort,
 
-		// 活动描述动辄几百字，卡片里只给三行，避免一屏放不下一条
+		// 活动描述动辄几百字，卡片里只给两行 —— 既省空间，
+		// 也避免整页看起来像「科普文章列表」（审核按内容型小程序判类目会拒）
 		descOf(item) {
-			return truncate(item.descriptionZh || item.description, 96)
+			return truncate(item.descriptionZh || item.description, 60)
 		}
 	}
 }
