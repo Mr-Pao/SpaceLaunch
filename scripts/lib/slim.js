@@ -107,12 +107,10 @@ function slimLaunch(l) {
 			configuration: {
 				id: c.id ?? null,
 				name: str(c.name),
-				full_name: str(c.full_name),
-				// 火箭参数，目前只用在详情页的「运载火箭」卡片里，没有就整行不显示
-				length: num(c.length),
-				diameter: num(c.diameter),
-				launch_mass: num(c.launch_mass),
-				leo_capacity: num(c.leo_capacity)
+				full_name: str(c.full_name)
+				// 长度 / 直径 / 起飞质量 / 运力这些参数**只有 mode=detailed 才返回**，
+				// 而 detailed 实测 72 秒超时，不可用。normal 模式下 c.length 等恒为 undefined，
+				// 取过来也是 null，所以不取 —— 免得前端摆一个永远空着的「火箭参数」卡片。
 			}
 		},
 

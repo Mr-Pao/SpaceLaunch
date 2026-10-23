@@ -78,10 +78,6 @@
 						<text class="label">配置</text>
 						<text class="value">{{ detail.rocket.configuration.name }}</text>
 					</view>
-					<view class="row" v-for="s in rocketSpecs" :key="s.label">
-						<text class="label">{{ s.label }}</text>
-						<text class="value">{{ s.value }}</text>
-					</view>
 				</view>
 
 				<!-- 发射条件：概率和天气顾虑都是 LL2 的可选字段，没有就整块不显示 -->
@@ -190,21 +186,6 @@ export default {
 		rocketName() {
 			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
 			return c ? c.full_name || c.name || '' : ''
-		},
-		// 火箭参数，只显示有值的项；LL2 里这些字段经常是 null
-		rocketSpecs() {
-			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
-			if (!c) return []
-
-			const specs = []
-			const m = (v) => v.toFixed(1).replace(/\.0$/, '') + ' 米'
-			const t = (kg) => (kg / 1000).toFixed(1).replace(/\.0$/, '') + ' 吨'
-
-			if (c.length) specs.push({ label: '长度', value: m(c.length) })
-			if (c.diameter) specs.push({ label: '直径', value: m(c.diameter) })
-			if (c.launch_mass) specs.push({ label: '起飞质量', value: t(c.launch_mass) })
-			if (c.leo_capacity) specs.push({ label: '近地运力', value: t(c.leo_capacity) })
-			return specs
 		},
 		probabilityText() {
 			const p = this.detail && this.detail.probability
