@@ -24,11 +24,12 @@ const { getJson } = require('./lib/fetch')
 const { slimLaunch, slimEvent, slimAgency } = require('./lib/slim')
 const { upload } = require('./lib/cos')
 const { localizeLaunches, localizeEvents, localizeAgencies } = require('./lib/localize')
+const { mirrorImages } = require('./lib/image')
 const translate = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
-// v2: 快照新增 descriptionZh / status.nameZh 字段，旧缓存必须整体失效
-const DATA_VERSION = 2
+// v3: 图片改为 COS 托管的缩略图地址，旧缓存里的原图 URL 真机加载不出来
+const DATA_VERSION = 3
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {
@@ -36,6 +37,7 @@ const DATASETS = {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',
 		localize: localizeLaunches,
+		images: ['image', 'pad.map_image'],
 		async fetch() {
 			const j = await getJson('/launches/upcoming/?limit=50&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
@@ -45,6 +47,7 @@ const DATASETS = {
 		file: 'launches-previous.json',
 		cacheControl: 'public, max-age=3600',
 		localize: localizeLaunches,
+		images: ['image'],
 		async fetch() {
 			const j = await getJson('/launches/previous/?limit=50&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
@@ -54,6 +57,7 @@ const DATASETS = {
 		file: 'events.json',
 		cacheControl: 'public, max-age=300',
 		localize: localizeEvents,
+		images: ['feature_image'],
 		async fetch() {
 			const j = await getJson('/events/upcoming/?limit=50&format=json')
 			return { count: j.count, list: j.results.map(slimEvent) }
@@ -61,7 +65,9 @@ const DATASETS = {
 	},
 	agencies: {
 		file: 'agencies.json',
-		cacheControl: 'public, max-age=3600',
+		// 机构图很少变，缓存一天；图片本身在 COS 上是一年
+		cacheControl: 'public, max-age=86400',
+		images: ['image_url', 'logo_url'],
 		// 机构是全项目唯一需要真翻页的：实测 count=350，limit=100 → 4 页
 		// 每天只跑一次，4 个请求可以接受
 		async fetch() {
@@ -149,6 +155,16 @@ async function runDataset(name) {
 		} catch (e) {
 			// 翻译是增强项，失败不能拖垮整个同步
 			console.warn(`  ! 中文回填失败，本次仍输出英文: ${e.message}`)
+		}
+	}
+
+	// 图片统一换成 COS 上的缩略图地址：原域名没备案，真机加载不出来；
+	// 而且原图太大，直接走 COS 流量会把预算吃穿
+	if (ds.images) {
+		try {
+			await mirrorImages(list, ds.images)
+		} catch (e) {
+			console.warn(`  ! 图片镜像失败，保留原始地址: ${e.message}`)
 		}
 	}
 

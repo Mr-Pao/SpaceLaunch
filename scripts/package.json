@@ -11,6 +11,7 @@
     "verify": "node verify-slim.js"
   },
   "dependencies": {
-    "cos-nodejs-sdk-v5": "^2.14.6"
+    "cos-nodejs-sdk-v5": "^2.14.6",
+    "sharp": "^0.35.5"
   }
 }

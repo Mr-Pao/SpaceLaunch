@@ -33,8 +33,8 @@
 export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-data'
 
 // 数据结构变更时改这个值，所有旧缓存整体失效
-// v2: 快照新增 descriptionZh / status.nameZh（中文由同步阶段写入）
-const DATA_VERSION = 2
+// v3: 图片换成 COS 缩略图地址（原图域名无备案，真机加载不出来）
+const DATA_VERSION = 3
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {
