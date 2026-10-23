@@ -19,13 +19,13 @@
 	font-size: 24rpx;
 }
 
+/* 卡片间距由卡片自己负责（launch-card 的 .card 带 margin-bottom）。
+   这里不能用 `.list > *`：scoped 编译后会变成 `.list > *.data-v-xxx`，
+   WXSS 不接受 `*` 后面跟类名，会直接报 “error at token *”。 */
+
 .list {
 	display: flex;
 	flex-direction: column;
-}
-
-.list > * {
-	margin-bottom: 20rpx;
 }
 
 .loading,

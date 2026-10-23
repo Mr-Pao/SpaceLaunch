@@ -74,6 +74,9 @@ export default {
 	display: flex;
 	width: 100%;
 	box-sizing: border-box;
+	/* 卡片间距放在组件自己身上，父页面就不用写 `.list > *` 这种
+	   scoped 编译后会变成非法选择器的写法 */
+	margin-bottom: 20rpx;
 	padding: 20rpx;
 	background: #141a26;
 	border-radius: 20rpx;
