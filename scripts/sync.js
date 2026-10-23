@@ -23,15 +23,19 @@ const path = require('path')
 const { getJson } = require('./lib/fetch')
 const { slimLaunch, slimEvent, slimAgency } = require('./lib/slim')
 const { upload } = require('./lib/cos')
+const { localizeLaunches, localizeEvents, localizeAgencies } = require('./lib/localize')
+const translate = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
-const DATA_VERSION = 1
+// v2: 快照新增 descriptionZh / status.nameZh 字段，旧缓存必须整体失效
+const DATA_VERSION = 2
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {
 	upcoming: {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',
+		localize: localizeLaunches,
 		async fetch() {
 			const j = await getJson('/launches/upcoming/?limit=50&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
@@ -40,6 +44,7 @@ const DATASETS = {
 	previous: {
 		file: 'launches-previous.json',
 		cacheControl: 'public, max-age=3600',
+		localize: localizeLaunches,
 		async fetch() {
 			const j = await getJson('/launches/previous/?limit=50&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
@@ -48,6 +53,7 @@ const DATASETS = {
 	events: {
 		file: 'events.json',
 		cacheControl: 'public, max-age=300',
+		localize: localizeEvents,
 		async fetch() {
 			const j = await getJson('/events/upcoming/?limit=50&format=json')
 			return { count: j.count, list: j.results.map(slimEvent) }
@@ -135,6 +141,17 @@ async function runDataset(name) {
 
 	validate(name, list)
 
+	// 中文化必须在写 JSON 之前完成，这样 COS 上的快照本身就带中文，
+	// 小程序端不需要任何翻译逻辑，也没有额外请求
+	if (ds.localize) {
+		try {
+			await ds.localize(list)
+		} catch (e) {
+			// 翻译是增强项，失败不能拖垮整个同步
+			console.warn(`  ! 中文回填失败，本次仍输出英文: ${e.message}`)
+		}
+	}
+
 	const payload = {
 		v: DATA_VERSION,
 		dataset: name,
@@ -172,6 +189,9 @@ async function runDataset(name) {
 
 	fs.mkdirSync(OUT_DIR, { recursive: true })
 
+	// 先读翻译缓存：CI 每次都是全新容器，不读的话每轮都要全量重翻，必然撞限额
+	await translate.loadCache()
+
 	console.log(`\n=== 同步 ${targets.join(', ')} ===`)
 	const summary = []
 	let failed = false
@@ -188,6 +208,22 @@ async function runDataset(name) {
 	console.log('\n=== 汇总 ===')
 	for (const s of summary) {
 		console.log(`  ${s.file.padEnd(26)} ${String(s.served).padStart(3)}/${String(s.count).padEnd(5)} 条  ${s.kb} KB`)
+	}
+
+	// 翻译缓存要回传 COS，否则下一轮 CI 又是零命中
+	const t = translate.summary()
+	console.log(
+		`\n  翻译: 命中缓存 ${t.hit} / 新翻成功 ${t.ok} / 失败 ${t.fail} / 缓存池 ${t.cached} 条` +
+			(t.quotaExhausted ? '  ⚠️ 配额已用尽，剩余条目下轮再补' : '')
+	)
+
+	if (t.dirty) {
+		const cachePath = translate.saveCache()
+		try {
+			await upload(cachePath, 'space-data/translation-cache.json', 'public, max-age=3600')
+		} catch (e) {
+			console.warn('  ! 翻译缓存上传失败（不影响数据）: ' + e.message)
+		}
 	}
 
 	if (failed) {

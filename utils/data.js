@@ -33,7 +33,8 @@
 export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-data'
 
 // 数据结构变更时改这个值，所有旧缓存整体失效
-const DATA_VERSION = 1
+// v2: 快照新增 descriptionZh / status.nameZh（中文由同步阶段写入）
+const DATA_VERSION = 2
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {
@@ -140,9 +141,11 @@ function fetchDataset(name) {
 	const url = CDN_BASE + '/' + FILES[name] + '?t=' + Math.floor(Date.now() / 60000)
 
 	return request(url).then((body) => {
-		// 版本不匹配说明本地方案与线上数据不同步，宁可用缓存也不污染
+		// 版本不一致不拒绝，只提示：字段都是后加的，旧数据照样能用（前端对缺失字段有回退）。
+		// 硬拒绝会让"前端先更新、后端还没跑"的窗口期整页报错。
+		// 缓存 key 里带版本号，所以旧缓存不会被误用。
 		if (body.v !== DATA_VERSION) {
-			throw new Error('数据版本不匹配：' + body.v)
+			console.warn('[spaceData] 数据版本不一致，线上 ' + body.v + ' / 本地 ' + DATA_VERSION)
 		}
 
 		const cached = {

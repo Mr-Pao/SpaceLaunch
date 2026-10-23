@@ -16,6 +16,38 @@ const str = (v) => (typeof v === 'string' ? v : '')
 const num = (v) => (typeof v === 'number' ? v : null)
 
 /**
+ * 发射状态的中文名。LL2 给的是英文全称（status.name），
+ * abbrev 是 Go / TBC / Success 这种缩写，直接显示对中文用户不友好。
+ *
+ * 用词刻意压到 2–3 个字：状态徽章是个小胶囊，超过 3 字会撑破布局。
+ * 找不到就回退英文全称，前端不必再做判断。
+ */
+const STATUS_ZH = {
+	Go: '就绪',
+	TBC: '待定',
+	TBD: '待定',
+	Scheduled: '已排期',
+	'In Flight': '飞行中',
+	Success: '成功',
+	Failure: '失败',
+	'Partial Failure': '部分失败',
+	Hold: '暂停',
+	'Go for Launch': '就绪',
+	'To Be Confirmed': '待定',
+	'To Be Determined': '待定'
+}
+
+function statusZh(status) {
+	if (!status) return ''
+	return (
+		STATUS_ZH[status.abbrev] ||
+		STATUS_ZH[status.name] ||
+		STATUS_ZH[status.description] ||
+		str(status.name)
+	)
+}
+
+/**
  * 数字或字符串都转成展示字符串
  * 坑：agency.founding_year 在 API 里是 number（如 1960），只判断 string 会得到空值，
  * 表现为"成立时间"永远空白
@@ -54,7 +86,9 @@ function slimLaunch(l) {
 
 		status: {
 			name: str(l.status && l.status.name),
-			abbrev: str(l.status && l.status.abbrev)
+			abbrev: str(l.status && l.status.abbrev),
+			// 状态是固定枚举，本地查表即可，不需要走翻译接口
+			nameZh: statusZh(l.status)
 		},
 
 		rocket: {
@@ -75,6 +109,9 @@ function slimLaunch(l) {
 
 		mission: {
 			description: str(l.mission && l.mission.description),
+			// 中文描述由 lib/localize.js 在同步阶段回填，翻不出来就留空，
+			// 前端用 descriptionZh || description 回退英文
+			descriptionZh: '',
 			type: str(l.mission && l.mission.type)
 		},
 
@@ -95,6 +132,7 @@ function slimEvent(e) {
 		name: str(e.name),
 		date: str(e.date),
 		description: str(e.description),
+		descriptionZh: '',
 		// 实测字段名是 image（对象），不是 feature_image。
 		// 读错字段的后果是活动列表 29 条全部无图
 		feature_image: imageUrl(e.image) || str(e.feature_image),
@@ -120,6 +158,7 @@ function slimAgency(a) {
 		type: str(a.type && a.type.name) || str(a.type),
 		founding_year: strOrNum(a.founding_year),
 		description: str(a.description),
+		descriptionZh: '',
 		// 实测真实字段名是 image / logo / social_logo，都是对象或 null，
 		// 根本没有 image_url / logo_url 这两个字段（旧页面一直读错，机构图从来没显示过）
 		image_url: imageUrl(a.image) || str(a.image_url),
@@ -134,4 +173,4 @@ function slimAgency(a) {
 	}
 }
 
-module.exports = { slimLaunch, slimEvent, slimAgency, imageUrl, joinNames }
+module.exports = { slimLaunch, slimEvent, slimAgency, imageUrl, joinNames, statusZh, STATUS_ZH }

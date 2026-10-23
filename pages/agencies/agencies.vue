@@ -26,8 +26,8 @@
 					<view class="cell-picture" v-if="Agencies.logo_url && Agencies.image_url">
 						<image :src="Agencies.logo_url" mode="widthFix"></image>
 					</view>
-					<view class="cell-details" v-if="Agencies.description">
-						{{ Agencies.description }}
+					<view class="cell-details" v-if="Agencies.descriptionZh || Agencies.description">
+						{{ Agencies.descriptionZh || Agencies.description }}
 					</view>
 					<view class="cell-item" v-if="Agencies.abbrev">
 						<view class="cell-item-title">缩写</view>

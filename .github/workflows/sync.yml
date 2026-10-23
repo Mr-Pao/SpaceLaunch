@@ -87,6 +87,9 @@ jobs:
           # 桶本身是私有读，靠单个对象打 public-read 让小程序能拉到
           # 不加这个，CI 上传的文件在浏览器里会 403
           COS_ACL: public-read
+          # 描述中文化：CI 在海外节点，Google 免费端点可直连且不限量，
+          # auto 表示 Google 挂了自动降级到 MyMemory，两条都挂就保留英文
+          TRANSLATE_PROVIDER: auto
         run: node sync.js --dataset=${{ steps.pick.outputs.dataset }}
 
       # GitHub 规定：公开仓库连续 60 天无提交，定时任务会被自动停用。

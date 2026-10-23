@@ -20,10 +20,10 @@
 					<uni-dateformat :date="detail.net" format="yyyy年MM月dd日 hh时mm分ss秒"></uni-dateformat>
 				</view>
 
-				<view class="cell-group" v-if="detail.mission && (detail.mission.description || detail.mission.type)">
+				<view class="cell-group" v-if="detail.mission && (detail.mission.descriptionZh || detail.mission.description || detail.mission.type)">
 					<view class="cell-title">任务信息</view>
-					<view class="cell-details" v-if="detail.mission.description">
-						{{ detail.mission.description }}
+					<view class="cell-details" v-if="detail.mission.descriptionZh || detail.mission.description">
+						{{ detail.mission.descriptionZh || detail.mission.description }}
 					</view>
 					<view class="cell-item" v-if="detail.mission.type">
 						<view class="cell-item-title">类型</view>

@@ -27,8 +27,8 @@
 					<uni-tag v-if="item.launches.length > 0" :circle="true" :text="item.launches[0].name" type="warning" size="mini" />
 				</view>
 
-				<view class="cell-desc" v-if="item.description">
-					{{ item.description }}
+				<view class="cell-desc" v-if="item.descriptionZh || item.description">
+					{{ item.descriptionZh || item.description }}
 				</view>
 			</view>
 

@@ -13,7 +13,9 @@
 
 		<!-- 标题区域 -->
 		<view class="header">
-			<image class="logo" src="/static/logo.png" mode="aspectFill"></image>
+			<view class="logo-badge">
+				<image class="rocket logo-rocket" src="/static/rocket.png" mode="aspectFit"></image>
+			</view>
 			<text class="title">太空发射任务</text>
 			<text class="subtitle">探索宇宙的壮丽旅程</text>
 		</view>
@@ -21,7 +23,12 @@
 		<!-- 加载状态：只有完全没有缓存时才出现 -->
 		<view class="loading" v-if="loading && launches.length === 0">
 			<view class="rocket-loading">
-				<image class="rocket-icon" src="/static/logo.png" :style="{ transform: 'translateY(' + rocketY + 'px)' }"></image>
+				<image
+					class="rocket"
+					src="/static/rocket.png"
+					mode="aspectFit"
+					:style="{ transform: 'translateY(' + rocketY + 'px)' }"
+				></image>
 				<view class="flame"></view>
 			</view>
 			<text class="loading-text">准备发射...</text>
@@ -51,7 +58,7 @@
 					<view class="card-header">
 						<text class="mission-name">{{ launch.name }}</text>
 						<view class="status-badge" :class="getStatusClass(launch.status && launch.status.name)">
-							{{ (launch.status && launch.status.abbrev) || '未知' }}
+							{{ (launch.status && (launch.status.nameZh || launch.status.abbrev)) || '未知' }}
 						</view>
 					</view>
 
@@ -71,8 +78,8 @@
 							</view>
 						</view>
 
-						<view class="card-description" v-if="launch.mission && launch.mission.description">
-							<text>{{ truncateText(launch.mission.description, 120) }}</text>
+						<view class="card-description" v-if="launch.mission && (launch.mission.descriptionZh || launch.mission.description)">
+							<text>{{ truncateText(launch.mission.descriptionZh || launch.mission.description, 120) }}</text>
 						</view>
 					</view>
 
@@ -280,12 +287,30 @@ export default {
 	padding: 60rpx 20rpx 40rpx;
 }
 
-.logo {
+/* 品牌徽章（替代原 uview 默认 logo） */
+.logo-badge {
 	width: 180rpx;
 	height: 180rpx;
+	margin: 0 auto 30rpx;
 	border-radius: 50%;
-	margin-bottom: 30rpx;
-	box-shadow: 0 0 40rpx rgba(255, 255, 255, 0.3);
+	background: radial-gradient(circle at 50% 32%, #1e3a5f 0%, #0b1220 72%);
+	border: 2rpx solid rgba(96, 165, 250, 0.35);
+	box-shadow: 0 0 40rpx rgba(56, 189, 248, 0.28), inset 0 0 30rpx rgba(56, 189, 248, 0.12);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.logo-rocket {
+	transform: scale(0.86);
+}
+
+/* 火箭图标（static/rocket.png，透明底） */
+.rocket {
+	width: 60rpx;
+	height: 120rpx;
+	transition: transform 0.1s ease;
+	z-index: 2;
 }
 
 .title {
@@ -322,27 +347,21 @@ export default {
 	align-items: center;
 }
 
-.rocket-icon {
-	width: 80rpx;
-	height: 80rpx;
-	transition: transform 0.1s ease;
-	z-index: 2;
-}
-
 .flame {
 	position: absolute;
-	bottom: 20rpx;
-	width: 30rpx;
-	height: 60rpx;
+	bottom: 16rpx;
+	width: 26rpx;
+	height: 62rpx;
 	background: linear-gradient(to top, #ff6b6b, #ffd700);
-	border-radius: 50% 50% 10% 10%;
-	animation: flame 0.5s infinite alternate;
-	opacity: 0.8;
+	border-radius: 50% 50% 20% 20%;
+	transform-origin: top center;
+	animation: flame 0.45s infinite alternate;
+	opacity: 0.85;
 }
 
 @keyframes flame {
-	0% { height: 50rpx; opacity: 0.7; }
-	100% { height: 70rpx; opacity: 1; }
+	from { transform: scaleY(0.75); opacity: 0.6; }
+	to { transform: scaleY(1.2); opacity: 1; }
 }
 
 .loading-text {
