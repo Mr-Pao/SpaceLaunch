@@ -48,7 +48,7 @@
 					v-for="item in visible"
 					:key="item.id"
 					:item="item"
-					@tap="goDetail"
+					@select="goDetail"
 				/>
 			</view>
 

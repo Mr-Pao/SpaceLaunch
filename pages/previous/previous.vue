@@ -6,7 +6,7 @@
 		</view>
 
 		<view class="list">
-			<launch-card v-for="item in visible" :key="item.id" :item="item" @tap="goDetail" />
+			<launch-card v-for="item in visible" :key="item.id" :item="item" @select="goDetail" />
 		</view>
 
 		<view class="loading" v-if="loading && visible.length === 0">

@@ -1,5 +1,7 @@
 <template>
-	<view class="card" hover-class="card-hover" @click="$emit('tap', item)">
+	<!-- 事件名不能叫 tap / click：小程序端自定义组件上的 @tap 会被编译成原生
+	     bindtap，$emit 出来时不一定能落到父页面的 handler 上，卡片就点不动了 -->
+	<view class="card" hover-class="card-hover" @click="$emit('select', item)">
 		<!-- lazy-load：列表滚动到可视区才真正下载图片，50 条卡片一次性触发下载会很卡 -->
 		<image
 			v-if="item.image"
@@ -44,7 +46,7 @@ export default {
 			required: true
 		}
 	},
-	emits: ['tap'],
+	emits: ['select'],
 	computed: {
 		timeText() {
 			// 历史发射看「多久前」、未来发射看「多久后」，同一个函数两种语境都对

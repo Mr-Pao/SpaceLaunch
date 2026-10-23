@@ -17,8 +17,8 @@
  *   this.launches = d.list
  *
  * 详情页不要传下标，传 id：
- *   uni.navigateTo({ url: '/pages/upcoming/upcomingInfo?id=' + launch.id })
- *   const item = await spaceData.getById('upcoming', options.id)
+ *   uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + launch.id })
+ *   const item = spaceData.findLaunchById(options.id)
  */
 
 // ============ 配置 ============
