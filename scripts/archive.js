@@ -19,6 +19,10 @@
  * ⚠️ 归档阶段**不做翻译**：800 条 × 每条约 1.5 秒，翻完就超 CI 的 15 分钟上限了。
  * 老数据的任务名会是英文，前端 launchTitle 已做 fallback；需要中文可以另跑回填任务。
  *
+ * 全部抓完之后转维护模式：每次刷新最新 MAINT_PAGES 片。
+ * 新发射会把整个列表往下顶，offset 分页会在头部留下一道空缺，重抓头部就能补上。
+ * 重写旧片前会先把已回填的中文搬过来，否则会冲掉 backfill 的成果。
+ *
  * 用法：
  *   node archive.js                # 自适应页数（默认）
  *   node archive.js --pages=3      # 强制本轮页数
@@ -128,6 +132,69 @@ async function readState() {
 	return { next: START_OFFSET, total: 0, pages: [], done: false, updatedAt: '', refreshed: 0 }
 }
 
+/** 读 COS 上已有的分片。读不到返回 null，调用方按「没有旧内容」处理 */
+async function readPage(key) {
+	const { COS_BUCKET, COS_REGION } = process.env
+	const url = `https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${key}`
+
+	try {
+		const res = await fetch(url, { signal: AbortSignal.timeout(20000) })
+		if (!res.ok) return null
+		const j = await res.json()
+		return Array.isArray(j.list) ? j : null
+	} catch (e) {
+		return null
+	}
+}
+
+/**
+ * 把旧片里已经回填好的中文搬到新抓的这一片上。
+ *
+ * 维护模式会重写头部几片，而译文是 backfill 任务另外补进去的，
+ * 直接覆盖会把已经翻好的任务名/描述冲掉，且 backfill 的游标早已走过这几片，
+ * 不会再来补 —— 于是这几片永久变回英文。
+ * 所以在写回之前，按 id 把译文搬过来，一次网络翻译都不用做。
+ */
+function carryTranslations(list, old) {
+	if (!old) return 0
+
+	const zhMap = new Map()
+	for (const x of old.list || []) {
+		const m = x.mission || {}
+		if (!x.id) continue
+		zhMap.set(x.id, {
+			nameZh: (m && m.nameZh) || '',
+			descriptionZh: (m && m.descriptionZh) || '',
+			weather_concernsZh: x.weather_concernsZh || '',
+			failreasonZh: x.failreasonZh || ''
+		})
+	}
+	if (!zhMap.size) return 0
+
+	// 统计实际搬走了几个字段，不是匹配了几条：
+	// 还没回填译文的片匹配上了也是 0，报成「保留 100 条」会让人以为译文齐全
+	let moved = 0
+	for (const x of list) {
+		const saved = zhMap.get(x.id)
+		if (!saved) continue
+
+		const put = (holder, key, value) => {
+			if (value && !holder[key]) {
+				holder[key] = value
+				moved++
+			}
+		}
+
+		if (x.mission) {
+			put(x.mission, 'nameZh', saved.nameZh)
+			put(x.mission, 'descriptionZh', saved.descriptionZh)
+		}
+		put(x, 'weather_concernsZh', saved.weather_concernsZh)
+		put(x, 'failreasonZh', saved.failreasonZh)
+	}
+	return moved
+}
+
 async function putJson(obj, key) {
 	const file = path.join(OUT_DIR, key.replace(/\//g, '_'))
 	fs.writeFileSync(file, JSON.stringify(obj), 'utf8')
@@ -180,7 +247,7 @@ function planPages(state, forced) {
  * @param {string} name   要写入的分片文件名
  * @param {number} index  分片序号，写进 JSON 里方便排查
  */
-async function pullPage(offset, name, index) {
+async function pullPage(offset, name, index, keepZh) {
 	const j = await getJsonWithRetry(
 		`/launches/previous/?limit=${PAGE_SIZE}&offset=${offset}&mode=normal&format=json`
 	)
@@ -190,6 +257,13 @@ async function pullPage(offset, name, index) {
 	if (!results.length) return { count: 0, total: j.count || 0, ok: true }
 
 	const list = results.map(slimLaunch)
+
+	// 只有重写旧片时才需要搬译文，新片本来就没译文可搬
+	let moved = 0
+	if (keepZh) {
+		const old = await readPage(`${PREFIX}/${name}`)
+		moved = carryTranslations(list, old)
+	}
 
 	await putJson(
 		{
@@ -203,7 +277,7 @@ async function pullPage(offset, name, index) {
 		`${PREFIX}/${name}`
 	)
 
-	return { count: results.length, total: j.count || 0, ok: true, list }
+	return { count: results.length, total: j.count || 0, ok: true, list, moved }
 }
 
 /** 拿到的这一页，和上一页的边界衔接得上吗。用来验证分页没漂移 */
@@ -213,7 +287,7 @@ function checkChain(prevOldest, list) {
 	return Date.parse(newest) <= Date.parse(prevOldest)
 }
 
-async function saveAndReport(state, pulled, note) {
+async function saveAndReport(state, pulled, note, head) {
 	state.updatedAt = new Date().toISOString()
 	await putJson(state, `${PREFIX}/state.json`)
 
@@ -233,7 +307,7 @@ async function saveAndReport(state, pulled, note) {
 
 	const pct = ((state.next / (state.total || 1)) * 100).toFixed(1)
 	console.log(
-		`\n本轮归档 ${pulled} 条，累计 ${state.next}/${state.total || '?'}（${pct}%）${note}\n`
+		`\n${head || '本轮归档 ' + pulled + ' 条，累计 ' + state.next + '/' + (state.total || '?') + '（' + pct + '%）'}${note}\n`
 	)
 }
 
@@ -251,7 +325,8 @@ async function maintain(state) {
 
 	for (let i = 0; i < n; i++) {
 		const offset = START_OFFSET + PAGE_SIZE * i
-		const r = await pullPage(offset, state.pages[i].file, i)
+		// 最后一个参数 true = 重写旧片，先把已有译文搬过来再覆盖
+		const r = await pullPage(offset, state.pages[i].file, i, true)
 		if (!r.ok) break
 
 		state.total = r.total || state.total
@@ -266,15 +341,23 @@ async function maintain(state) {
 		pulled += r.count
 		state.refreshed = (state.refreshed || 0) + 1
 
-		console.log(`  ${state.pages[i].file}  第 ${offset}-${state.next} 条  ${r.count} 项`)
+		console.log(
+			`  ${state.pages[i].file}  第 ${offset}-${offset + r.count} 条  ${r.count} 项` +
+				(r.moved ? `  搬回译文 ${r.moved} 处` : '')
+		)
 
 		if (i < n - 1) await sleep(2000)
 	}
 
-	await saveAndReport(state, pulled, ' · 维护模式')
+	await saveAndReport(
+		state,
+		pulled,
+		' · 维护模式',
+		`本轮刷新 ${n} 片 / ${pulled} 条（全库 ${state.total || '?'} 条已归档）`
+	)
 }
 
-;(async () => {
+async function run() {
 	const args = parseArgs(process.argv)
 	DRY_RUN = args.dry
 	fs.mkdirSync(OUT_DIR, { recursive: true })
@@ -350,7 +433,14 @@ async function maintain(state) {
 	}
 
 	await saveAndReport(state, pulled, note)
-})().catch((e) => {
-	console.error('未捕获异常:', e)
-	process.exit(1)
-})
+}
+
+// 直接 node archive.js 时才自动执行；被 require 时只导出函数，方便写验证脚本
+if (require.main === module) {
+	run().catch((e) => {
+		console.error('未捕获异常:', e)
+		process.exit(1)
+	})
+}
+
+module.exports = { run, maintain, pullPage, readPage, readState, carryTranslations, planPages, elapsedMs }
