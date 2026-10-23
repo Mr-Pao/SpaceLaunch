@@ -117,6 +117,20 @@ export default {
 				bestAt = at
 			}
 			return best
+		},
+
+		// 倒计时卡片已经展示了最近这一次，列表里要去掉，否则同一条出现两次
+		listForRender() {
+			const skip = this.nextLaunch ? this.nextLaunch.id : null
+			return skip ? this.list.filter((x) => x.id !== skip) : this.list
+		},
+
+		visible() {
+			return this.listForRender.slice(0, this.listNum)
+		},
+
+		hasMore() {
+			return this.listNum < this.listForRender.length
 		}
 	},
 

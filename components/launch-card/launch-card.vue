@@ -31,13 +31,11 @@
 				<text class="date">{{ dateText }}</text>
 			</view>
 
-			<view class="tags">
-				<text class="tag" v-if="rocketName">{{ rocketName }}</text>
-			</view>
+			<text class="rocket" v-if="rocketName">{{ rocketName }}</text>
 
-			<!-- 机构与状态同一行：机构名长了就截断，状态始终靠右完整显示 -->
+			<!-- 机构与状态同一行：机构靠左可省略，状态靠右永不换行 -->
 			<view class="foot">
-				<text class="tag tag-provider" v-if="providerName">{{ providerName }}</text>
+				<text class="provider" v-if="providerName">{{ providerName }}</text>
 				<text class="status" :class="status.cls">{{ status.text }}</text>
 			</view>
 		</view>
@@ -182,49 +180,47 @@ export default {
 	font-size: 24rpx;
 }
 
-/* 型号单独一行，机构与状态合成一行 —— 省高度，且状态始终完整可见 */
-.tags {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	margin-top: 12rpx;
-}
-
-.tag {
-	max-width: 100%;
-	padding: 4rpx 14rpx;
-	background: rgba(56, 189, 248, 0.1);
+/* 型号和机构都去掉胶囊底色，改成左对齐的纯文字，
+   比一排小方块干净，也不会因为背景色块把版面切碎 */
+.rocket {
+	display: block;
+	margin-top: 10rpx;
 	color: #7bb8e0;
-	font-size: 22rpx;
-	border-radius: 6rpx;
+	font-size: 23rpx;
+	line-height: 1.4;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-/* 机构名常常极长，让它吃掉剩余宽度、超出就省略，把右端留给状态 */
-.tag-provider {
-	flex: 1;
-	min-width: 0;
-	margin-right: 12rpx;
-	background: rgba(255, 255, 255, 0.06);
-	color: #8a97a8;
-}
-
 .foot {
 	/* auto 让它贴到卡片底部，标题只有一行时也不会浮在中间 */
 	margin-top: auto;
-	padding-top: 10rpx;
+	padding-top: 8rpx;
 	display: flex;
 	align-items: center;
 }
 
+.provider {
+	flex: 1;
+	/* min-width: 0 是关键：不加这句 flex 子项不会收缩，省略号永远不出来 */
+	min-width: 0;
+	margin-right: 14rpx;
+	color: #5d6a7d;
+	font-size: 22rpx;
+	line-height: 1.4;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .status {
 	flex-shrink: 0;
-	/* 没有机构时也要靠右 */
+	white-space: nowrap;
+	/* 没有机构时也靠右 */
 	margin-left: auto;
-	font-size: 22rpx;
-	padding: 4rpx 14rpx;
+	font-size: 21rpx;
+	padding: 3rpx 12rpx;
 	border-radius: 6rpx;
 }
 
