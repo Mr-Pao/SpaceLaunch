@@ -10,12 +10,19 @@
  *
  * 分页用 offset（LL2 的 net__lt 参数实测无效），从新到旧推进。
  *
+ * ⚠️ 为什么页数要按「距上次跑过多久」自适应：
+ * GitHub 的 schedule 事件本身就不保证准时，实测还会整点漏触发，
+ * 写死 8 页/轮的话，漏一小时就少 800 条，77 页能拖到几十小时。
+ * 现在改成按实际间隔补跑：隔了 3 小时没跑成就一次性抓 24 页，把落后补回来。
+ * 抓不完也不怕 —— 遇到 429 会退避重试，实在不行就保存断点，下一轮继续。
+ *
  * ⚠️ 归档阶段**不做翻译**：800 条 × 每条约 1.5 秒，翻完就超 CI 的 15 分钟上限了。
  * 老数据的任务名会是英文，前端 launchTitle 已做 fallback；需要中文可以另跑回填任务。
  *
  * 用法：
- *   node archive.js                # 跑一轮（默认 8 页）
- *   node archive.js --pages=3      # 自定义本轮页数
+ *   node archive.js                # 自适应页数（默认）
+ *   node archive.js --pages=3      # 强制本轮页数
+ *   node archive.js --dry          # 只抓不传，用于本地验证
  */
 
 const path = require('path')
@@ -26,9 +33,20 @@ const { upload } = require('./lib/cos')
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 const PREFIX = 'space-data/history'
 const PAGE_SIZE = 100
+
+// 干跑开关：只抓不传，方便本机验证改动
+let DRY_RUN = false
 // 每小时 15 次的预算里，upcoming 占 4、events 占 2、previous 占 1，
 // 留 8 次给归档，大约每小时 800 条
-const PAGES_PER_RUN = 8
+const PAGES_PER_HOUR = 8
+// 一轮最多抓这么多页。24 页约 6 分钟，留足 CI 的 20 分钟上限
+const MAX_PAGES = 24
+// 间隔太短就跳过，避免 push 触发时连着把配额打光
+const MIN_INTERVAL_MS = 20 * 60 * 1000
+// 抓完之后的维护模式：每次刷新最新 4 片。
+// 新发射会把整个列表往下顶，offset 分页会因此在头部留下一道空缺，
+// 头部几片重抓一次就能补上（前端按 id 去重，重复项无害）
+const MAINT_PAGES = 4
 // 覆盖 previous.json（最近 100 条）之后的数据，避免重复
 const START_OFFSET = 100
 
@@ -38,20 +56,54 @@ function baseUrl() {
 		: 'https://ll.thespacedevs.com/2.3.0'
 }
 
-async function getJson(pathAndQuery) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * 带退避的抓取
+ * LL2 匿名限 15 次/小时，超限返回 429。以前是直接 break 放弃整轮，
+ * 现在先等 30 秒重试一次，还是 429 才认输。
+ * 返回 null 表示这一页拿不到，交给调用方收尾。
+ */
+async function getJsonWithRetry(pathAndQuery) {
 	const headers = { 'User-Agent': 'SpaceLaunch/1.1 (+https://github.com/Mr-Pao/SpaceLaunch)' }
 	if (process.env.LL2_TOKEN) headers.Authorization = 'Token ' + process.env.LL2_TOKEN
 
-	const ctrl = new AbortController()
-	const timer = setTimeout(() => ctrl.abort(), 120000)
+	for (let attempt = 0; attempt < 2; attempt++) {
+		const ctrl = new AbortController()
+		const timer = setTimeout(() => ctrl.abort(), 120000)
 
-	try {
-		const res = await fetch(baseUrl() + pathAndQuery, { headers, signal: ctrl.signal })
-		if (!res.ok) throw new Error('HTTP ' + res.status)
-		return await res.json()
-	} finally {
-		clearTimeout(timer)
+		try {
+			const res = await fetch(baseUrl() + pathAndQuery, { headers, signal: ctrl.signal })
+
+			if (res.status === 429 || res.status >= 500) {
+				if (attempt === 0) {
+					console.warn(`  ! 被限流（HTTP ${res.status}），等 30 秒重试`)
+					await sleep(30000)
+					continue
+				}
+				console.warn(`  ! 仍被限流（HTTP ${res.status}），本轮到此为止`)
+				return null
+			}
+
+			if (!res.ok) throw new Error('HTTP ' + res.status)
+			return await res.json()
+		} catch (e) {
+			if (e && e.name === 'AbortError') {
+				console.warn('  ! 请求超时，本轮到此为止')
+				return null
+			}
+			if (attempt === 0) {
+				console.warn(`  ! 请求失败（${e.message}），等 10 秒重试`)
+				await sleep(10000)
+				continue
+			}
+			console.warn(`  ! 仍然失败（${e.message}），本轮到此为止`)
+			return null
+		} finally {
+			clearTimeout(timer)
+		}
 	}
+	return null
 }
 
 /** 读 COS 上的状态文件；没有就从头开始。桶是公有读，直接走 CDN 地址即可 */
@@ -73,98 +125,95 @@ async function readState() {
 	}
 
 	console.log('  归档状态: 暂无，从头开始')
-	return { next: START_OFFSET, total: 0, pages: [], done: false, updatedAt: '' }
+	return { next: START_OFFSET, total: 0, pages: [], done: false, updatedAt: '', refreshed: 0 }
 }
 
 async function putJson(obj, key) {
 	const file = path.join(OUT_DIR, key.replace(/\//g, '_'))
 	fs.writeFileSync(file, JSON.stringify(obj), 'utf8')
+
+	if (DRY_RUN) {
+		console.log(`  · 干跑：已生成 ${file}（不上传）`)
+		return
+	}
 	await upload(file, key, 'public, max-age=3600')
 }
 
 function parseArgs(argv) {
-	let pages = PAGES_PER_RUN
+	let pages = null // null = 自适应
+	let dry = false
 	for (const a of argv.slice(2)) {
+		// auto 走自适应，交给 planPages 按间隔折算
+		if (a === '--pages=auto') continue
 		const m = a.match(/^--pages=(\d+)$/)
 		if (m) pages = Number(m[1])
+		if (a === '--dry') dry = true
 	}
-	return { pages }
+	return { pages, dry }
 }
 
-;(async () => {
-	const { pages: maxPages } = parseArgs(process.argv)
-	fs.mkdirSync(OUT_DIR, { recursive: true })
+/** 距上次归档过了多久。没有记录就当成一整小时（首次跑满） */
+function elapsedMs(state) {
+	if (!state.updatedAt) return 3600 * 1000
+	const t = Date.parse(state.updatedAt)
+	return Number.isNaN(t) ? 3600 * 1000 : Date.now() - t
+}
 
-	const state = await readState()
+/**
+ * 本轮抓几页：按实际间隔折算，补回漏掉的那些小时。
+ * 间隔不足 MIN_INTERVAL_MS 就返回 0（直接跳过），
+ * 上限 MAX_PAGES 是为了不把 CI 的 20 分钟跑爆。
+ */
+function planPages(state, forced) {
+	if (typeof forced === 'number') return Math.max(0, forced)
 
-	if (state.done) {
-		console.log(`归档已完成（${state.pages.length} 片 / ${state.total} 条），本轮跳过`)
-		return
-	}
+	const ms = elapsedMs(state)
+	if (ms < MIN_INTERVAL_MS) return 0
 
-	console.log(
-		`\n=== 历史归档 ===\n  进度 ${state.next} / ${state.total || '?'} 条，已归档 ${state.pages.length} 片`
+	const pages = Math.floor((ms / 3600000) * PAGES_PER_HOUR)
+	return Math.max(1, Math.min(MAX_PAGES, pages))
+}
+
+/**
+ * 抓某一页并落盘。返回本页条数，拿不到返回 0。
+ * @param {number} offset 在 LL2 全量列表里的起始位置
+ * @param {string} name   要写入的分片文件名
+ * @param {number} index  分片序号，写进 JSON 里方便排查
+ */
+async function pullPage(offset, name, index) {
+	const j = await getJsonWithRetry(
+		`/launches/previous/?limit=${PAGE_SIZE}&offset=${offset}&mode=normal&format=json`
+	)
+	if (!j) return { count: 0, total: 0, ok: false }
+
+	const results = j.results || []
+	if (!results.length) return { count: 0, total: j.count || 0, ok: true }
+
+	const list = results.map(slimLaunch)
+
+	await putJson(
+		{
+			v: 6,
+			dataset: 'history',
+			page: index,
+			generatedAt: new Date().toISOString(),
+			count: list.length,
+			list
+		},
+		`${PREFIX}/${name}`
 	)
 
-	let pulled = 0
+	return { count: results.length, total: j.count || 0, ok: true, list }
+}
 
-	for (let i = 0; i < maxPages; i++) {
-		const offset = state.next
+/** 拿到的这一页，和上一页的边界衔接得上吗。用来验证分页没漂移 */
+function checkChain(prevOldest, list) {
+	if (!prevOldest) return true
+	const newest = list[0].net
+	return Date.parse(newest) <= Date.parse(prevOldest)
+}
 
-		let j
-		try {
-			j = await getJson(
-				`/launches/previous/?limit=${PAGE_SIZE}&offset=${offset}&mode=normal&format=json`
-			)
-		} catch (e) {
-			console.warn(`  ! 第 ${offset} 条起抓取失败（${e.message}），本轮到此为止`)
-			break
-		}
-
-		const results = j.results || []
-		state.total = j.count || state.total
-
-		if (!results.length) {
-			state.done = true
-			console.log('  已到末页，归档完成')
-			break
-		}
-
-		const list = results.map(slimLaunch)
-		const name = `p${String(state.pages.length).padStart(2, '0')}.json`
-
-		await putJson(
-			{
-				v: 6,
-				dataset: 'history',
-				page: state.pages.length,
-				generatedAt: new Date().toISOString(),
-				count: list.length,
-				list
-			},
-			`${PREFIX}/${name}`
-		)
-
-		state.pages.push({
-			file: name,
-			count: list.length,
-			// list 是 net 倒序，首个最新、末个最旧
-			from: list[list.length - 1].net,
-			to: list[0].net
-		})
-
-		state.next = offset + results.length
-		pulled += results.length
-
-		console.log(`  ${name}  第 ${offset}-${state.next} 条  ${list.length} 项`)
-
-		if (state.next >= j.count) {
-			state.done = true
-			console.log('  已到末页，归档完成')
-			break
-		}
-	}
-
+async function saveAndReport(state, pulled, note) {
 	state.updatedAt = new Date().toISOString()
 	await putJson(state, `${PREFIX}/state.json`)
 
@@ -182,9 +231,125 @@ function parseArgs(argv) {
 		`${PREFIX}/index.json`
 	)
 
+	const pct = ((state.next / (state.total || 1)) * 100).toFixed(1)
 	console.log(
-		`\n本轮归档 ${pulled} 条，累计 ${state.next}/${state.total}（${((state.next / (state.total || 1)) * 100).toFixed(1)}%）${state.done ? ' ✓ 已全部完成' : ''}\n`
+		`\n本轮归档 ${pulled} 条，累计 ${state.next}/${state.total || '?'}（${pct}%）${note}\n`
 	)
+}
+
+/**
+ * 维护模式：整库抓完之后，每次刷新最新几片。
+ * 新发射会把列表整体下推，offset 分页会在头部留下一道空缺，
+ * 重抓头部就能补上；前端按 id 去重，重复项无害。
+ */
+async function maintain(state) {
+	const total = state.pages.length
+	const n = Math.min(MAINT_PAGES, total)
+	let pulled = 0
+
+	console.log(`\n=== 历史归档（维护模式）===\n  已归档 ${total} 片 / ${state.total} 条`)
+
+	for (let i = 0; i < n; i++) {
+		const offset = START_OFFSET + PAGE_SIZE * i
+		const r = await pullPage(offset, state.pages[i].file, i)
+		if (!r.ok) break
+
+		state.total = r.total || state.total
+		state.pages[i].count = r.count
+		if (r.list && r.list.length) {
+			// list 是 net 倒序，首个最新、末个最旧
+			state.pages[i].from = r.list[r.list.length - 1].net
+			state.pages[i].to = r.list[0].net
+		}
+		// 注意不要动 state.next：全库已抓完，它记录的是归档总量，
+		// 这里只是刷新头部几片的内容，改了会让进度显示倒退
+		pulled += r.count
+		state.refreshed = (state.refreshed || 0) + 1
+
+		console.log(`  ${state.pages[i].file}  第 ${offset}-${state.next} 条  ${r.count} 项`)
+
+		if (i < n - 1) await sleep(2000)
+	}
+
+	await saveAndReport(state, pulled, ' · 维护模式')
+}
+
+;(async () => {
+	const args = parseArgs(process.argv)
+	DRY_RUN = args.dry
+	fs.mkdirSync(OUT_DIR, { recursive: true })
+
+	const state = await readState()
+
+	if (state.done) {
+		if (planPages(state, args.pages) === 0) {
+			console.log(`归档已完成且本轮无需维护（${state.pages.length} 片 / ${state.total} 条）`)
+			return
+		}
+		await maintain(state)
+		return
+	}
+
+	const maxPages = planPages(state, args.pages)
+	console.log(
+		`\n=== 历史归档 ===\n  进度 ${state.next} / ${state.total || '?'} 条，已归档 ${state.pages.length} 片\n  距上次更新 ${(elapsedMs(state) / 60000).toFixed(0)} 分钟，本轮计划 ${maxPages} 页`
+	)
+
+	if (maxPages === 0) {
+		console.log('  间隔太短，本轮跳过')
+		return
+	}
+
+	let pulled = 0
+	let prevOldest = state.pages.length ? state.pages[state.pages.length - 1].from : ''
+	let note = ''
+
+	for (let i = 0; i < maxPages; i++) {
+		const offset = state.next
+		const name = `p${String(state.pages.length).padStart(2, '0')}.json`
+
+		const r = await pullPage(offset, name, state.pages.length)
+		state.total = r.total || state.total
+
+		if (!r.ok) {
+			note = ' · 本轮未完成，下轮继续'
+			break
+		}
+		if (r.count === 0) {
+			state.done = true
+			note = ' ✓ 已全部完成'
+			break
+		}
+
+		if (!checkChain(prevOldest, r.list)) {
+			console.warn(`  ! 分页接缝异常：上一页最旧 ${prevOldest}，本页最新 ${r.list[0].net}`)
+		}
+
+		state.pages.push({
+			file: name,
+			count: r.count,
+			// list 是 net 倒序，首个最新、末个最旧
+			from: r.list[r.list.length - 1].net,
+			to: r.list[0].net
+		})
+
+		state.next = offset + r.count
+		pulled += r.count
+		prevOldest = state.pages[state.pages.length - 1].from
+
+		console.log(`  ${name}  第 ${offset}-${state.next} 条  ${r.count} 项`)
+
+		if (r.total && state.next >= r.total) {
+			state.done = true
+			note = ' ✓ 已全部完成'
+			break
+		}
+
+		// 别把 15 次/小时的额度一口气打光
+		if (i < maxPages - 1) await sleep(2000)
+	}
+
+	await saveAndReport(state, pulled, note)
 })().catch((e) => {
 	console.error('未捕获异常:', e)
 	process.exit(1)

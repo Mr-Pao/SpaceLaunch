@@ -10,16 +10,31 @@ name: archive-history
 # 配额分配（每小时）：
 #   upcoming 4（每 15 分钟）+ events 1 + previous 1 + 归档 8 = 14，留 1 次余量
 
+# 为什么排两个 cron 而不是一个：
+# GitHub 的 schedule 事件会漏触发（实测本仓库的定时曾连续几小时不跑）。
+# 只排一个点，漏一次就少 800 条；排两个点，漏一个还有另一个顶上。
+# 脚本本身按「距上次跑过多久」折算页数，两个点都命中时各抓 4 页，
+# 只命中一个时那个抓 8 页，总量自动持平，不会超 15 次/小时。
+#
+# push 触发是为了改完脚本立刻跑一次：路径收窄到归档相关的两个文件，
+# 平时推业务代码不会碰它。
+
 on:
   schedule:
-    # 每小时的 5 分钟，避开整点那批
+    # 每小时的第 5 分和第 35 分，避开整点那批
     - cron: '5 * * * *'
+    - cron: '35 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/archive.js'
+      - '.github/workflows/archive.yml'
   workflow_dispatch:
     inputs:
       pages:
-        description: '本轮抓取页数（每页 100 条）'
+        description: '本轮抓取页数（每页 100 条）；auto = 按距上次间隔自动折算'
         required: false
-        default: '8'
+        default: 'auto'
         type: string
 
 permissions:
@@ -27,13 +42,14 @@ permissions:
 
 concurrency:
   group: archive-history
+  # 排队而不是取消：两个实例同时写 state，会把断点覆盖乱
   cancel-in-progress: false
 
 jobs:
   archive:
     runs-on: ubuntu-latest
-    # 8 页 × 每页最长约 60 秒，再留给上传
-    timeout-minutes: 20
+    # 单轮上限 24 页，每页最长约 60 秒，再留给上传
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
@@ -55,4 +71,4 @@ jobs:
           COS_BUCKET: ${{ secrets.COS_BUCKET || 'spacelaunch-1258113633' }}
           COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
           COS_ACL: public-read
-        run: node archive.js --pages=${{ inputs.pages || '8' }}
+        run: node archive.js --pages=${{ inputs.pages || 'auto' }}
