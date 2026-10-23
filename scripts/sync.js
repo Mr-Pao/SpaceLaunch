@@ -140,11 +140,14 @@ const DATASETS = {
 	 * 技术参数（长度/直径/起飞质量/运力）**只在 mode=detailed 下返回**。
 	 *
 	 * 532 个型号、limit=100 → 6 页，型号参数几乎不变，每天跑一次足够。
-	 * 图片不镜像：500 多张会把 CI 顶到超时，前端用视觉头部代替，不用图。
+	 * 图片只镜像现役型号（161 张）：532 张全镜像会把 CI 顶到超时，
+	 * 退役型号的图在 slim 阶段就被置空了。
 	 */
 	launchers: {
 		file: 'launchers.json',
 		cacheControl: 'public, max-age=86400',
+		// 只镜像现役型号的图（161 张），退役的在 slim 阶段就把 image 置空了
+		images: ['image'],
 		async fetch() {
 			const all = []
 			let count = 0

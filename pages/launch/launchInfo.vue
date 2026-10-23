@@ -1,5 +1,8 @@
 <template>
 	<view class="page">
+		<!-- 沉浸式页面没有原生导航栏，返回按钮由组件自己画 -->
+		<nav-bar :solid="navSolid" :title="navSolid ? '发射任务详情' : ''" />
+
 		<view class="loading" v-if="loading">
 			<text class="loading-text">加载中...</text>
 		</view>
@@ -13,15 +16,39 @@
 		<block v-else>
 			<!-- 首图：固定高度裁切。原先是 mode=widthFix 让图片按原比例撑开，
 			     遇到竖图会占满整屏，用户得滑很久才能看到信息 -->
+			<!-- 首图：顶到屏幕最上方做沉浸式。只有一张图时用 image，
+			     将来有多张会自动走 swiper 轮播 -->
 			<view class="hero">
+				<swiper
+					v-if="heroImages.length > 1"
+					class="hero-swiper"
+					:indicator-dots="true"
+					indicator-color="rgba(255,255,255,0.35)"
+					indicator-active-color="#38bdf8"
+					:autoplay="true"
+					:interval="5000"
+					circular
+				>
+					<swiper-item v-for="(img, i) in heroImages" :key="i">
+						<image
+							class="hero-img"
+							:src="img"
+							mode="aspectFill"
+							@click="preview(img)"
+						></image>
+					</swiper-item>
+				</swiper>
+
 				<image
-					v-if="detail.image"
+					v-else-if="heroImages.length === 1"
 					class="hero-img"
-					:src="detail.image"
+					:src="heroImages[0]"
 					mode="aspectFill"
-					@click="preview(detail.image)"
+					@click="preview(heroImages[0])"
 				></image>
+
 				<view v-else class="hero-img hero-placeholder"></view>
+
 				<view class="hero-mask"></view>
 			</view>
 
@@ -201,10 +228,18 @@ export default {
 			detail: null,
 			agency: null,
 			loading: true,
-			isFav: false
+			isFav: false,
+			navSolid: false
 		}
 	},
 	computed: {
+		// 首图轮播数据。目前 LL2 一个任务只给一张图，
+		// 留成数组是为了以后多图源接进来时直接生效
+		heroImages() {
+			const d = this.detail
+			if (!d) return []
+			return [d.image].filter(Boolean)
+		},
 		netText() {
 			if (!this.detail) return ''
 			const abs = formatDateTime(this.detail.net)
@@ -358,6 +393,12 @@ export default {
 		}
 	},
 
+	// 滚过首图后导航栏切成实色，否则图片上的文字看不清
+	onPageScroll(e) {
+		const solid = e.scrollTop > 200
+		if (solid !== this.navSolid) this.navSolid = solid
+	},
+
 	async onLoad(query) {
 		const id = query && query.id
 		this.launchId = id || ''
@@ -457,11 +498,16 @@ export default {
 	border-radius: 60rpx;
 }
 
-/* 首图 */
+/* 首图：顶到屏幕最上方，状态栏压在图上，形成沉浸感 */
 .hero {
 	position: relative;
 	width: 100%;
-	height: 420rpx;
+	height: 660rpx;
+}
+
+.hero-swiper {
+	width: 100%;
+	height: 100%;
 }
 
 .hero-img {

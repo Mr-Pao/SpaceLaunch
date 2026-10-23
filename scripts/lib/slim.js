@@ -288,7 +288,9 @@ function slimLauncher(c) {
 		// 中文由 backfill 任务慢慢补，前端回退英文
 		descriptionZh: '',
 
-		image: imageUrl(c.image),
+		// 只给现役型号保留图片：532 张全镜像会把 CI 顶到超时，
+		// 退役型号的图访客也很少看，留空用占位图即可
+		image: c.active ? imageUrl(c.image) : '',
 		info_url: str(c.info_url),
 		wiki_url: str(c.wiki_url)
 	}

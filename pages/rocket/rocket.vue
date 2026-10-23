@@ -1,5 +1,8 @@
 <template>
 	<view class="page">
+		<!-- 沉浸式页面没有原生导航栏，返回按钮由组件自己画 -->
+		<nav-bar :solid="navSolid" :title="navSolid ? '运载火箭' : ''" />
+
 		<view class="loading" v-if="loading">
 			<text class="hint-text">加载中...</text>
 		</view>
@@ -11,13 +14,28 @@
 		</view>
 
 		<block v-else>
-			<!-- 头部：型号名 + 英文名 + 标签 -->
+			<!-- 头图顶到屏幕最上方，型号信息压在渐变遮罩上 -->
 			<view class="hero">
-				<text class="hero-name">{{ displayName }}</text>
-				<text class="hero-sub" v-if="subName">{{ subName }}</text>
+				<image
+					v-if="heroImages.length"
+					class="hero-img"
+					:src="heroImages[0]"
+					mode="aspectFill"
+					@click="preview(heroImages[0])"
+				></image>
+				<view v-else class="hero-img hero-placeholder">
+					<text class="hero-placeholder-icon">🚀</text>
+				</view>
 
-				<view class="hero-tags" v-if="tags.length">
-					<text class="tag" v-for="t in tags" :key="t">{{ t }}</text>
+				<view class="hero-mask"></view>
+
+				<view class="hero-body">
+					<text class="hero-name">{{ displayName }}</text>
+					<text class="hero-sub" v-if="subName">{{ subName }}</text>
+
+					<view class="hero-tags" v-if="tags.length">
+						<text class="tag" v-for="t in tags" :key="t">{{ t }}</text>
+					</view>
 				</view>
 			</view>
 
@@ -117,11 +135,18 @@ export default {
 			queryName: '',
 			config: null,
 			records: [],
-			loading: true
+			loading: true,
+			navSolid: false
 		}
 	},
 
 	computed: {
+		heroImages() {
+			const c = this.config
+			if (!c) return []
+			// 只镜像了现役型号的图，退役型号这里是空数组，走占位
+			return [c.image].filter(Boolean)
+		},
 		displayName() {
 			if (this.config) return rocketNameOf(this.config) || this.config.full_name || this.config.name
 			return this.queryName || ''
@@ -198,6 +223,12 @@ export default {
 		}
 	},
 
+	// 滚过首图后导航栏切成实色
+	onPageScroll(e) {
+		const solid = e.scrollTop > 180
+		if (solid !== this.navSolid) this.navSolid = solid
+	},
+
 	async onLoad(query) {
 		this.rocketId = (query && query.id) || ''
 		this.queryName = (query && query.name) ? decodeURIComponent(query.name) : ''
@@ -252,6 +283,11 @@ export default {
 			})
 		},
 
+		preview(url) {
+			if (!url) return
+			uni.previewImage({ urls: [url], current: url })
+		},
+
 		goDetail(item) {
 			if (!item || !item.id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + item.id })
@@ -302,10 +338,46 @@ function cost(usd) {
 	padding-bottom: 40rpx;
 }
 
-/* 头部 */
+/* 头图：顶到屏幕最上方，文字压在渐变遮罩上 */
 .hero {
-	padding: 60rpx 40rpx 60rpx;
-	background: linear-gradient(180deg, #16233a 0%, #0a0e17 100%);
+	position: relative;
+	width: 100%;
+	height: 580rpx;
+}
+
+.hero-img {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+.hero-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: linear-gradient(160deg, #1b2c47 0%, #0d1420 100%);
+}
+
+.hero-placeholder-icon {
+	font-size: 160rpx;
+	opacity: 0.18;
+}
+
+.hero-mask {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 380rpx;
+	background: linear-gradient(to bottom, rgba(10, 14, 23, 0) 0%, rgba(10, 14, 23, 0.85) 55%, #0a0e17 100%);
+}
+
+.hero-body {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	padding: 0 32rpx 34rpx;
 }
 
 .hero-name {
@@ -314,19 +386,20 @@ function cost(usd) {
 	font-size: 46rpx;
 	font-weight: 600;
 	line-height: 1.3;
+	text-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.5);
 }
 
 .hero-sub {
 	display: block;
 	margin-top: 10rpx;
-	color: #6b7891;
+	color: #a8b6c8;
 	font-size: 26rpx;
 }
 
 .hero-tags {
 	display: flex;
 	flex-wrap: wrap;
-	margin-top: 22rpx;
+	margin-top: 18rpx;
 }
 
 .tag {
@@ -341,7 +414,7 @@ function cost(usd) {
 
 .body {
 	padding: 0 24rpx;
-	margin-top: -20rpx;
+	margin-top: -24rpx;
 }
 
 /* 四个大数字 */

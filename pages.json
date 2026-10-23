@@ -46,13 +46,15 @@
 		{
 			"path": "pages/launch/launchInfo",
 			"style": {
-				"navigationBarTitleText": "发射任务详情"
+				"navigationBarTitleText": "发射任务详情",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/rocket/rocket",
 			"style": {
-				"navigationBarTitleText": "运载火箭"
+				"navigationBarTitleText": "运载火箭",
+				"navigationStyle": "custom"
 			}
 		},
 		{
