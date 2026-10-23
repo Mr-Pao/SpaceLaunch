@@ -1,54 +1,59 @@
 <template>
 	<view class="page">
-		<view class="stat" v-if="list.length">
-			<text class="stat-main">近期活动 {{ list.length }} 项</text>
-			<text class="stat-sub">{{ freshText }}</text>
-		</view>
+		<!-- 审核模式下整页只留空态：活动是资讯感最重的一块，
+		     开关来自 COS 的 app-config.json（utils/config.js），
+		     失败兜底正常展示，不影响普通用户 -->
+		<block v-if="!reviewMode">
+			<view class="stat" v-if="list.length">
+				<text class="stat-main">近期活动 {{ list.length }} 项</text>
+				<text class="stat-sub">{{ freshText }}</text>
+			</view>
 
-		<view class="list">
-			<view class="card" v-for="item in visible" :key="item.id">
-				<image
-					v-if="item.feature_image"
-					class="cover"
-					:src="item.feature_image"
-					mode="aspectFill"
-					lazy-load
-				></image>
-				<view v-else class="cover cover-empty">
-					<text class="cover-icon">🛰️</text>
-				</view>
-
-				<view class="body">
-					<view class="top">
-						<text class="type">{{ (item.type && item.type.name) || '活动' }}</text>
-						<text class="date">{{ formatShort(item.date) }}</text>
+			<view class="list">
+				<view class="card" v-for="item in visible" :key="item.id">
+					<image
+						v-if="item.feature_image"
+						class="cover"
+						:src="item.feature_image"
+						mode="aspectFill"
+						lazy-load
+					></image>
+					<view v-else class="cover cover-empty">
+						<text class="cover-icon">🛰️</text>
 					</view>
 
-					<text class="title">{{ item.name }}</text>
+					<view class="body">
+						<view class="top">
+							<text class="type">{{ (item.type && item.type.name) || '活动' }}</text>
+							<text class="date">{{ formatShort(item.date) }}</text>
+						</view>
 
-					<view class="tags" v-if="item.location || (item.launches && item.launches.length)">
-						<text class="tag" v-if="item.location">{{ item.location }}</text>
-						<text class="tag tag-link" v-if="item.launches && item.launches.length">
-							{{ item.launches[0].name }}
-						</text>
+						<text class="title">{{ item.name }}</text>
+
+						<view class="tags" v-if="item.location || (item.launches && item.launches.length)">
+							<text class="tag" v-if="item.location">{{ item.location }}</text>
+							<text class="tag tag-link" v-if="item.launches && item.launches.length">
+								{{ item.launches[0].name }}
+							</text>
+						</view>
+
+						<text class="desc" v-if="descOf(item)">{{ descOf(item) }}</text>
 					</view>
-
-					<text class="desc" v-if="descOf(item)">{{ descOf(item) }}</text>
 				</view>
 			</view>
+
+			<view class="foot-hint" v-if="visible.length > 0">
+				<text>{{ hasMore ? '上拉加载更多' : '已显示 ' + visible.length + ' 项' }}</text>
+			</view>
+		</block>
+
+		<view class="loading" v-else-if="loading">
+			<text class="hint-text">加载中...</text>
 		</view>
 
-		<view class="loading" v-if="loading && visible.length === 0">
-			<text class="hint-text">活动数据加载中...</text>
-		</view>
-
-		<view class="empty" v-else-if="!loading && visible.length === 0">
+		<view class="empty" v-else>
 			<text class="empty-icon">🛰️</text>
-			<text class="hint-text">暂无活动数据</text>
-		</view>
-
-		<view class="foot-hint" v-if="visible.length > 0">
-			<text>{{ hasMore ? '上拉加载更多' : '已显示 ' + visible.length + ' 项' }}</text>
+			<text class="hint-text">活动数据整理中</text>
 		</view>
 	</view>
 </template>
@@ -57,11 +62,23 @@
 import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort, truncate } from '@/utils/format.js'
+import { getConfig } from '@/utils/config.js'
 
 export default {
 	mixins: [createListMixin({ dataset: 'events', pageSize: 8 })],
 
+	data() {
+		return {
+			// 审核模式：为 true 时页面只显示空态
+			reviewMode: false
+		}
+	},
+
 	onLoad() {
+		// 开关和数据并行拉，谁先到都行；开关失败走兜底正常展示
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
 		this.getData()
 	},
 

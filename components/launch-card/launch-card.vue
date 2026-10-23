@@ -3,22 +3,23 @@
 	     bindtap，$emit 出来时不一定能落到父页面的 handler 上，卡片就点不动了 -->
 	<view
 		class="card"
-		:class="{ 'card-fav': fav }"
+		:class="{ 'card-fav': fav, 'card-plain': plain }"
 		hover-class="card-hover"
 		@click="$emit('select', item)"
 	>
 		<!-- 收藏标记：左侧一道琥珀色竖条，比星标角标更不打扰，但一眼能看出 -->
 		<view class="fav-mark" v-if="fav"></view>
 
-		<!-- lazy-load：列表滚动到可视区才真正下载图片，50 条卡片一次性触发下载会很卡 -->
+		<!-- plain（审核模式）下不渲染缩略图：整列变成纯文字数据行，
+		     观感是「排期表」而不是「图文资讯流」 -->
 		<image
-			v-if="item.image"
+			v-if="!plain && item.image"
 			class="thumb"
 			:src="item.image"
 			mode="aspectFill"
 			lazy-load
 		></image>
-		<view v-else class="thumb thumb-empty">
+		<view v-else-if="!plain" class="thumb thumb-empty">
 			<text class="thumb-icon">🚀</text>
 		</view>
 
@@ -52,11 +53,16 @@ export default {
 			type: Object,
 			required: true
 		},
-		// 是否已收藏，只影响视觉标记
-		fav: {
-			type: Boolean,
-			default: false
-		}
+	// 是否已收藏，只影响视觉标记
+	fav: {
+		type: Boolean,
+		default: false
+	},
+	// 纯文字模式（审核模式）：不带缩略图，列表更像数据排期表
+	plain: {
+		type: Boolean,
+		default: false
+	}
 	},
 	emits: ['select'],
 	computed: {
@@ -116,6 +122,11 @@ export default {
 
 .card-hover {
 	background: #1a2231;
+}
+
+/* 纯文字模式：没有缩略图，文字区占满整行 */
+.card-plain .info {
+	margin-left: 0;
 }
 
 .thumb {

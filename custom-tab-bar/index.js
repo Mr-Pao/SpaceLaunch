@@ -11,6 +11,8 @@
  */
 Component({
 	data: {
+		// 审核模式：为 true 时 wxml 里隐藏「活动」tab（原始索引不变，go() 不受影响）
+		review: false,
 		// 默认选中「即将发射」（索引 2），与小程序启动页一致
 		selected: 2,
 		list: [
@@ -45,6 +47,40 @@ Component({
 				iconActive: '/static/image/tabbar/tongji2.png'
 			}
 		]
+	},
+
+	lifetimes: {
+		attached() {
+			// 审核模式开关：与 utils/config.js 读同一份 COS 配置、同一个 storage key。
+			// 原生组件不走 uni-app 编译，这里单独用 wx.request 拉一次；
+			// 正常用户本地有 5 分钟内缓存时零请求。
+			const KEY = 'appReviewConfig'
+			const TTL = 5 * 60 * 1000
+
+			try {
+				const cached = wx.getStorageSync(KEY)
+				if (cached && cached.ts && cached.data && Date.now() - cached.ts < TTL) {
+					if (cached.data.review) this.setData({ review: true })
+					return
+				}
+			} catch (e) {
+				// 没缓存就走请求
+			}
+
+			wx.request({
+				url: 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-data/app-config.json',
+				timeout: 5000,
+				success: (res) => {
+					if (res.statusCode !== 200 || !res.data || typeof res.data !== 'object') return
+					// 成功结果与 vue 端共用一份缓存，谁先拉到都行
+					try {
+						wx.setStorageSync(KEY, { ts: Date.now(), data: res.data })
+					} catch (e) {}
+					if (res.data.review) this.setData({ review: true })
+				},
+				fail: () => {}
+			})
+		}
 	},
 
 	methods: {

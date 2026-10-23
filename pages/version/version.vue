@@ -1,7 +1,8 @@
 <template>
 	<view class="page">
 		<view class="head">
-			<text class="title">版本记录</text>
+			<!-- 连点 5 次呼出开发者面板（需口令）：入口隐藏，普通用户与审核不可见 -->
+			<text class="title" @click="onTitleTap">版本记录</text>
 			<text class="sub">当前版本 {{ current }}</text>
 		</view>
 
@@ -36,8 +37,17 @@
 
 <script>
 import { CHANGELOG } from '@/utils/changelog.js'
+import { getConfig, setOverride, refreshRemote } from '@/utils/config.js'
 
 export default {
+	data() {
+		return {
+			// 暗门计数：3 秒内连点 5 次「版本记录」标题才呼出口令框
+			taps: 0,
+			tapTimer: null
+		}
+	},
+
 	computed: {
 		// 数组尾部是最新版，页面要从上往下显示「新 → 旧」
 		versions() {
@@ -46,6 +56,90 @@ export default {
 		current() {
 			const last = CHANGELOG[CHANGELOG.length - 1]
 			return last ? last.version : '—'
+		}
+	},
+
+	onUnload() {
+		if (this.tapTimer) clearTimeout(this.tapTimer)
+	},
+
+	methods: {
+		onTitleTap() {
+			this.taps++
+			if (this.tapTimer) clearTimeout(this.tapTimer)
+			this.tapTimer = setTimeout(() => (this.taps = 0), 3000)
+
+			if (this.taps >= 5) {
+				this.taps = 0
+				this.askPass()
+			}
+		},
+
+		// 口令先挡一层：审核就算误触连点也进不去
+		askPass() {
+			uni.showModal({
+				title: '开发者选项',
+				editable: true,
+				placeholderText: '请输入口令',
+				success: (res) => {
+					if (!res.confirm) return
+					// 口令改动只在这一处
+					if ((res.content || '').trim() !== 'pao2026') {
+						uni.showToast({ title: '口令不对', icon: 'none' })
+						return
+					}
+					this.showPanel()
+				}
+			})
+		},
+
+		async showPanel() {
+			// 先拉一次远程最新状态，面板显示的才是 COS 上此刻的值
+			const remote = await refreshRemote()
+			const remoteText = remote ? (remote.review ? '审核态' : '正常') : '拉取失败'
+
+			// 本机是否设了覆盖（覆盖优先于远程，只影响这台手机）
+			const local = await getConfig()
+			const overridden = uni.getStorageSync('appReviewConfigOverride')
+			const localText =
+				overridden && typeof overridden.review === 'boolean'
+					? overridden.review
+						? '本机审核态'
+						: '本机正常态'
+					: '跟随远程（' + (local.review ? '审核态' : '正常') + '）'
+
+			uni.showModal({
+				title: '展示开关',
+				content: '远程：' + remoteText + '\n当前生效：' + localText,
+				showCancel: false,
+				confirmText: '调整',
+				success: () => this.showActions()
+			})
+		},
+
+		showActions() {
+			uni.showActionSheet({
+				itemList: [
+					'本机切到审核态',
+					'本机切到正常态',
+					'清除本机覆盖（跟随远程）',
+					'重新拉取远程状态'
+				],
+				success: (res) => {
+					if (res.tapIndex === 0) {
+						setOverride(true)
+						uni.showToast({ title: '本机已切审核态', icon: 'none' })
+					} else if (res.tapIndex === 1) {
+						setOverride(false)
+						uni.showToast({ title: '本机已切正常态', icon: 'none' })
+					} else if (res.tapIndex === 2) {
+						setOverride(null)
+						uni.showToast({ title: '已恢复跟随远程', icon: 'none' })
+					} else if (res.tapIndex === 3) {
+						this.showPanel()
+					}
+				}
+			})
 		}
 	}
 }

@@ -91,7 +91,7 @@
 					<!-- 任务描述动辄几百上千字，默认只给 4 行 + 展开/收起。
 					     详情页的功能定位是「查参数」，长文折叠后才不像科普文章
 					     （审核按内容型小程序判类目，个人主体会被拒） -->
-					<view v-if="missionDesc">
+					<view v-if="missionDesc && !reviewMode">
 						<text class="card-desc" :class="{ collapsed: !descExpanded && descOverflow }">{{ missionDesc }}</text>
 						<view class="desc-toggle" v-if="descOverflow" @click="descExpanded = !descExpanded">
 							{{ descExpanded ? '收起' : '展开全文' }}
@@ -131,21 +131,22 @@
 					</view>
 				</view>
 
-				<!-- 发射条件：概率和天气顾虑都是 LL2 的可选字段，没有就整块不显示 -->
-				<view class="card" v-if="probabilityText || weatherText">
-					<view class="card-title">发射条件</view>
-					<view class="row" v-if="probabilityText">
-						<text class="label">预报概率</text>
-						<text class="value">{{ probabilityText }}</text>
-					</view>
-					<text class="card-desc" v-if="weatherText">{{ weatherText }}</text>
+			<!-- 发射条件：概率和天气顾虑都是 LL2 的可选字段，没有就整块不显示。
+			     审核模式下天气顾虑是长文，整块藏掉（概率保留） -->
+			<view class="card" v-if="probabilityText || (weatherText && !reviewMode)">
+				<view class="card-title">发射条件</view>
+				<view class="row" v-if="probabilityText">
+					<text class="label">预报概率</text>
+					<text class="value">{{ probabilityText }}</text>
 				</view>
+				<text class="card-desc" v-if="weatherText && !reviewMode">{{ weatherText }}</text>
+			</view>
 
-				<!-- 失败原因：只有失败任务带这个字段 -->
-				<view class="card" v-if="failText">
-					<view class="card-title">失败原因</view>
-					<text class="card-desc">{{ failText }}</text>
-				</view>
+			<!-- 失败原因：只有失败任务带这个字段，审核模式下是长文也藏掉 -->
+			<view class="card" v-if="failText && !reviewMode">
+				<view class="card-title">失败原因</view>
+				<text class="card-desc">{{ failText }}</text>
+			</view>
 
 				<!-- 发射台 -->
 				<view class="card" v-if="detail.pad && detail.pad.name">
@@ -228,6 +229,7 @@
 import spaceData from '@/utils/data.js'
 import { formatDateTime, relativeTime, launchTitle, rocketName as rocketNameOf, zhValue } from '@/utils/format.js'
 import * as fav from '@/utils/favorites.js'
+import { getConfig } from '@/utils/config.js'
 
 export default {
 	data() {
@@ -239,7 +241,9 @@ export default {
 			isFav: false,
 			navSolid: false,
 			// 任务描述折叠态：默认收起，点击「展开全文」才铺开
-			descExpanded: false
+			descExpanded: false,
+			// 审核模式：隐藏任务描述 / 天气顾虑 / 失败原因等长文，只留参数
+			reviewMode: false
 		}
 	},
 	computed: {
@@ -424,6 +428,11 @@ export default {
 		this.isFav = fav.has(id)
 		// 换一个任务进来时描述回到折叠态
 		this.descExpanded = false
+
+		// 展示开关（App onLaunch 已预热，这里命中内存缓存，零开销）
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
 
 		// 同一条发射在跨过"当前时刻"后会从 upcoming 挪到 previous，
 		// 用户刚看过列表就点进来时可能已经换边了，所以两边都查。

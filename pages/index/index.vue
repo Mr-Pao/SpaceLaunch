@@ -61,6 +61,7 @@
 					:key="item.id"
 					:item="item"
 					:fav="favIds.indexOf(item.id) !== -1"
+					:plain="reviewMode"
 					@select="goDetail"
 				/>
 			</view>
@@ -84,6 +85,7 @@
 import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { isStillUpcoming } from '@/utils/format.js'
+import { getConfig } from '@/utils/config.js'
 
 export default {
 	// filter 用来剔掉 LL2 还挂在 upcoming 里的「已发射成功」任务
@@ -96,7 +98,9 @@ export default {
 			stars: [],
 			// 后续排期（第 100 条之后）只在第一次翻到底时拉一回
 			loadingMore: false,
-			moreDone: false
+			moreDone: false,
+			// 审核模式：列表卡片不带大图，观感是排期表而不是图文资讯流
+			reviewMode: false
 		}
 	},
 
@@ -145,6 +149,10 @@ export default {
 		}))
 		this.startRocketAnimation()
 		this.getData()
+		// 展示开关与数据并行拉；App onLaunch 已预热，这里大概率命中缓存
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
 	},
 
 	onUnload() {
