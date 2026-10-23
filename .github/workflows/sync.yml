@@ -20,6 +20,7 @@ on:
     - cron: '0 * * * *'      # 历史发射：每小时
     - cron: '0 3 * * *'      # 机构：每天 UTC 03:00 = 北京 11:00
     - cron: '30 3 * * *'     # 统计：每天 UTC 03:30 = 北京 11:30（错开机构，避免抢配额）
+    - cron: '0 20 * * *'     # 即将发射后续排期：每天 UTC 20:00 = 北京 04:00（要 4 个请求）
   workflow_dispatch:
     inputs:
       dataset:
@@ -29,6 +30,7 @@ on:
         type: choice
         options:
           - upcoming
+          - upcomingMore
           - previous
           - events
           - agencies
@@ -61,6 +63,7 @@ jobs:
               "0 * * * *")    DS="previous" ;;
               "0 3 * * *")    DS="agencies" ;;
               "30 3 * * *")   DS="stats" ;;
+              "0 20 * * *")   DS="upcomingMore" ;;
               *)              DS="upcoming" ;;
             esac
           fi

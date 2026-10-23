@@ -1,0 +1,56 @@
+name: backfill-translate
+
+# 历史分片的翻译回填
+#
+# 归档任务为了赶进度不翻译，老数据的任务名/描述是英文。
+# 这个任务专门补译文 —— 只读 COS + 调翻译接口，**不请求 LL2**，
+# 所以不占 15 次/小时的配额，可以和 archive-history 同时跑。
+#
+# 译文有永久缓存，同一句只翻一次；整批跑完（约 76 片）就不再执行。
+
+on:
+  schedule:
+    # 每 15 分钟一轮，每轮 2 片（约 200 条 × 2 字段）
+    - cron: '10,25,40,55 * * * *'
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: '本轮处理的分片数（每片 100 条）'
+        required: false
+        default: '2'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backfill-translate
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: 回填译文
+        working-directory: scripts
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET || 'spacelaunch-1258113633' }}
+          COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
+          COS_ACL: public-read
+          # CI 在海外节点，Google 免费端点可直连且不限量
+          TRANSLATE_PROVIDER: auto
+        run: node backfill.js --pages=${{ inputs.pages || '2' }}

@@ -42,6 +42,8 @@ const DATA_VERSION = 6
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {
 	upcoming: 'launches-upcoming.json',
+	// 即将发射的第 100 条之后（每天更新一次，首页翻到底时加载）
+	upcomingMore: 'launches-upcoming-more.json',
 	previous: 'launches-previous.json',
 	events: 'events.json',
 	agencies: 'agencies.json',

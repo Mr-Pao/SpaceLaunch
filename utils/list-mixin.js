@@ -109,6 +109,25 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 				this.favIds = favoriteIds(this.list)
 			},
 
+			/**
+			 * 追加一批条目（用于「翻到底后再去 CDN 拉下一段」）
+			 * 按 id 去重：分段拉取时中间有新任务插入会导致整体错位
+			 * @returns {number} 实际追加的条数
+			 */
+			appendMore(items) {
+				if (!items || !items.length) return 0
+
+				const seen = new Set()
+				for (const x of this.list) if (x.id) seen.add(x.id)
+
+				const add = items.filter((x) => x.id && !seen.has(x.id))
+				if (!add.length) return 0
+
+				this.list = this.list.concat(add)
+				if (favorite) this.favIds = favoriteIds(this.list)
+				return add.length
+			},
+
 			loadMore() {
 				if (!this.hasMore) return
 				this.listNum += pageSize

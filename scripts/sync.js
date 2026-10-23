@@ -23,7 +23,7 @@ const path = require('path')
 const { getJson } = require('./lib/fetch')
 const { slimLaunch, slimEvent, slimAgency, slimStatLaunch } = require('./lib/slim')
 const { upload } = require('./lib/cos')
-const { localizeLaunches, localizeEvents, localizeAgencies } = require('./lib/localize')
+const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
 const translate = require('./lib/translate')
 
@@ -43,8 +43,40 @@ const DATASETS = {
 		localize: localizeLaunches,
 		images: ['image', 'pad.map_image', { path: 'infographic', preset: 'large' }],
 		async fetch() {
-			const j = await getJson('/launches/upcoming/?limit=50&mode=normal&format=json')
+			// limit=100 仍然是 1 个请求，和原来的 limit=50 同价，首屏条数直接翻倍
+			const j = await getJson('/launches/upcoming/?limit=100&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
+		}
+	},
+
+	/**
+	 * 即将发射的后续排期（第 100 条之后）。
+	 *
+	 * LL2 的 upcoming 共有 476 条，主快照只取前 100 条（每 15 分钟刷一次）。
+	 * 后面的 376 条变化很慢，单独拉一个文件、每天更新一次，
+	 * 首页下拉到底时加载它 —— 这样不会因为「多拉 4 页」把 15 次/小时的配额吃光。
+	 */
+	upcomingMore: {
+		file: 'launches-upcoming-more.json',
+		cacheControl: 'public, max-age=21600',
+		// 只翻任务名：400 条连描述一起翻会顶破 CI 的 15 分钟上限
+		localize: localizeLaunchNames,
+		images: ['image', 'pad.map_image', { path: 'infographic', preset: 'large' }],
+		async fetch() {
+			const all = []
+			let count = 0
+
+			for (let offset = 100; offset < 600; offset += 100) {
+				const j = await getJson(
+					`/launches/upcoming/?limit=100&offset=${offset}&mode=normal&format=json`
+				)
+				count = j.count
+				const results = j.results || []
+				all.push(...results)
+				if (!results.length || offset + results.length >= count) break
+			}
+
+			return { count: all.length, list: all.map(slimLaunch) }
 		}
 	},
 	previous: {

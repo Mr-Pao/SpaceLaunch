@@ -70,7 +70,9 @@
 			</view>
 
 			<view class="foot-hint" v-if="visible.length > 0">
-				<text>{{ hasMore ? '上拉加载更多' : '已显示 ' + visible.length + ' 条' }}</text>
+				<text v-if="loadingMore">正在加载后续排期…</text>
+				<text v-else-if="moreDone">已显示全部 {{ list.length }} 条</text>
+				<text v-else>{{ hasMore ? '上拉加载更多' : '上拉加载后续排期' }}</text>
 			</view>
 		</view>
 	</view>
@@ -89,7 +91,10 @@ export default {
 		return {
 			rocketY: 0,
 			animationInterval: null,
-			stars: []
+			stars: [],
+			// 后续排期（第 100 条之后）只在第一次翻到底时拉一回
+			loadingMore: false,
+			moreDone: false
 		}
 	},
 
@@ -138,11 +143,19 @@ export default {
 
 	onPullDownRefresh() {
 		this.resetPaging()
+		// 重新刷新后，后续排期可以再拉一次
+		this.moreDone = false
 		this.getData(true).then(() => uni.stopPullDownRefresh())
 	},
 
 	onReachBottom() {
-		this.loadMore()
+		// 本地还有没渲染出来的，先把它们放出来
+		if (this.hasMore) {
+			this.loadMore()
+			return
+		}
+		// 已经渲染完了，再去 CDN 拉第 100 条之后的排期
+		this.loadMoreUpcoming()
 	},
 
 	methods: {
@@ -154,6 +167,29 @@ export default {
 		// 点 logo 看版本记录，比藏在设置里更容易被发现
 		goVersion() {
 			uni.navigateTo({ url: '/pages/version/version' })
+		},
+
+		/**
+		 * 加载第 100 条之后的排期。
+		 * 这份数据每天更新一次（不是每 15 分钟），所以拉一次就够了，
+		 * 用 moreDone 标记避免反复请求。
+		 */
+		async loadMoreUpcoming() {
+			if (this.loadingMore || this.moreDone) return
+
+			this.loadingMore = true
+			try {
+				const d = await spaceData.load('upcomingMore')
+				const raw = (d && d.list) || []
+				const added = this.appendMore(raw.filter(isStillUpcoming))
+				// 追加成功就把新的一批放出来
+				if (added) this.loadMore()
+				this.moreDone = true
+			} catch (e) {
+				console.warn('[index] 加载后续排期失败', e)
+			} finally {
+				this.loadingMore = false
+			}
 		},
 
 		startRocketAnimation() {

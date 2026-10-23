@@ -75,6 +75,19 @@ async function localizeLaunches(list) {
 	)
 }
 
+/** 只翻任务名，不碰描述。
+ *  即将发射的「后续排期」（第 100 条之后）用它：那部分变化慢、一次 400 条，
+ *  连描述一起翻会顶破 CI 的 15 分钟上限 */
+async function localizeLaunchNames(list) {
+	return fill(
+		list,
+		(x) => x.mission && x.mission.name,
+		(x, zh) => {
+			if (x.mission) x.mission.nameZh = zh
+		}
+	)
+}
+
 /** event.description → descriptionZh */
 function localizeEvents(list) {
 	return fill(
@@ -100,4 +113,9 @@ function localizeAgencies(list) {
 	)
 }
 
-module.exports = { localizeLaunches, localizeEvents, localizeAgencies }
+module.exports = {
+	localizeLaunches,
+	localizeLaunchNames,
+	localizeEvents,
+	localizeAgencies
+}
