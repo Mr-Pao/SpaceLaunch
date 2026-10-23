@@ -39,7 +39,7 @@ const DATASETS = {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',
 		localize: localizeLaunches,
-		images: ['image', 'pad.map_image'],
+		images: ['image', 'pad.map_image', { path: 'infographic', preset: 'large' }],
 		async fetch() {
 			const j = await getJson('/launches/upcoming/?limit=50&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
@@ -49,7 +49,7 @@ const DATASETS = {
 		file: 'launches-previous.json',
 		cacheControl: 'public, max-age=3600',
 		localize: localizeLaunches,
-		images: ['image'],
+		images: ['image', { path: 'infographic', preset: 'large' }],
 		async fetch() {
 			const j = await getJson('/launches/previous/?limit=50&mode=normal&format=json')
 			return { count: j.count, list: j.results.map(slimLaunch) }
