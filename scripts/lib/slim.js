@@ -238,10 +238,67 @@ function slimStatLaunch(l) {
 	}
 }
 
+/**
+ * 火箭型号配置（/launcher_configurations/）
+ *
+ * 这个端点**只有 mode=detailed 才给技术参数**，normal 模式下 length / diameter /
+ * launch_mass / leo_capacity 全是 undefined —— 之前正是踩了这个坑，
+ * 以为 LL2 没有型号数据，其实是端点名写成了 /configurations/（404）。
+ * 正确路径是 `/launcher_configurations/`（带下划线）。
+ */
+function slimLauncher(c) {
+	const fams = Array.isArray(c.families)
+		? c.families.map((f) => str(f && f.name)).filter(Boolean)
+		: []
+
+	return {
+		id: c.id ?? null,
+		name: str(c.name),
+		full_name: str(c.full_name),
+		variant: str(c.variant),
+		families: fams,
+
+		// manufacturer 在 detailed 下是字符串，也见过对象形态，两种都兜住
+		manufacturer: str(c.manufacturer) || str(c.manufacturer && c.manufacturer.name),
+
+		// 技术参数
+		length: num(c.length),
+		diameter: num(c.diameter),
+		// 起飞质量单位是吨
+		launch_mass: num(c.launch_mass),
+		// 起飞推力单位 kN
+		to_thrust: num(c.to_thrust),
+		// 运力单位 kg
+		leo_capacity: num(c.leo_capacity),
+		gto_capacity: num(c.gto_capacity),
+		maiden_flight: str(c.maiden_flight),
+		min_stage: num(c.min_stage),
+		max_stage: num(c.max_stage),
+		launch_cost: num(c.launch_cost),
+		reusable: Boolean(c.reusable),
+		active: Boolean(c.active),
+
+		// 战绩
+		total_launch_count: num(c.total_launch_count),
+		successful_launches: num(c.successful_launches),
+		failed_launches: num(c.failed_launches),
+		pending_launches: num(c.pending_launches),
+
+		description: str(c.description),
+		// 中文由 backfill 任务慢慢补，前端回退英文
+		descriptionZh: '',
+
+		image: imageUrl(c.image),
+		info_url: str(c.info_url),
+		wiki_url: str(c.wiki_url)
+	}
+}
+
 module.exports = {
 	slimLaunch,
 	slimEvent,
 	slimAgency,
+	slimLauncher,
 	slimStatLaunch,
 	imageUrl,
 	joinNames,

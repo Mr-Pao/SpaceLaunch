@@ -47,6 +47,8 @@ const FILES = {
 	previous: 'launches-previous.json',
 	events: 'events.json',
 	agencies: 'agencies.json',
+	// 火箭型号库（532 个型号，含技术参数）
+	launchers: 'launchers.json',
 	// 统计页的原料：最近 400 次发射的极简字段，前端自己按年份/机构/轨道聚合
 	stats: 'stats-launches.json'
 }

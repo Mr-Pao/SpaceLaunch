@@ -21,7 +21,7 @@
 const fs = require('fs')
 const path = require('path')
 const { getJson } = require('./lib/fetch')
-const { slimLaunch, slimEvent, slimAgency, slimStatLaunch } = require('./lib/slim')
+const { slimLaunch, slimEvent, slimAgency, slimStatLaunch, slimLauncher } = require('./lib/slim')
 const { upload } = require('./lib/cos')
 const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
@@ -132,6 +132,37 @@ const DATASETS = {
 	 * 改成直接按时间倒序拉最近 400 次发射，前端自己按 net 的年份筛。
 	 * 400 条 × 5 个短字段约 35KB，比在 CI 里把统计结果算死要灵活得多。
 	 */
+	/**
+	 * 火箭型号库
+	 *
+	 * 端点必须是 `/launcher_configurations/`（带下划线）—— `/configurations/`
+	 * 和 `/rocket-configurations/` 都是 404，之前据此误判「LL2 没有型号数据」。
+	 * 技术参数（长度/直径/起飞质量/运力）**只在 mode=detailed 下返回**。
+	 *
+	 * 532 个型号、limit=100 → 6 页，型号参数几乎不变，每天跑一次足够。
+	 * 图片不镜像：500 多张会把 CI 顶到超时，前端用视觉头部代替，不用图。
+	 */
+	launchers: {
+		file: 'launchers.json',
+		cacheControl: 'public, max-age=86400',
+		async fetch() {
+			const all = []
+			let count = 0
+
+			for (let offset = 0; offset < 700; offset += 100) {
+				const j = await getJson(
+					`/launcher_configurations/?limit=100&offset=${offset}&mode=detailed&format=json`
+				)
+				count = j.count
+				const results = j.results || []
+				all.push(...results)
+				if (!results.length || offset + results.length >= count) break
+			}
+
+			return { count, list: all.map(slimLauncher) }
+		}
+	},
+
 	stats: {
 		file: 'stats-launches.json',
 		// 一年也就涨几百条，半天缓存足够
