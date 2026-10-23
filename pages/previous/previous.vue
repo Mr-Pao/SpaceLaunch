@@ -28,11 +28,15 @@
 import { createListMixin } from '@/utils/list-mixin.js'
 
 export default {
-	mixins: [createListMixin({ dataset: 'previous', pageSize: 12 })],
+	mixins: [createListMixin({ dataset: 'previous', pageSize: 12, favorite: true })],
 
 	onLoad() {
 		// 快照来自 /launches/previous/，本身已按 net 倒序，不需要再排序
 		this.getData()
+	},
+
+	onShow() {
+		this.reorder()
 	},
 
 	onPullDownRefresh() {

@@ -42,7 +42,9 @@ const FILES = {
 	upcoming: 'launches-upcoming.json',
 	previous: 'launches-previous.json',
 	events: 'events.json',
-	agencies: 'agencies.json'
+	agencies: 'agencies.json',
+	// 统计页的原料：最近 400 次发射的极简字段，前端自己按年份/机构/轨道聚合
+	stats: 'stats-launches.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"

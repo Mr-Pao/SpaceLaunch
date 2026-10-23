@@ -33,8 +33,12 @@
 					</view>
 				</view>
 
-				<view class="time">
-					{{ netText }}
+				<view class="meta-line">
+					<text class="time">{{ netText }}</text>
+					<view class="fav" :class="{ on: isFav }" @click="toggleFav">
+						<text class="fav-icon">{{ isFav ? '★' : '☆' }}</text>
+						<text class="fav-text">{{ isFav ? '已收藏' : '收藏' }}</text>
+					</view>
 				</view>
 
 				<!-- 任务信息 -->
@@ -67,9 +71,12 @@
 					></image>
 				</view>
 
-				<!-- 火箭 -->
-				<view class="card" v-if="rocketName">
-					<view class="card-title">运载火箭</view>
+				<!-- 火箭：可点进型号页看该型号的全部发射记录 -->
+				<view class="card card-link" v-if="rocketName" @click="goRocket">
+					<view class="card-title">
+						运载火箭
+						<text class="arrow">›</text>
+					</view>
 					<view class="row">
 						<text class="label">型号</text>
 						<text class="value">{{ rocketName }}</text>
@@ -148,6 +155,7 @@
 <script>
 import spaceData from '@/utils/data.js'
 import { formatDateTime, relativeTime } from '@/utils/format.js'
+import * as fav from '@/utils/favorites.js'
 
 export default {
 	data() {
@@ -155,7 +163,8 @@ export default {
 			launchId: '',
 			detail: null,
 			agency: null,
-			loading: true
+			loading: true,
+			isFav: false
 		}
 	},
 	computed: {
@@ -252,6 +261,8 @@ export default {
 			return
 		}
 
+		this.isFav = fav.has(id)
+
 		// 同一条发射在跨过"当前时刻"后会从 upcoming 挪到 previous，
 		// 用户刚看过列表就点进来时可能已经换边了，所以两边都查。
 		// findLaunchById 内部先扫缓存，命中则零网络开销。
@@ -269,6 +280,23 @@ export default {
 		goAgency(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/agencies/agencies?id=' + id })
+		},
+		goRocket() {
+			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
+			if (!c || !c.id) return
+			const name = c.full_name || c.name || ''
+			uni.navigateTo({
+				url: '/pages/rocket/rocket?id=' + c.id + '&name=' + encodeURIComponent(name)
+			})
+		},
+		toggleFav() {
+			if (!this.launchId) return
+			this.isFav = fav.toggle(this.launchId)
+			uni.showToast({
+				title: this.isFav ? '已收藏，列表里会置顶' : '已取消收藏',
+				icon: 'none',
+				duration: 1500
+			})
 		},
 		// 点开图片能双指放大，长图信息不点开根本看不清
 		preview(url) {
@@ -405,12 +433,51 @@ export default {
 	color: #a0aec0;
 }
 
-.time {
-	display: block;
+.meta-line {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	margin-top: 16rpx;
+}
+
+.time {
+	flex: 1;
 	color: #38bdf8;
 	font-size: 28rpx;
 	letter-spacing: 0.5rpx;
+}
+
+/* 收藏按钮：默认灰底描边，收藏后转成琥珀色 */
+.fav {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	margin-left: 20rpx;
+	padding: 8rpx 20rpx;
+	border-radius: 40rpx;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1rpx solid rgba(255, 255, 255, 0.08);
+}
+
+.fav.on {
+	background: rgba(245, 195, 59, 0.14);
+	border-color: rgba(245, 195, 59, 0.35);
+}
+
+.fav-icon {
+	margin-right: 8rpx;
+	color: #6b7891;
+	font-size: 26rpx;
+}
+
+.fav-text {
+	color: #6b7891;
+	font-size: 24rpx;
+}
+
+.fav.on .fav-icon,
+.fav.on .fav-text {
+	color: #f5c33b;
 }
 
 /* 卡片 */

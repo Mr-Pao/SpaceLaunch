@@ -204,4 +204,31 @@ function slimAgency(a) {
 	}
 }
 
-module.exports = { slimLaunch, slimEvent, slimAgency, imageUrl, joinNames, statusZh, STATUS_ZH }
+/**
+ * 统计用的极简裁剪：一条发射只留聚合需要的 5 个字段。
+ * 统计页要按年份 / 机构 / 轨道 / 月份随便切维度，与其在 CI 里把结果算死，
+ * 不如把「原料」压到最小传给前端，前端想加什么维度都不用改同步脚本。
+ */
+function slimStatLaunch(l) {
+	return {
+		net: str(l.net),
+		// 只存 abbrev，前端按 Success / Failure / Partial 归类
+		status: str(l.status && l.status.abbrev) || str(l.status && l.status.name),
+		agency: str(l.launch_service_provider && l.launch_service_provider.name),
+		rocket: str(l.rocket && l.rocket.configuration && l.rocket.configuration.name),
+		orbit:
+			str(l.mission && l.mission.orbit && l.mission.orbit.abbrev) ||
+			str(l.mission && l.mission.orbit && l.mission.orbit.name)
+	}
+}
+
+module.exports = {
+	slimLaunch,
+	slimEvent,
+	slimAgency,
+	slimStatLaunch,
+	imageUrl,
+	joinNames,
+	statusZh,
+	STATUS_ZH
+}

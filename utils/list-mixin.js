@@ -1,4 +1,20 @@
 import spaceData from '@/utils/data.js'
+import { snapshot as favSnapshot } from '@/utils/favorites.js'
+
+/**
+ * 收藏的条目排到最前，其余保持快照原有顺序（后端已经按 net 排好，不要打乱）
+ */
+function favoriteFirst(list) {
+	const set = favSnapshot()
+	if (!set.size) return list
+
+	const top = []
+	const rest = []
+	for (const item of list) {
+		;(set.has(item.id) ? top : rest).push(item)
+	}
+	return top.concat(rest)
+}
 
 /**
  * 列表页公共逻辑（首页 / 历史 / 活动三家共用）。
@@ -16,8 +32,12 @@ import spaceData from '@/utils/data.js'
  *
  * 注意：onLoad / onPullDownRefresh / onReachBottom 仍然留在各页面里。
  * 小程序端把页面生命周期写进 mixin 行为不够可靠，宁可各页多写两行。
+ *
+ * @param {string} dataset     数据集名，对应 utils/data.js 里的 FILES
+ * @param {number} pageSize    每页条数
+ * @param {boolean} favorite   是否把收藏的条目置顶（只有发射列表需要）
  */
-export function createListMixin({ dataset, pageSize = 12 }) {
+export function createListMixin({ dataset, pageSize = 12, favorite = false }) {
 	return {
 		data() {
 			return {
@@ -62,9 +82,16 @@ export function createListMixin({ dataset, pageSize = 12 }) {
 
 			applyData(d) {
 				if (!d) return
-				this.list = d.list || []
+				const raw = d.list || []
+				this.list = favorite ? favoriteFirst(raw) : raw
 				this.total = d.count || this.list.length
 				this.freshText = spaceData.freshnessText(d.generatedAt)
+			},
+
+			// 从详情页收藏回来时列表要重排，但不需要重新请求数据
+			reorder() {
+				if (!favorite || !this.list.length) return
+				this.list = favoriteFirst(this.list)
 			},
 
 			loadMore() {

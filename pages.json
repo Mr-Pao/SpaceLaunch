@@ -28,15 +28,35 @@
 			}
 		},
 		{
+			"path": "pages/stats/stats",
+			"style": {
+				"navigationBarTitleText": "发射统计",
+				"enablePullDownRefresh": true,
+				"backgroundTextStyle": "light"
+			}
+		},
+		{
 			"path": "pages/launch/launchInfo",
 			"style": {
 				"navigationBarTitleText": "发射任务详情"
 			}
 		},
 		{
+			"path": "pages/rocket/rocket",
+			"style": {
+				"navigationBarTitleText": "运载火箭"
+			}
+		},
+		{
 			"path": "pages/agencies/agencies",
 			"style": {
 				"navigationBarTitleText": "机构信息"
+			}
+		},
+		{
+			"path": "pages/version/version",
+			"style": {
+				"navigationBarTitleText": "版本记录"
 			}
 		}
 	],
@@ -63,6 +83,12 @@
 				"pagePath": "pages/event/event",
 				"iconPath": "static/image/tabbar/guanyu1.png",
 				"selectedIconPath": "static/image/tabbar/guanyu2.png"
+			},
+			{
+				"text": "统计",
+				"pagePath": "pages/stats/stats",
+				"iconPath": "static/image/tabbar/tongji1.png",
+				"selectedIconPath": "static/image/tabbar/tongji2.png"
 			}
 		]
 	},

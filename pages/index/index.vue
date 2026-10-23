@@ -12,7 +12,12 @@
 		</view>
 
 		<view class="header">
-			<image class="logo" src="/static/logo.png" mode="aspectFill"></image>
+			<image
+				class="logo"
+				src="/static/logo.png"
+				mode="aspectFill"
+				@click="goVersion"
+			></image>
 			<text class="title">太空发射任务</text>
 			<text class="subtitle">探索宇宙的壮丽旅程</text>
 		</view>
@@ -69,7 +74,7 @@
 import { createListMixin } from '@/utils/list-mixin.js'
 
 export default {
-	mixins: [createListMixin({ dataset: 'upcoming', pageSize: 12 })],
+	mixins: [createListMixin({ dataset: 'upcoming', pageSize: 12, favorite: true })],
 
 	data() {
 		return {
@@ -94,6 +99,11 @@ export default {
 		this.stopRocketAnimation()
 	},
 
+	// 从详情页收藏回来时把收藏项顶上去（不重新请求数据）
+	onShow() {
+		this.reorder()
+	},
+
 	onPullDownRefresh() {
 		this.resetPaging()
 		this.getData(true).then(() => uni.stopPullDownRefresh())
@@ -107,6 +117,11 @@ export default {
 		goDetail(item) {
 			if (!item || !item.id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + item.id })
+		},
+
+		// 点 logo 看版本记录，比藏在设置里更容易被发现
+		goVersion() {
+			uni.navigateTo({ url: '/pages/version/version' })
 		},
 
 		startRocketAnimation() {

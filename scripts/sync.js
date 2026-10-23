@@ -21,7 +21,7 @@
 const fs = require('fs')
 const path = require('path')
 const { getJson } = require('./lib/fetch')
-const { slimLaunch, slimEvent, slimAgency } = require('./lib/slim')
+const { slimLaunch, slimEvent, slimAgency, slimStatLaunch } = require('./lib/slim')
 const { upload } = require('./lib/cos')
 const { localizeLaunches, localizeEvents, localizeAgencies } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
@@ -88,6 +88,38 @@ const DATASETS = {
 			}
 
 			return { count, list: all.map(slimAgency) }
+		}
+	},
+
+	/**
+	 * 统计页的原料。
+	 *
+	 * 不做年份过滤（`net__gte` 这类过滤参数在 2.3.0 上没实测过，不敢押），
+	 * 改成直接按时间倒序拉最近 400 次发射，前端自己按 net 的年份筛。
+	 * 400 条 × 5 个短字段约 35KB，比在 CI 里把统计结果算死要灵活得多。
+	 */
+	stats: {
+		file: 'stats-launches.json',
+		// 一年也就涨几百条，半天缓存足够
+		cacheControl: 'public, max-age=21600',
+		async fetch() {
+			const all = []
+			let offset = 0
+			let count = 0
+
+			for (;;) {
+				const j = await getJson(
+					`/launches/previous/?limit=100&offset=${offset}&mode=normal&format=json`
+				)
+				count = j.count
+				const results = j.results || []
+				all.push(...results)
+				offset += results.length
+
+				if (!results.length || offset >= count || offset >= 400) break
+			}
+
+			return { count: all.length, list: all.map(slimStatLaunch) }
 		}
 	}
 }
