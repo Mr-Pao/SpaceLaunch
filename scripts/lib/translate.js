@@ -72,7 +72,12 @@ function httpGetJson(url, timeoutMs) {
 				res.on('data', (c) => chunks.push(c))
 				res.on('end', () => {
 					const body = Buffer.concat(chunks).toString('utf8')
-					if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode))
+					if (res.statusCode !== 200) {
+						const err = new Error('HTTP ' + res.statusCode)
+						// 带上状态码，上层才能区分「瞬时限流」和「这后端彻底不通」
+						err.status = res.statusCode
+						return reject(err)
+					}
 					try {
 						resolve(JSON.parse(body))
 					} catch (e) {
@@ -84,6 +89,11 @@ function httpGetJson(url, timeoutMs) {
 		req.on('timeout', () => req.destroy(new Error('请求超时')))
 		req.on('error', reject)
 	})
+}
+
+/** 429 / 5xx 属于瞬时限流，退避一下还能继续；其它错误视为后端不可用 */
+function isTransient(e) {
+	return e && (e.status === 429 || (e.status >= 500 && e.status < 600))
 }
 
 /** 按句子边界切段，保证每段不超过 MAX_SEG */
@@ -167,11 +177,39 @@ async function translateSegment(seg) {
 		try {
 			return await translateByGoogle(seg)
 		} catch (e) {
+			// 只是被限流的话不算「Google 不可用」，退避重试仍然走 Google，
+			// 否则一次 429 就会把整批流量都甩给只有 1000 词/天的 MyMemory
+			if (isTransient(e)) throw e
 			googleDown = true
 			console.warn(`  · Google 翻译不可用（${e.message}），本次改用 MyMemory`)
 		}
 	}
 	return translateByMyMemory(seg)
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const RETRY_DELAYS = [2000, 6000]
+
+/**
+ * 限流退避重试。
+ * 实测尾部总有一二十条撞 429，之前直接计入失败、连挂 5 条就整轮中止，
+ * 导致机构简介长期停在 87%。加两层退避后基本能跑满。
+ */
+async function translateWithRetry(seg) {
+	let lastErr
+	for (let i = 0; i <= RETRY_DELAYS.length; i++) {
+		try {
+			return await translateSegment(seg)
+		} catch (e) {
+			lastErr = e
+			// 配额真的用尽时重试只会让情况更糟，直接放弃
+			if (quotaExhausted) break
+			if (i < RETRY_DELAYS.length) {
+				await sleep(RETRY_DELAYS[i] + Math.floor(Math.random() * 800))
+			}
+		}
+	}
+	throw lastErr
 }
 
 /**
@@ -200,7 +238,7 @@ async function translateTexts(texts) {
 			try {
 				const parts = []
 				for (const seg of splitSegments(text)) {
-					parts.push(await translateSegment(seg))
+					parts.push(await translateWithRetry(seg))
 				}
 				const zh = parts.join(' ').replace(/\s+/g, ' ').trim()
 				if (zh) {
