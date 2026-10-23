@@ -129,6 +129,27 @@ export function rocketName(config) {
 }
 
 /**
+ * 机翻术语修正
+ *
+ * 任务名走的是通用翻译接口，几个高频词固定译错：
+ *   Starlink Group 15-15 → 「星链集团 15-15」（Group 是「组」不是「集团」）
+ *   Unknown Payload      → 「未知有效负载」（航天标准说法是「有效载荷」）
+ * 只修这两种最常见的，不追求逐条人工润色。
+ */
+const TERM_FIX = [
+	[/星链集团/g, '星链'],
+	[/有效负载/g, '有效载荷'],
+	[/未知负载/g, '未知载荷']
+]
+
+function fixTerms(text) {
+	if (!text) return ''
+	let s = String(text)
+	for (const [re, to] of TERM_FIX) s = s.replace(re, to)
+	return s
+}
+
+/**
  * 列表/详情页的标题
  *
  * LL2 的 launch.name 是「型号 | 任务名」拼好的英文串，直接显示全英文。
@@ -139,7 +160,7 @@ export function launchTitle(item) {
 
 	const rocket = rocketName(item.rocket && item.rocket.configuration)
 	const m = item.mission || {}
-	const mission = m.nameZh || m.name || ''
+	const mission = fixTerms(m.nameZh || m.name || '')
 
 	if (mission && rocket) return rocket + ' | ' + mission
 	if (mission) return mission
