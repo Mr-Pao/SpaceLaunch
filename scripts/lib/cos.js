@@ -81,8 +81,9 @@ async function putBuffer(buffer, key, contentType, cacheControl) {
  * @param {string} localPath 本地文件路径
  * @param {string} key COS 上的对象键，例如 space-data/launches-upcoming.json
  * @param {string} cacheControl 例如 'public, max-age=300'
+ * @param {string} [contentType] 默认按 JSON 处理
  */
-async function upload(localPath, key, cacheControl) {
+async function upload(localPath, key, cacheControl, contentType) {
 	if (!hasCosConfig()) {
 		console.log(`  · 未配置 COS 环境变量，跳过上传 ${key}`)
 		return false
@@ -90,7 +91,12 @@ async function upload(localPath, key, cacheControl) {
 
 	getClient()
 	const body = fs.readFileSync(localPath)
-	await putBuffer(body, key, 'application/json; charset=utf-8', cacheControl || 'public, max-age=300')
+	await putBuffer(
+		body,
+		key,
+		contentType || 'application/json; charset=utf-8',
+		cacheControl || 'public, max-age=300'
+	)
 
 	console.log(`  ↑ 已上传 ${key}`)
 	return true

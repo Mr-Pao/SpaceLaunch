@@ -242,6 +242,20 @@ async function runDataset(name) {
 		}
 	}
 
+	// 品牌资源也放一份到 COS。
+	// 小程序端仍然读 static/logo.png（本地资源零请求、首屏秒出，18KB 也没必要走网络），
+	// COS 这份是给后续 H5、分享页、或其他端复用的，不参与小程序渲染。
+	if (dataset === 'all' || dataset === 'agencies') {
+		const logoPath = path.resolve(__dirname, '..', 'static', 'logo.png')
+		if (fs.existsSync(logoPath)) {
+			try {
+				await upload(logoPath, 'brand/logo.png', 'public, max-age=604800', 'image/png')
+			} catch (e) {
+				console.warn('  ! logo 上传失败（不影响数据）: ' + e.message)
+			}
+		}
+	}
+
 	if (failed) {
 		console.error('\n部分数据集失败，退出码 1')
 		process.exit(1)

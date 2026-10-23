@@ -13,9 +13,7 @@
 
 		<!-- 标题区域 -->
 		<view class="header">
-			<view class="logo-badge">
-				<image class="rocket logo-rocket" src="/static/rocket.png" mode="aspectFit"></image>
-			</view>
+			<image class="logo" src="/static/logo.png" mode="aspectFill"></image>
 			<text class="title">太空发射任务</text>
 			<text class="subtitle">探索宇宙的壮丽旅程</text>
 		</view>
@@ -287,25 +285,19 @@ export default {
 	padding: 60rpx 20rpx 40rpx;
 }
 
-/* 品牌徽章（替代原 uview 默认 logo） */
-.logo-badge {
+/* 品牌 logo：直接用 static/logo.png，180rpx 圆形裁切。
+   不放 COS 是刻意的——图标小而固定，本地资源零请求零延迟，首屏秒出；
+   COS 留给会变、量大的发射图。 */
+.logo {
+	display: block;
 	width: 180rpx;
 	height: 180rpx;
 	margin: 0 auto 30rpx;
 	border-radius: 50%;
-	background: radial-gradient(circle at 50% 32%, #1e3a5f 0%, #0b1220 72%);
-	border: 2rpx solid rgba(96, 165, 250, 0.35);
-	box-shadow: 0 0 40rpx rgba(56, 189, 248, 0.28), inset 0 0 30rpx rgba(56, 189, 248, 0.12);
-	display: flex;
-	align-items: center;
-	justify-content: center;
+	box-shadow: 0 0 40rpx rgba(56, 189, 248, 0.3);
 }
 
-.logo-rocket {
-	transform: scale(0.86);
-}
-
-/* 火箭图标（static/rocket.png，透明底） */
+/* 火箭图标（static/rocket.png，透明底），仅用于加载动画 */
 .rocket {
 	width: 60rpx;
 	height: 120rpx;
