@@ -22,6 +22,7 @@ const fs = require('fs')
 const path = require('path')
 const { getJson } = require('./lib/fetch')
 const { slimLaunch, slimEvent, slimAgency, slimStatLaunch, slimLauncher } = require('./lib/slim')
+const { aggregateByYear } = require('./lib/aggregate')
 const { upload } = require('./lib/cos')
 const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
@@ -34,7 +35,19 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v5: 增加发射窗口 window_start/end、四类累计发射次数、火箭系列与型号代号
 // v6: 增加 mission.nameZh（任务名中文），标题不再整行英文
 // v7: stats 增加 id / name / site（发射场），支撑年度回顾
-const DATA_VERSION = 7
+// v8: stats 改为「按年预聚合」输出，不再下发原始数据；数据源换成最新快照 + 历史归档
+const DATA_VERSION = 8
+
+/** 读 COS 上已生成的 JSON。桶是公有读，直接走 CDN 地址 */
+async function readCosJson(key) {
+	const { COS_BUCKET, COS_REGION } = process.env
+	if (!COS_BUCKET || !COS_REGION) throw new Error('缺少 COS_BUCKET / COS_REGION')
+
+	const url = `https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${key}`
+	const res = await fetch(url, { signal: AbortSignal.timeout(30000) })
+	if (!res.ok) throw new Error('HTTP ' + res.status)
+	return res.json()
+}
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {
@@ -168,27 +181,40 @@ const DATASETS = {
 	},
 
 	stats: {
-		file: 'stats-launches.json',
-		// 一年也就涨几百条，半天缓存足够
+		// 输出的是「按年聚合好的结果」，不是原始数据
+		file: 'stats-years.json',
 		cacheControl: 'public, max-age=21600',
 		async fetch() {
-			const all = []
-			let offset = 0
-			let count = 0
-
-			for (;;) {
-				const j = await getJson(
-					`/launches/previous/?limit=100&offset=${offset}&mode=normal&format=json`
-				)
-				count = j.count
-				const results = j.results || []
-				all.push(...results)
-				offset += results.length
-
-				if (!results.length || offset >= count || offset >= 400) break
+			// 不再自己拉 LL2：全量历史要 77 页请求，配额根本不够。
+			// 直接用「最新快照 + 历史归档分片」，两者都是已有的数据。
+			//
+			// 归档是逐小时补齐的，所以这份统计会随着归档自动变全，
+			// 代码不用改 —— 这就是把聚合放在 CI 侧的好处。
+			let recent = []
+			try {
+				const p = await readCosJson('space-data/launches-previous.json')
+				recent = p.list || []
+			} catch (e) {
+				console.warn('  ! 读取最新快照失败，只用归档数据: ' + e.message)
 			}
 
-			return { count: all.length, list: all.map(slimStatLaunch) }
+			let archived = []
+			try {
+				const idx = await readCosJson('space-data/history/index.json')
+				for (const page of idx.pages || []) {
+					const d = await readCosJson('space-data/history/' + page.file)
+					archived = archived.concat(d.list || [])
+				}
+				console.log(`  统计来源: 最新 ${recent.length} 条 + 归档 ${archived.length} 条`)
+			} catch (e) {
+				console.warn('  ! 读取归档分片失败，只用最新快照: ' + e.message)
+			}
+
+			const all = recent.concat(archived)
+			const years = aggregateByYear(all)
+
+			// list 装的是年份统计行，validate 只检查里面有没有 undefined，能通过
+			return { count: all.length, list: years }
 		}
 	}
 }

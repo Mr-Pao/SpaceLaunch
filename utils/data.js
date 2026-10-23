@@ -38,7 +38,8 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 // v5: 增加发射窗口、四类累计发射次数、火箭系列与型号
 // v6: 增加任务名中文 mission.nameZh
 // v7: stats 增加任务 id / 名称 / 发射场
-const DATA_VERSION = 7
+// v8: stats 改为按年预聚合输出
+const DATA_VERSION = 8
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {
@@ -51,7 +52,7 @@ const FILES = {
 	// 火箭型号库（532 个型号，含技术参数）
 	launchers: 'launchers.json',
 	// 统计页的原料：最近 400 次发射的极简字段，前端自己按年份/机构/轨道聚合
-	stats: 'stats-launches.json'
+	stats: 'stats-years.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"

@@ -4,7 +4,7 @@
 			<text class="hint-text">统计中...</text>
 		</view>
 
-		<view class="empty" v-else-if="!total">
+		<view class="empty" v-else-if="!years.length">
 			<text class="empty-icon">📊</text>
 			<text class="hint-text">统计数据还没生成，稍后再来看看</text>
 			<view class="btn" @click="getData(true)">重新加载</view>
@@ -14,6 +14,19 @@
 			<view class="head">
 				<text class="year">{{ year }}</text>
 				<text class="year-label">年度航天回顾</text>
+			</view>
+
+			<!-- 年度切换。可选年份直接来自 CI 预聚合好的结果 -->
+			<view class="year-picker" v-if="availableYears.length > 1">
+				<view
+					class="year-chip"
+					v-for="y in availableYears"
+					:key="y"
+					:class="{ on: year === y }"
+					@click="year = y"
+				>
+					{{ y }}
+				</view>
 			</view>
 
 			<!-- 主数字 -->
@@ -124,13 +137,14 @@
 						<text class="fail-date">{{ f.dateText }}</text>
 						<text class="fail-tag" :class="{ partial: f.isPartial }">{{ f.statusText }}</text>
 					</view>
-					<text class="fail-name">{{ f.title }}</text>
+					<text class="fail-name">{{ f.name }}</text>
 					<text class="fail-meta">{{ f.meta }}</text>
 				</view>
 			</view>
 
 			<view class="footer-hint">
-				<text>统计范围：{{ year }} 年已发射任务 · 更新于 {{ freshText }}</text>
+				<text>数据源：最新快照 + 历史归档，共 {{ sourceCount }} 条 · {{ freshText }}</text>
+				<text v-if="isEarliestYear" class="footer-note">该年度只覆盖到归档边界，非全年完整统计</text>
 			</view>
 		</block>
 	</view>
@@ -142,11 +156,6 @@ import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort } from '@/utils/format.js'
 
 const MONTH_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
-
-// LL2 的状态码里，Deployed 表示载荷已成功部署，算成功
-const OK = ['Success', 'Deployed']
-const BAD = ['Failure']
-const PARTIAL = ['Partial']
 
 /**
  * 机构 → 国家/地区
@@ -173,52 +182,50 @@ export default {
 	data() {
 		return {
 			loading: true,
+			// CI 已经按年聚合好，前端只负责挑一年出来渲染
+			years: [],
 			year: new Date().getFullYear(),
-			list: [],
-			servedCount: 0,
+			sourceCount: 0,
 			freshText: ''
 		}
 	},
 
 	computed: {
-		// 只保留今年的记录，数据源是最近 400 次，跨年时会混进去年的
-		yearList() {
-			return this.list.filter((x) => {
-				if (!x.net) return false
-				return new Date(x.net).getFullYear() === this.year
-			})
+		availableYears() {
+			return this.years.map((y) => y.year)
 		},
+
+		current() {
+			const hit = this.years.find((y) => y.year === this.year)
+			return hit || this.years[0] || null
+		},
+
 		total() {
-			return this.yearList.length
+			return this.current ? this.current.total : 0
 		},
 		successCount() {
-			return this.yearList.filter((x) => OK.indexOf(x.status) !== -1).length
+			return this.current ? this.current.success : 0
 		},
 		failCount() {
-			return this.yearList.filter(
-				(x) => BAD.indexOf(x.status) !== -1 || PARTIAL.indexOf(x.status) !== -1
-			).length
+			if (!this.current) return 0
+			return (this.current.fail || 0) + (this.current.partial || 0)
 		},
 		successRate() {
 			const decided = this.successCount + this.failCount
 			if (!decided) return '—'
 			return ((this.successCount / decided) * 100).toFixed(1).replace(/\.0$/, '') + '%'
 		},
-		// 亚轨道在 LL2 里 orbit 标记为 Sub
 		subCount() {
-			return this.yearList.filter((x) => x.orbit === 'Sub').length
+			return this.current ? this.current.sub || 0 : 0
 		},
 		orbitalCount() {
-			return this.total - this.subCount
+			return this.current ? this.current.orbital || 0 : 0
 		},
+
 		months() {
-			const buckets = new Array(12).fill(0)
-			for (const x of this.yearList) {
-				const m = new Date(x.net).getMonth()
-				if (m >= 0 && m < 12) buckets[m]++
-			}
-			const max = Math.max(...buckets, 1)
-			return buckets.map((count, i) => ({
+			const arr = this.current ? this.current.months || [] : []
+			const max = Math.max(...arr, 1)
+			return arr.map((count, i) => ({
 				month: i + 1,
 				label: MONTH_LABELS[i],
 				count,
@@ -226,46 +233,54 @@ export default {
 				pct: count ? Math.max(8, Math.round((count / max) * 100)) : 0
 			}))
 		},
+
 		topRockets() {
-			return rankBy(this.yearList, (x) => x.rocket, 10)
+			return withPct(this.current ? this.current.rockets : [])
 		},
 		topSites() {
-			return rankBy(this.yearList, (x) => x.site, 10)
+			return withPct(this.current ? this.current.sites : [])
 		},
+		topAgencies() {
+			return withPct(this.current ? this.current.agencies : [])
+		},
+		topOrbits() {
+			return withPct(this.current ? this.current.orbits : [])
+		},
+
+		// 国家不在 CI 侧聚合：规则是前端维护的，而且只需读机构那十来行，开销可忽略
 		topCountries() {
-			// 先按机构聚合成国家，再排序
+			const rows = this.current ? this.current.agencies || [] : []
+
 			const map = new Map()
-			for (const x of this.yearList) {
-				const c = countryOf(x.agency)
-				map.set(c, (map.get(c) || 0) + 1)
+			for (const a of rows) {
+				const c = countryOf(a.name)
+				map.set(c, (map.get(c) || 0) + a.count)
 			}
-			const rows = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
-			const max = rows.length ? rows[0][1] : 1
-			return rows.map(([name, count]) => ({
+			const out = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+			const max = out.length ? out[0][1] : 1
+			return out.map(([name, count]) => ({
 				name,
 				count,
 				pct: Math.max(6, Math.round((count / max) * 100))
 			}))
 		},
-		topAgencies() {
-			return rankBy(this.yearList, (x) => x.agency, 8)
-		},
-		topOrbits() {
-			return rankBy(this.yearList, (x) => x.orbit, 6)
-		},
+
 		failures() {
-			return this.yearList
-				.filter((x) => BAD.indexOf(x.status) !== -1 || PARTIAL.indexOf(x.status) !== -1)
-				.map((x) => ({
-					id: x.id,
-					dateText: formatShort(x.net),
-					statusText: x.status === 'Partial' ? '部分成功' : '发射失败',
-					isPartial: x.status === 'Partial',
-					title: x.name || '未知任务',
-					meta: [x.rocket, x.site].filter(Boolean).join(' · ')
-				}))
-				// 最近的排在前面
-				.sort((a, b) => (a.dateText < b.dateText ? 1 : -1))
+			const rows = this.current ? this.current.failures || [] : []
+			return rows.map((x) => ({
+				id: x.id,
+				dateText: formatShort(x.net),
+				statusText: x.status === 'Partial' ? '部分成功' : '发射失败',
+				isPartial: x.status === 'Partial',
+				name: x.name || '未知任务',
+				meta: [x.rocket, x.site].filter(Boolean).join(' · ')
+			}))
+		},
+
+		// 最早的年份往往只覆盖了一部分（归档还没跑完），要如实说明
+		isEarliestYear() {
+			if (!this.years.length) return false
+			return this.year === this.years[this.years.length - 1].year
 		}
 	},
 
@@ -286,9 +301,14 @@ export default {
 			this.loading = true
 			try {
 				const d = await spaceData.load('stats', { force: !!force })
-				this.list = (d && d.list) || []
-				this.servedCount = this.list.length
+				this.years = (d && d.list) || []
+				this.sourceCount = (d && d.count) || 0
 				this.freshText = spaceData.freshnessText(d && d.generatedAt)
+
+				// 数据里的年份可能还没有当前年（跨年后统计没更新），退回最新的一年
+				if (this.years.length && !this.years.some((y) => y.year === this.year)) {
+					this.year = this.years[0].year
+				}
 			} catch (e) {
 				console.warn('[stats] 获取统计失败', e)
 			} finally {
@@ -303,20 +323,10 @@ export default {
 	}
 }
 
-/** 按某个字段计数并排序，返回 [{name, count, pct}] */
-function rankBy(list, pick, limit) {
-	const map = new Map()
-	for (const item of list) {
-		const key = (pick(item) || '未标注').trim()
-		map.set(key, (map.get(key) || 0) + 1)
-	}
-
-	const rows = [...map.entries()]
-		.sort((a, b) => b[1] - a[1])
-		.slice(0, limit)
-		.map(([name, count]) => ({ name, count }))
-
-	const max = rows.length ? rows[0].count : 1
+/** 给排名补上百分比，进度条要用 */
+function withPct(rows) {
+	if (!rows || !rows.length) return []
+	const max = rows[0].count || 1
 	return rows.map((r) => ({ ...r, pct: Math.max(6, Math.round((r.count / max) * 100)) }))
 }
 
@@ -358,6 +368,30 @@ function countryOf(agency) {
 	color: #6b7891;
 	font-size: 24rpx;
 	letter-spacing: 2rpx;
+}
+
+/* 年度切换 */
+.year-picker {
+	display: flex;
+	flex-wrap: wrap;
+	padding: 4rpx 32rpx 22rpx;
+}
+
+.year-chip {
+	padding: 8rpx 24rpx;
+	margin: 0 14rpx 10rpx 0;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.06);
+	border-radius: 30rpx;
+	color: #8a97a8;
+	font-size: 24rpx;
+}
+
+.year-chip.on {
+	background: rgba(56, 189, 248, 0.14);
+	border-color: rgba(56, 189, 248, 0.45);
+	color: #38bdf8;
+	font-weight: 600;
 }
 
 .hero-card {
@@ -685,5 +719,11 @@ function countryOf(agency) {
 	color: #3d4a5c;
 	font-size: 22rpx;
 	line-height: 1.6;
+}
+
+.footer-note {
+	display: block;
+	margin-top: 6rpx;
+	color: #3d4a5c;
 }
 </style>
