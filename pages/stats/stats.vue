@@ -148,6 +148,7 @@
 				<text v-if="isEarliestYear" class="footer-note">该年度只覆盖到归档边界，非全年完整统计</text>
 			</view>
 		</block>
+		</block>
 
 		<!-- 审核模式：tabBar 已隐藏，本页正常情况到不了，留空态兜底 -->
 		<view class="empty" v-else>
