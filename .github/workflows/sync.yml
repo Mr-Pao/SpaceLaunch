@@ -16,7 +16,7 @@ name: sync-space-data
 on:
   schedule:
     - cron: '*/15 * * * *'   # 即将发射：每 15 分钟
-    - cron: '*/30 * * * *'   # 事件：每 30 分钟（与上一条同时段触发时靠 schedule 字段区分）
+    - cron: '15 * * * *'     # 事件：每小时一次（原本 30 分钟，腾出配额给历史归档）
     - cron: '0 * * * *'      # 历史发射：每小时
     - cron: '0 3 * * *'      # 机构：每天 UTC 03:00 = 北京 11:00
     - cron: '30 3 * * *'     # 统计：每天 UTC 03:30 = 北京 11:30（错开机构，避免抢配额）
@@ -57,7 +57,7 @@ jobs:
           else
             case "${{ github.event.schedule }}" in
               "*/15 * * * *") DS="upcoming" ;;
-              "*/30 * * * *") DS="events" ;;
+              "15 * * * *")   DS="events" ;;
               "0 * * * *")    DS="previous" ;;
               "0 3 * * *")    DS="agencies" ;;
               "30 3 * * *")   DS="stats" ;;
