@@ -16,6 +16,13 @@ function favoriteFirst(list) {
 	return top.concat(rest)
 }
 
+/** 只把「已收藏」的 id 挑出来。卡片要靠它显示标记，所以必须是响应式数组，不能是 Set */
+function favoriteIds(list) {
+	const set = favSnapshot()
+	if (!set.size) return []
+	return list.filter((item) => set.has(item.id)).map((item) => item.id)
+}
+
 /**
  * 列表页公共逻辑（首页 / 历史 / 活动三家共用）。
  *
@@ -46,6 +53,8 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false }) {
 				freshText: '',
 				loading: true,
 				error: '',
+				// 已收藏的 id，交给卡片画标记；重排时一起刷新
+				favIds: [],
 				// 快照本身只有 50 条，分页纯本地切，不发网络请求
 				listNum: pageSize
 			}
@@ -84,6 +93,7 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false }) {
 				if (!d) return
 				const raw = d.list || []
 				this.list = favorite ? favoriteFirst(raw) : raw
+				this.favIds = favorite ? favoriteIds(this.list) : []
 				this.total = d.count || this.list.length
 				this.freshText = spaceData.freshnessText(d.generatedAt)
 			},
@@ -92,6 +102,7 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false }) {
 			reorder() {
 				if (!favorite || !this.list.length) return
 				this.list = favoriteFirst(this.list)
+				this.favIds = favoriteIds(this.list)
 			},
 
 			loadMore() {

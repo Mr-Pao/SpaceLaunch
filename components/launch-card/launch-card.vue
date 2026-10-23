@@ -1,7 +1,15 @@
 <template>
 	<!-- 事件名不能叫 tap / click：小程序端自定义组件上的 @tap 会被编译成原生
 	     bindtap，$emit 出来时不一定能落到父页面的 handler 上，卡片就点不动了 -->
-	<view class="card" hover-class="card-hover" @click="$emit('select', item)">
+	<view
+		class="card"
+		:class="{ 'card-fav': fav }"
+		hover-class="card-hover"
+		@click="$emit('select', item)"
+	>
+		<!-- 收藏标记：左侧一道琥珀色竖条，比星标角标更不打扰，但一眼能看出 -->
+		<view class="fav-mark" v-if="fav"></view>
+
 		<!-- lazy-load：列表滚动到可视区才真正下载图片，50 条卡片一次性触发下载会很卡 -->
 		<image
 			v-if="item.image"
@@ -44,6 +52,11 @@ export default {
 		item: {
 			type: Object,
 			required: true
+		},
+		// 是否已收藏，只影响视觉标记
+		fav: {
+			type: Boolean,
+			default: false
 		}
 	},
 	emits: ['select'],
@@ -81,6 +94,22 @@ export default {
 	background: #141a26;
 	border-radius: 20rpx;
 	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	/* 收藏竖条要跟着圆角裁切 */
+	position: relative;
+	overflow: hidden;
+}
+
+.card-fav {
+	border-color: rgba(245, 195, 59, 0.28);
+}
+
+.fav-mark {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 6rpx;
+	background: linear-gradient(to bottom, #f5c33b, #d99e1f);
 }
 
 .card-hover {

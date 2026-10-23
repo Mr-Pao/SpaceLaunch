@@ -1,0 +1,19 @@
+<view class="ctb-wrap">
+	<view class="ctb-bar">
+		<view
+			wx:for="{{list}}"
+			wx:for-index="idx"
+			wx:key="pagePath"
+			class="ctb-tab {{selected === idx ? 'ctb-on' : ''}}"
+			data-index="{{idx}}"
+			bindtap="go"
+		>
+			<image
+				class="ctb-icon"
+				src="{{selected === idx ? item.iconActive : item.icon}}"
+				mode="aspectFit"
+			></image>
+			<text class="ctb-label">{{item.text}}</text>
+		</view>
+	</view>
+</view>

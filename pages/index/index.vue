@@ -53,6 +53,7 @@
 					v-for="item in visible"
 					:key="item.id"
 					:item="item"
+					:fav="favIds.indexOf(item.id) !== -1"
 					@select="goDetail"
 				/>
 			</view>
@@ -72,6 +73,7 @@
 
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
+import { syncTabBar } from '@/utils/tabbar.js'
 
 export default {
 	mixins: [createListMixin({ dataset: 'upcoming', pageSize: 12, favorite: true })],
@@ -101,6 +103,7 @@ export default {
 
 	// 从详情页收藏回来时把收藏项顶上去（不重新请求数据）
 	onShow() {
+		syncTabBar(2)
 		this.reorder()
 	},
 
@@ -158,7 +161,8 @@ export default {
 .page {
 	position: relative;
 	min-height: 100vh;
-	padding-bottom: 40rpx;
+	/* 底部要给悬浮胶囊 tabBar 让位，否则最后一张卡片会被盖住 */
+	padding-bottom: 200rpx;
 	background: #0a0e17;
 	overflow: hidden;
 }

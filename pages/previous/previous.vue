@@ -6,7 +6,13 @@
 		</view>
 
 		<view class="list">
-			<launch-card v-for="item in visible" :key="item.id" :item="item" @select="goDetail" />
+			<launch-card
+				v-for="item in visible"
+				:key="item.id"
+				:item="item"
+				:fav="favIds.indexOf(item.id) !== -1"
+				@select="goDetail"
+			/>
 		</view>
 
 		<view class="loading" v-if="loading && visible.length === 0">
@@ -26,6 +32,7 @@
 
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
+import { syncTabBar } from '@/utils/tabbar.js'
 
 export default {
 	mixins: [createListMixin({ dataset: 'previous', pageSize: 12, favorite: true })],
@@ -36,6 +43,7 @@ export default {
 	},
 
 	onShow() {
+		syncTabBar(1)
 		this.reorder()
 	},
 
@@ -62,7 +70,7 @@ export default {
 
 .page {
 	min-height: 100vh;
-	padding: 20rpx 24rpx 40rpx;
+	padding: 20rpx 24rpx 200rpx;
 	background: #0a0e17;
 	box-sizing: border-box;
 }

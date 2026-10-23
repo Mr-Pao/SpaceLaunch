@@ -79,6 +79,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
+import { syncTabBar } from '@/utils/tabbar.js'
 
 const MONTH_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -146,6 +147,10 @@ export default {
 		this.getData()
 	},
 
+	onShow() {
+		syncTabBar(4)
+	},
+
 	onPullDownRefresh() {
 		this.getData(true).then(() => uni.stopPullDownRefresh())
 	},
@@ -191,7 +196,7 @@ function rankBy(list, pick, limit) {
 .page {
 	min-height: 100vh;
 	background: #0a0e17;
-	padding-bottom: 40rpx;
+	padding-bottom: 200rpx;
 	box-sizing: border-box;
 }
 

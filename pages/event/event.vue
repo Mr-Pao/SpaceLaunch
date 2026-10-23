@@ -55,6 +55,7 @@
 
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
+import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort, truncate } from '@/utils/format.js'
 
 export default {
@@ -62,6 +63,10 @@ export default {
 
 	onLoad() {
 		this.getData()
+	},
+
+	onShow() {
+		syncTabBar(3)
 	},
 
 	onPullDownRefresh() {
@@ -89,7 +94,7 @@ export default {
 
 .page {
 	min-height: 100vh;
-	padding: 20rpx 24rpx 40rpx;
+	padding: 20rpx 24rpx 200rpx;
 	background: #0a0e17;
 	box-sizing: border-box;
 }
