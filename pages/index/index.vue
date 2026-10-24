@@ -1,14 +1,9 @@
 <template>
 	<view class="page">
-		<!-- 太空背景：星星位置在 onLoad 里一次算好，写在模板里 Math.random() 会每次重渲染都变 -->
+		<!-- 太空背景：整片星空是「一个元素 + box-shadow 星点」，只有一条动画合成层。
+		     之前 36 个 view 各跑一条 twinkle 动画，低端机上每条都是实打实的合成开销 -->
 		<view class="space-bg">
-			<view
-				class="stars"
-				v-for="(s, i) in stars"
-				:key="i"
-				:style="{ left: s.left, top: s.top, animationDelay: s.delay }"
-			></view>
-			<view class="planets"></view>
+			<view class="stars" :style="{ boxShadow: starShadow }"></view>
 		</view>
 
 		<view class="header">
@@ -30,12 +25,11 @@
 			<!-- 只有完全没有缓存时才整屏转圈，有缓存时下面直接出内容 -->
 			<view class="loading" v-if="loading && list.length === 0">
 				<view class="rocket-loading">
-					<image
-						class="rocket"
-						src="/static/rocket.png"
-						mode="aspectFit"
-						:style="{ transform: 'translateY(' + rocketY + 'px)' }"
-					></image>
+				<image
+					class="rocket"
+					src="/static/rocket.png"
+					mode="aspectFit"
+				></image>
 					<view class="flame"></view>
 				</view>
 				<text class="loading-text">准备发射...</text>
@@ -101,9 +95,8 @@ export default {
 
 	data() {
 		return {
-			rocketY: 0,
-			animationInterval: null,
-			stars: [],
+			// 整片星空的 box-shadow 字符串（onLoad 一次生成）
+			starShadow: '',
 			// 后续排期（第 100 条之后）只在第一次翻到底时拉一回
 			loadingMore: false,
 			moreDone: false,
@@ -149,28 +142,28 @@ export default {
 	},
 
 	onLoad() {
-		// 星星位置一次算好：写在模板里 Math.random() 会每次重渲染都变
-		this.stars = Array.from({ length: 36 }, () => ({
-			left: Math.random() * 100 + '%',
-			top: Math.random() * 100 + '%',
-			delay: (Math.random() * 2).toFixed(2) + 's'
-		}))
-		this.startRocketAnimation()
+		// 整片星空 = 一个元素的 box-shadow 星点（90+ 颗，含少量大星），
+		// 单条动画合成层；位置用 px（box-shadow 里 rpx 要靠编译期，运行时生成只能用 px）
+		const info = uni.getSystemInfoSync()
+		const dots = []
+		for (let i = 0; i < 90; i++) {
+			const x = (Math.random() * info.windowWidth).toFixed(1)
+			const y = (Math.random() * info.windowHeight).toFixed(1)
+			const size = Math.random() > 0.85 ? 1 : 0
+			const alpha = (0.3 + Math.random() * 0.7).toFixed(2)
+			dots.push(x + 'px ' + y + 'px 0 ' + size + 'px rgba(255,255,255,' + alpha + ')')
+		}
+		this.starShadow = dots.join(', ')
 		// 审核态：首页不放内容，直接把入口切到火箭大全（tabBar 已隐藏，
 		// 审核员看到的就是一个纯粹的火箭参数查询工具）；本机切「展示」后也一样
 		getConfig().then((c) => {
 			this.reviewMode = Boolean(c && c.review)
 			if (this.reviewMode) {
-				this.stopRocketAnimation()
 				uni.switchTab({ url: '/pages/rockets/rockets' })
 				return
 			}
 			this.getData()
 		})
-	},
-
-	onUnload() {
-		this.stopRocketAnimation()
 	},
 
 	// 从详情页收藏回来时把收藏项顶上去（不重新请求数据）
@@ -233,29 +226,6 @@ export default {
 			} finally {
 				this.loadingMore = false
 			}
-		},
-
-		startRocketAnimation() {
-			if (this.animationInterval) return
-			let direction = 1
-			this.animationInterval = setInterval(() => {
-				this.rocketY += direction * 2
-				if (this.rocketY > 10 || this.rocketY < -10) direction *= -1
-			}, 50)
-		},
-
-		stopRocketAnimation() {
-			if (this.animationInterval) {
-				clearInterval(this.animationInterval)
-				this.animationInterval = null
-			}
-		}
-	},
-
-	// 数据拉完就不再需要那个定时器了
-	watch: {
-		loading(v) {
-			if (!v) this.stopRocketAnimation()
 		}
 	}
 }
@@ -285,29 +255,22 @@ export default {
 	pointer-events: none;
 }
 
+/* 整片星空是一个元素：星星全部由 box-shadow 画出（onLoad 生成的内联样式），
+   元素本身缩成 1px 透明点藏在原点；整层只跑一条 twinkle，合成开销极低 */
 .stars {
 	position: absolute;
+	top: 0;
+	left: 0;
 	width: 2rpx;
 	height: 2rpx;
-	background: #ffffff;
+	background: transparent;
 	border-radius: 50%;
-	animation: twinkle 2.4s infinite ease-in-out;
+	animation: twinkle 3.2s infinite ease-in-out;
 }
 
 @keyframes twinkle {
-	0%, 100% { opacity: 0.15; }
-	50% { opacity: 0.9; }
-}
-
-.planets {
-	position: absolute;
-	width: 90rpx;
-	height: 90rpx;
-	right: 8%;
-	top: 18%;
-	border-radius: 50%;
-	background: radial-gradient(circle at 35% 30%, #ffd479 0%, #f5a623 60%, #c97b1a 100%);
-	box-shadow: 0 0 60rpx rgba(245, 195, 59, 0.35);
+	0%, 100% { opacity: 0.35; }
+	50% { opacity: 1; }
 }
 
 .header {
@@ -359,11 +322,18 @@ export default {
 	justify-content: center;
 }
 
+/* 上下浮动纯 CSS：之前 setInterval 50ms 改一次 data、每次触发 Vue 重渲染，
+   关键帧动画走合成器，零 JS 参与 */
 .rocket {
 	width: 60rpx;
 	height: 120rpx;
-	transition: transform 0.1s ease;
 	z-index: 2;
+	animation: rocket-float 1s ease-in-out infinite alternate;
+}
+
+@keyframes rocket-float {
+	from { transform: translateY(-8px); }
+	to { transform: translateY(8px); }
 }
 
 .flame {
