@@ -217,9 +217,20 @@
 					</view>
 				</view>
 
+				<!-- 分享海报：canvas 离屏绘制任务卡片图，可保存到相册 / 发朋友圈 -->
+				<view class="card" v-if="!reviewMode">
+					<view class="card-title">分享</view>
+					<view class="poster-btn" hover-class="poster-btn-hover" @click="makePoster">
+						<text class="poster-btn-text">🖼 生成分享海报</text>
+					</view>
+				</view>
+
 				<view class="footer-hint">
 					<text>数据来源 The Space Devs · 中文翻译由同步任务生成</text>
 				</view>
+
+				<!-- 离屏画布：绘制 600x960 逻辑像素的竖版卡片，导出后保存到相册 -->
+				<canvas type="2d" id="poster" class="poster-canvas"></canvas>
 			</view>
 		</block>
 	</view>
@@ -464,6 +475,212 @@ export default {
 		}
 	},
 	methods: {
+		// ==================== 分享海报 ====================
+
+		/** 入口：生成海报并保存到相册（canvas 2d 离屏绘制） */
+		async makePoster() {
+			const d = this.detail
+			if (!d) return
+			// #ifdef MP-WEIXIN
+			try {
+				uni.showLoading({ title: '生成中…', mask: true })
+				const imgPath = await this._posterImage(d.image)
+				const { canvas, ctx, W, H } = await this._posterCanvas()
+				await this._drawPoster(canvas, ctx, W, H, imgPath)
+				// 给绘制留一帧落盘的时间
+				await new Promise((r) => setTimeout(r, 120))
+				const res = await new Promise((resolve, reject) =>
+					wx.canvasToTempFilePath({ canvas, success: resolve, fail: reject })
+				)
+				uni.hideLoading()
+				await this._saveToAlbum(res.tempFilePath)
+			} catch (e) {
+				uni.hideLoading()
+				const msg = (e && e.errMsg) || ''
+				if (msg.indexOf('auth') !== -1 || msg.indexOf('denied') !== -1) {
+					uni.showModal({
+						title: '需要相册权限',
+						content: '保存海报需要相册权限，请在设置中开启',
+						confirmText: '去设置',
+						success: (r) => {
+							if (r.confirm) uni.openSetting()
+						}
+					})
+				} else {
+					console.warn('[launchInfo] 海报生成失败', e)
+					uni.showToast({ title: '生成失败，请重试', icon: 'none' })
+				}
+			}
+			// #endif
+		},
+
+		/** 任务图下载成本地路径；失败或没有图就返回 null（海报退化为纯背景） */
+		_posterImage(url) {
+			if (!url) return Promise.resolve(null)
+			return new Promise((resolve) => {
+				uni.downloadFile({
+					url,
+					success: (res) => resolve(res.statusCode === 200 ? res.tempFilePath : null),
+					fail: () => resolve(null)
+				})
+			})
+		},
+
+		/** 拿 canvas 2d 节点，按 dpr 放大物理像素保证清晰度 */
+		_posterCanvas() {
+			return new Promise((resolve, reject) => {
+				uni
+					.createSelectorQuery()
+					.in(this)
+					.select('#poster')
+					.fields({ node: true, size: true })
+					.exec((res) => {
+						const node = res && res[0] && res[0].node
+						if (!node) return reject(new Error('canvas node not found'))
+						const W = 600
+						const H = 960
+						const dpr = (uni.getSystemInfoSync().pixelRatio) || 2
+						node.width = W * dpr
+						node.height = H * dpr
+						const ctx = node.getContext('2d')
+						ctx.scale(dpr, dpr)
+						resolve({ canvas: node, ctx, W, H })
+					})
+			})
+		},
+
+		/** 卡片内容：顶部任务图 → 标题 → 时间/状态 → 关键信息 → 底部品牌 */
+		_drawPoster(canvas, ctx, W, H, imgPath) {
+			return new Promise((resolve) => {
+				const IMG_H = 320
+				// 背景
+				const bg = ctx.createLinearGradient(0, 0, 0, H)
+				bg.addColorStop(0, '#101a2e')
+				bg.addColorStop(1, '#0a0e17')
+				ctx.fillStyle = bg
+				ctx.fillRect(0, 0, W, H)
+
+				const next = () => {
+					// 图底渐隐到背景色，图文衔接不生硬
+					const fade = ctx.createLinearGradient(0, IMG_H - 90, 0, IMG_H)
+					fade.addColorStop(0, 'rgba(10,14,23,0)')
+					fade.addColorStop(1, '#0a0e17')
+					ctx.fillStyle = fade
+					ctx.fillRect(0, IMG_H - 90, W, 90)
+
+					let y = IMG_H + 56
+					// 标题：最多两行，超出省略
+					ctx.fillStyle = '#ffffff'
+					ctx.font = 'bold 36px sans-serif'
+					y = this._wrapText(ctx, this.displayName || '太空发射任务', 44, W - 88, 48, 2, y)
+
+					// 状态 + 时间
+					const zh = (d.status && d.status.nameZh) || (d.status && d.status.abbrev) || ''
+					if (zh) {
+						ctx.fillStyle = '#38bdf8'
+						ctx.font = 'bold 26px sans-serif'
+						ctx.fillText(zh, 44, y)
+					}
+					ctx.fillStyle = '#8a97a8'
+					ctx.font = '26px sans-serif'
+					ctx.fillText(formatDateTime(d.net) || '', 44 + (zh ? 96 : 0), y)
+					y += 34
+
+					// 关键信息三行
+					const c = d.rocket && d.rocket.configuration
+					const rows = [
+						['火箭', rocketNameOf(d) || (c && c.name) || ''],
+						['机构', (d.launch_service_provider && d.launch_service_provider.name) || ''],
+						['工位', (d.pad && d.pad.name ? d.pad.name + ' · ' : '') + ((d.pad && d.pad.location && d.pad.location.name) || '')]
+					]
+					for (const pair of rows) {
+						const label = pair[0]
+						const value = pair[1]
+						if (!value) continue
+						ctx.font = '26px sans-serif'
+						ctx.fillStyle = '#4a5568'
+						ctx.fillText(label, 44, y)
+						ctx.fillStyle = '#e2e8f0'
+						ctx.font = '28px sans-serif'
+						ctx.fillText(this._ellipsis(ctx, value, W - 200), 110, y)
+						y += 48
+					}
+
+					// 底部品牌行
+					ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+					ctx.beginPath()
+					ctx.moveTo(44, H - 120)
+					ctx.lineTo(W - 44, H - 120)
+					ctx.stroke()
+					ctx.fillStyle = '#8a97a8'
+					ctx.font = 'bold 30px sans-serif'
+					ctx.fillText('太空发射任务', 44, H - 68)
+					ctx.fillStyle = '#4a5568'
+					ctx.font = '24px sans-serif'
+					ctx.fillText('看发射 · 查火箭 · 懂航天', 44, H - 32)
+					resolve()
+				}
+
+				if (imgPath) {
+					// cover 裁剪画顶部图
+					const img = canvas.createImage()
+					img.onload = () => {
+						const scale = Math.max(W / img.width, IMG_H / img.height)
+						const dw = img.width * scale
+						const dh = img.height * scale
+						ctx.drawImage(img, (W - dw) / 2, (IMG_H - dh) / 2, dw, dh)
+						next()
+					}
+					img.onerror = next
+					img.src = imgPath
+				} else {
+					next()
+				}
+			})
+		},
+
+		/** 多行文本绘制，返回结束 y */
+		_wrapText(ctx, text, x, maxWidth, lineHeight, maxLines, y) {
+			const lines = []
+			let line = ''
+			for (const ch of String(text)) {
+				if (ctx.measureText(line + ch).width > maxWidth) {
+					lines.push(line)
+					line = ch
+					if (lines.length >= maxLines - 1) break
+				} else {
+					line += ch
+				}
+			}
+			if (line) lines.push(line)
+			for (const l of lines.slice(0, maxLines)) {
+				ctx.fillText(l, x, y)
+				y += lineHeight
+			}
+			return y
+		},
+
+		_ellipsis(ctx, text, maxWidth) {
+			const t = String(text)
+			if (ctx.measureText(t).width <= maxWidth) return t
+			let s = t
+			while (s.length > 1 && ctx.measureText(s + '…').width > maxWidth) s = s.slice(0, -1)
+			return s + '…'
+		},
+
+		_saveToAlbum(filePath) {
+			return new Promise((resolve, reject) => {
+				uni.saveImageToPhotosAlbum({
+					filePath,
+					success: () => {
+						uni.showToast({ title: '已保存到相册', icon: 'success' })
+						resolve()
+					},
+					fail: reject
+				})
+			})
+		},
+
 		goAgency(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/agencies/agencies?id=' + id })
@@ -805,6 +1022,34 @@ export default {
 .agency-name {
 	color: #e2e8f0;
 	font-size: 30rpx;
+}
+
+.poster-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20rpx 0;
+	background: rgba(56, 189, 248, 0.12);
+	border: 1rpx solid rgba(56, 189, 248, 0.4);
+	border-radius: 14rpx;
+}
+
+.poster-btn-hover {
+	background: rgba(56, 189, 248, 0.24);
+}
+
+.poster-btn-text {
+	color: #38bdf8;
+	font-size: 28rpx;
+}
+
+/* 离屏画布：不参与布局也不可见，但 canvas 2d 照常绘制 */
+.poster-canvas {
+	position: fixed;
+	left: -9999px;
+	top: 0;
+	width: 600px;
+	height: 960px;
 }
 
 .footer-hint {
