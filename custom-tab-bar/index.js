@@ -68,11 +68,10 @@ Component({
 				}
 			} catch (e) {}
 
-			// 1.5) 开发版（HBuilderX 运行/预览）永远正常态，不读远程；
-			//      审核员与线上用户是正式版，不受影响。
-			//      与 utils/config.js 的 isDevBuild() 同一逻辑
+			// 1.5) 审核态只在正式版（release）生效：开发版/体验版一律正常态，
+			//      不读远程。与 utils/config.js 的 isReleaseBuild() 同一逻辑
 			try {
-				if (wx.getAccountInfoSync().miniProgram.envVersion === 'develop') return
+				if (wx.getAccountInfoSync().miniProgram.envVersion !== 'release') return
 			} catch (e) {}
 
 			// 2) 远程开关的 5 分钟内缓存

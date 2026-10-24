@@ -19,17 +19,18 @@ const KEY = 'appReviewConfig'
 const TTL = 5 * 60 * 1000
 
 /**
- * 是否开发版（HBuilderX 真机运行 / 预览 / 开发者工具编译预览）。
- * 开发版永远按正常态展示、不读 COS —— 等审核期间 COS 停着 review:true
- * 也不影响本机开发。审核员拿到的是提审的正式版（release），必走 COS。
- * 基础库不支持该 API 时按非开发版处理（正式设备走 COS，行为不变）。
+ * 审核态只在正式版（release）生效。
+ * 审核员跑的提审包、线上用户拿到的包都是 release；
+ * 开发版（HBuilderX 运行/预览/开发者工具）与体验版一律完整态——
+ * COS 上停着 review:true 也不影响本机开发与自测。
+ * 基础库不支持该 API 时按非 release 处理（宁可审核态失效，不卡开发）。
  */
-function isDevBuild() {
+function isReleaseBuild() {
 	// #ifdef MP-WEIXIN
 	try {
-		return wx.getAccountInfoSync().miniProgram.envVersion === 'develop'
+		return wx.getAccountInfoSync().miniProgram.envVersion === 'release'
 	} catch (e) {
-		// API 不存在或取不到：当正式版处理
+		// API 不存在或取不到：当非 release 处理
 	}
 	// #endif
 	return false
@@ -125,15 +126,14 @@ async function fetchOnce() {
 
 /**
  * 取展示开关，永远 resolve 一个对象（任何失败都兜底 review:false）。
- * 优先级：本机覆盖 > 开发版完整态 > 内存缓存 > 本地缓存 > 远程。
+ * 优先级：本机覆盖 > 非正式版完整态 > 内存缓存 > 本地缓存 > 远程。
  */
 export function getConfig() {
 	const ov = readOverride()
 	if (ov) return Promise.resolve(ov)
 
-	// 开发版（HBuilderX 运行/预览）永远完整态，不读 COS；
-	// 审核员与线上用户走的是正式版，不受影响
-	if (isDevBuild()) return Promise.resolve({ review: false })
+	// 审核态只在正式版生效：开发版/体验版永远完整态，不读 COS
+	if (!isReleaseBuild()) return Promise.resolve({ review: false })
 
 	if (mem && Date.now() - mem.ts < TTL) return Promise.resolve(mem.data)
 	if (inflight) return inflight
