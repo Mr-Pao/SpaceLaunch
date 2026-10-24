@@ -64,8 +64,22 @@ const SOFT_TTL = {
 	agencies: 24 * 60 * 60 * 1000
 }
 
-// 硬过期：超过这个时间连兜底展示都不做了，直接当没有缓存
-const HARD_TTL = 7 * 24 * 60 * 60 * 1000
+// 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。
+// 小数据集（upcoming/previous/events/stats）保持 7 天；
+// 大体积、低频访问的数据集（launchers 435KB / upcomingMore 626KB / agencies 180KB，
+// 合计约 1.2MB，占小程序 10MB Storage 配额的 1/8）只用 2 天——
+// 到期后第一次访问就把它们从 Storage 腾出来，本会话先用内存里的渲染 + 后台刷新，
+// 空间释放了，页面也不用白屏等网络（低频页面下次访问重新拉一次完全可接受）。
+const HARD_TTL_DEFAULT = 7 * 24 * 60 * 60 * 1000
+const HARD_TTL = {
+	upcomingMore: 2 * 24 * 60 * 60 * 1000,
+	agencies: 2 * 24 * 60 * 60 * 1000,
+	launchers: 2 * 24 * 60 * 60 * 1000
+}
+
+function hardTtl(name) {
+	return HARD_TTL[name] || HARD_TTL_DEFAULT
+}
 
 const REQUEST_TIMEOUT = 8000
 
@@ -95,7 +109,16 @@ function readStorage(name) {
 		if (!obj.savedAt) return null
 
 		const age = Date.now() - obj.savedAt
-		if (age > HARD_TTL) return null
+		if (age > hardTtl(name)) {
+			// 硬过期：立刻从 Storage 腾出空间（大数据集不再长期占配额），
+			// 数据照样返回——本会话先渲染它，load() 会触发后台刷新重写缓存
+			try {
+				uni.removeStorageSync(cacheKey(name))
+			} catch (e) {
+				// 清不掉也无妨，下次再清
+			}
+			return { data: obj, age, expired: true }
+		}
 
 		return { data: obj, age }
 	} catch (e) {
@@ -218,7 +241,8 @@ export function load(name, opts) {
 	if (hit) {
 		const data = hit.data
 		const age = hit.age != null ? hit.age : Date.now() - data.savedAt
-		const isStale = age > ttl
+		// 硬过期的缓存（Storage 副本已腾掉）按 stale 处理：照常渲染 + 后台刷新
+		const isStale = hit.expired || age > ttl
 
 		// 过期了就在后台刷一次，不阻塞本次返回
 		if (isStale) {
