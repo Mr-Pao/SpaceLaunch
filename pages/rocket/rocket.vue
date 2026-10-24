@@ -87,8 +87,9 @@
 					<text class="card-desc">{{ descText }}</text>
 				</view>
 
-				<!-- 外部资料：小程序打不开外链，只能复制 -->
-				<view class="card" v-if="config && (config.info_url || config.wiki_url)">
+				<!-- 外部资料：小程序打不开外链，只能复制。
+				     审核态隐藏——引导到外部网站的链接容易被判违规 -->
+				<view class="card" v-if="!reviewMode && config && (config.info_url || config.wiki_url)">
 					<view class="card-title">外部资料</view>
 					<view class="link" v-if="config.info_url" @click="copy(config.info_url, '官网')">
 						<text class="link-name">官方网站</text>
@@ -100,8 +101,8 @@
 					</view>
 				</view>
 
-				<!-- 发射记录 -->
-				<block v-if="records.length">
+				<!-- 发射记录：审核态隐藏（列表观感易被判资讯） -->
+				<block v-if="!reviewMode && records.length">
 					<view class="section-title">
 						<text>近期发射</text>
 					</view>
@@ -116,7 +117,8 @@
 				</block>
 
 				<view class="footer-hint">
-					<text v-if="records.length">发射记录来自小程序缓存的最近 100 次</text>
+					<text v-if="reviewMode">数据每日自动同步</text>
+					<text v-else-if="records.length">发射记录来自小程序缓存的最近 100 次</text>
 					<text v-else>暂无该型号的发射记录</text>
 				</view>
 			</view>
@@ -127,6 +129,7 @@
 <script>
 import spaceData from '@/utils/data.js'
 import { rocketName as rocketNameOf } from '@/utils/format.js'
+import { getConfig } from '@/utils/config.js'
 
 export default {
 	data() {
@@ -136,7 +139,9 @@ export default {
 			config: null,
 			records: [],
 			loading: true,
-			navSolid: false
+			navSolid: false,
+			// 审核模式：隐藏外部资料与近期发射
+			reviewMode: false
 		}
 	},
 
@@ -237,6 +242,11 @@ export default {
 			this.loading = false
 			return
 		}
+
+		// 展示开关：审核态下外部资料与近期发射整块隐藏
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
 
 		await Promise.all([this.loadConfig(), this.loadRecords()])
 		this.loading = false

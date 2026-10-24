@@ -52,11 +52,23 @@ Component({
 	lifetimes: {
 		attached() {
 			// 审核模式开关：与 utils/config.js 读同一份 COS 配置、同一个 storage key。
-			// 原生组件不走 uni-app 编译，这里单独用 wx.request 拉一次；
-			// 正常用户本地有 5 分钟内缓存时零请求。
+			// 原生组件不走 uni-app 编译，这里单独用 wx.request 拉一次。
+			// 优先级与页面端一致：本机覆盖 > 远程缓存 > 远程请求 ——
+			// 否则暗门切回正常态后，bar 会被过期的远程审核态缓存藏掉。
 			const KEY = 'appReviewConfig'
+			const OVERRIDE_KEY = 'appReviewConfigOverride'
 			const TTL = 5 * 60 * 1000
 
+			// 1) 本机覆盖（暗门切的）最高优先
+			try {
+				const ov = wx.getStorageSync(OVERRIDE_KEY)
+				if (ov && typeof ov.review === 'boolean') {
+					this.setData({ review: ov.review })
+					return
+				}
+			} catch (e) {}
+
+			// 2) 远程开关的 5 分钟内缓存
 			try {
 				const cached = wx.getStorageSync(KEY)
 				if (cached && cached.ts && cached.data && Date.now() - cached.ts < TTL) {
@@ -67,12 +79,12 @@ Component({
 				// 没缓存就走请求
 			}
 
+			// 3) 远程请求（成功结果与页面端共用一份缓存，谁先拉到都行）
 			wx.request({
 				url: 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-data/app-config.json',
 				timeout: 5000,
 				success: (res) => {
 					if (res.statusCode !== 200 || !res.data || typeof res.data !== 'object') return
-					// 成功结果与 vue 端共用一份缓存，谁先拉到都行
 					try {
 						wx.setStorageSync(KEY, { ts: Date.now(), data: res.data })
 					} catch (e) {}
