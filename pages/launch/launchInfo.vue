@@ -502,19 +502,12 @@ export default {
 					wx.canvasToTempFilePath({ canvas, success: resolve, fail: reject })
 				)
 				uni.hideLoading()
-				await this._saveToAlbum(res.tempFilePath)
+				this._shareOrSave(res.tempFilePath)
 			} catch (e) {
 				uni.hideLoading()
 				const msg = (e && e.errMsg) || ''
 				if (msg.indexOf('auth') !== -1 || msg.indexOf('denied') !== -1) {
-					uni.showModal({
-						title: '需要相册权限',
-						content: '保存海报需要相册权限，请在设置中开启',
-						confirmText: '去设置',
-						success: (r) => {
-							if (r.confirm) uni.openSetting()
-						}
-					})
+					this._albumAuthModal()
 				} else {
 					console.warn('[launchInfo] 海报生成失败', e)
 					uni.showToast({ title: '生成失败，请重试', icon: 'none' })
@@ -570,7 +563,7 @@ export default {
 				ctx.fillStyle = bg
 				ctx.fillRect(0, 0, W, H)
 
-				const next = () => {
+				const paint = (qrImg) => {
 					// 图底渐隐到背景色，图文衔接不生硬
 					const fade = ctx.createLinearGradient(0, IMG_H - 90, 0, IMG_H)
 					fade.addColorStop(0, 'rgba(10,14,23,0)')
@@ -616,19 +609,45 @@ export default {
 						y += 48
 					}
 
-					// 底部品牌行
+					// 底部品牌行：右侧留给小程序码（static/qrcode.png，文件缺失则只画文字）
 					ctx.strokeStyle = 'rgba(255,255,255,0.08)'
 					ctx.beginPath()
-					ctx.moveTo(44, H - 120)
-					ctx.lineTo(W - 44, H - 120)
+					ctx.moveTo(44, H - 230)
+					ctx.lineTo(W - 44, H - 230)
 					ctx.stroke()
 					ctx.fillStyle = '#8a97a8'
 					ctx.font = 'bold 30px sans-serif'
-					ctx.fillText('太空发射任务', 44, H - 68)
+					ctx.fillText('太空发射任务', 44, H - 160)
 					ctx.fillStyle = '#4a5568'
 					ctx.font = '24px sans-serif'
-					ctx.fillText('看发射 · 查火箭 · 懂航天', 44, H - 32)
+					ctx.fillText('看发射 · 查火箭 · 懂航天', 44, H - 118)
+					ctx.fillStyle = '#4a5568'
+					ctx.font = '22px sans-serif'
+					ctx.fillText('扫码打开小程序', 44, H - 78)
+					if (qrImg) {
+						const S = 130
+						const qx = W - 44 - S
+						const qy = H - 212
+						// 白底圆角衬托二维码（二维码图本身多为透明底）
+						ctx.fillStyle = '#ffffff'
+						this._roundRect(ctx, qx - 8, qy - 8, S + 16, S + 16, 12)
+						ctx.fill()
+						ctx.drawImage(qrImg, qx, qy, S, S)
+					}
 					resolve()
+				}
+
+				/**
+				 * 小程序码来源：公众平台「设置 → 基本设置 → 小程序码及线下物料下载」
+				 * 下载的固定码。无服务端调不了 getUnlimited（要 access_token），
+				 * 生成不了带 scene 的任务直达码，固定码只能指向首页——可接受。
+				 * 文件不存在时静默跳过，海报照常出。
+				 */
+				const loadQr = () => {
+					const qr = canvas.createImage()
+					qr.onload = () => paint(qr)
+					qr.onerror = () => paint(null)
+					qr.src = '/static/qrcode.png'
 				}
 
 				if (imgPath) {
@@ -639,14 +658,25 @@ export default {
 						const dw = img.width * scale
 						const dh = img.height * scale
 						ctx.drawImage(img, (W - dw) / 2, (IMG_H - dh) / 2, dw, dh)
-						next()
+						loadQr()
 					}
-					img.onerror = next
+					img.onerror = loadQr
 					img.src = imgPath
 				} else {
-					next()
+					loadQr()
 				}
 			})
+		},
+
+		/** 圆角矩形路径（海报白底衬托用） */
+		_roundRect(ctx, x, y, w, h, r) {
+			ctx.beginPath()
+			ctx.moveTo(x + r, y)
+			ctx.arcTo(x + w, y, x + w, y + h, r)
+			ctx.arcTo(x + w, y + h, x, y + h, r)
+			ctx.arcTo(x, y + h, x, y, r)
+			ctx.arcTo(x, y, x + w, y, r)
+			ctx.closePath()
 		},
 
 		/** 多行文本绘制，返回结束 y */
@@ -676,6 +706,45 @@ export default {
 			let s = t
 			while (s.length > 1 && ctx.measureText(s + '…').width > maxWidth) s = s.slice(0, -1)
 			return s + '…'
+		},
+
+		/**
+		 * 海报生成后的出口：优先拉起原生「图片分享菜单」——
+		 * 里面有「发送给朋友」（把海报图直接发到聊天）和「保存图片」，
+		 * 转发 / 存相册一步到位，正好补上未认证小程序发不了卡片的空。
+		 * 基础库不支持 showShareImageMenu 时退回只存相册。
+		 */
+		_shareOrSave(filePath) {
+			const ok = typeof wx !== 'undefined' && typeof wx.showShareImageMenu === 'function'
+			if (ok) {
+				wx.showShareImageMenu({
+					path: filePath,
+					fail: (e) => {
+						const msg = (e && e.errMsg) || ''
+						// 用户主动关菜单不算失败
+						if (msg.indexOf('cancel') !== -1) return
+						if (msg.indexOf('auth') !== -1 || msg.indexOf('denied') !== -1) {
+							this._albumAuthModal()
+						} else {
+							this._saveToAlbum(filePath).catch(() => {})
+						}
+					}
+				})
+			} else {
+				this._saveToAlbum(filePath).catch(() => this._albumAuthModal())
+			}
+		},
+
+		/** 相册权限被拒时的引导弹窗 */
+		_albumAuthModal() {
+			uni.showModal({
+				title: '需要相册权限',
+				content: '保存海报需要相册权限，请在设置中开启',
+				confirmText: '去设置',
+				success: (r) => {
+					if (r.confirm) uni.openSetting()
+				}
+			})
 		},
 
 		_saveToAlbum(filePath) {
