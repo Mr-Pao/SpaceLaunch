@@ -43,13 +43,14 @@ async function decide(envVersion, version, remote) {
 
 const CASES = [
 	['正式版在白名单', 'release', '3.0.10', { review: false, reviewVersions: ['3.0.10'] }, true],
-	['正式版不在白名单', 'release', '3.0.9', { review: false, reviewVersions: ['3.0.10'] }, false],
-	['正式版无版本号（审核环境）', 'release', '', { review: false, reviewVersions: ['3.0.10'] }, true],
-	['旧布尔开关 true', 'release', '3.0.9', { review: true }, true],
-	['旧布尔开关 false', 'release', '3.0.9', { review: false }, false],
-	['白名单为空走布尔', 'release', '3.0.9', { review: true, reviewVersions: [] }, true],
-	['体验版永远完整态', 'trial', '3.0.10', { review: true, reviewVersions: ['3.0.10'] }, false],
-	['开发版永远完整态', 'develop', '3.0.10', { review: true, reviewVersions: ['3.0.10'] }, false]
+	['正式版不在白名单', 'release', '3.0.9', { reviewVersions: ['3.0.10'] }, false],
+	['正式版无版本号（审核环境）', 'release', '', { reviewVersions: ['3.0.10'] }, true],
+	['白名单为空 → 完整态', 'release', '3.0.10', { reviewVersions: [] }, false],
+	['兼容旧格式 review:true', 'release', '3.0.9', { review: true }, true],
+	['兼容旧格式 review:false', 'release', '3.0.9', { review: false }, false],
+	['多版本白名单命中', 'release', '3.0.10', { reviewVersions: ['3.0.9', '3.0.10'] }, true],
+	['体验版永远完整态', 'trial', '3.0.10', { reviewVersions: ['3.0.10'] }, false],
+	['开发版永远完整态', 'develop', '3.0.10', { reviewVersions: ['3.0.10'] }, false]
 ]
 
 ;(async () => {

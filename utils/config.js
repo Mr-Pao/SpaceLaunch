@@ -1,28 +1,25 @@
 /**
  * 远程展示开关（审核模式）
  *
- * COS 上放一份 app-config.json：
- *   { "review": false, "reviewVersions": [] }
+ * COS 上放一份 app-config.json，**只有一个字段**：
+ *   { "reviewVersions": [] }
  *
- * 两种生效方式（reviewVersions 优先）：
- * - reviewVersions 非空：**只有列在里面的版本**进工具态，其它线上版本照常完整展示。
- *   提审流程：把要提审的版本号（= manifest 的 versionName，如 "3.0.10"）加进去 →
- *   审核员与该版用户看到工具态，老版本用户完全不受影响 →
- *   过审发布后把这条删掉，该版用户即恢复完整展示（不用重新提审）。
- * - reviewVersions 为空：退回全局布尔 review（老行为），一提审所有用户都变工具态。
+ * 语义：列在里面的版本号（= manifest 的 versionName，如 "3.0.10"）进工具态，
+ * 其它版本一律完整展示。
+ *
+ * 提审流程（全程只改这一处）：
+ *   提审 3.0.10 → { "reviewVersions": ["3.0.10"] }
+ *   过审发布后 → { "reviewVersions": [] }
+ *
+ * 效果：
+ *   - 提审期间：3.0.10（审核员跑的包）工具态，线上老版本用户完全不受影响
+ *   - 过审后清空：3.0.10 用户也恢复完整态，**不用重新提审**
+ *
+ * 审核员不会漏判，两条兜底：
+ *   1. 审核环境返回版本号 3.0.10 → 命中白名单
+ *   2. 审核环境拿不到版本号 → 正式版必有版本号，拿不到的只可能是审核环境，直接判工具态
  *
  * 工具态内容：隐藏活动 tab 与活动列表、收起详情页长文、列表卡片去大图。
- *
- * ⚠ 字段名容易误解：review **不是**「正在审核」的意思，而是「强制工具态」的全局开关。
- *   白名单非空时 review 直接被忽略（见下面三种配置的实际效果）：
- *
- *   平时：        { "review": false, "reviewVersions": [] }
- *                 → 所有人都完整态
- *   提审 3.0.10： { "review": true,  "reviewVersions": ["3.0.10"] }
- *                 → 3.0.10 工具态；3.0.9 等老版本仍完整态（review 被忽略）
- *                 → 同时留 review:true 是双保险：万一白名单解析异常，也不会让审核员看到完整内容
- *   过审发布后：  { "review": false, "reviewVersions": [] }
- *                 → 全量恢复完整态，不用重新提审
  *
  * 设计约束：
  * - 请求失败一律按完整态兜底，绝不影响正常使用
@@ -98,16 +95,21 @@ function applyVersionRule(raw) {
 		return out
 	}
 
-	const list = Array.isArray(cfg.reviewVersions) ? cfg.reviewVersions.map(String) : []
-
-	if (list.length) {
-		const v = runtimeVersion()
-		// 拿不到版本号：无版本号的审核环境，保审核
-		out.review = v ? list.indexOf(v) !== -1 : true
+	// 兼容旧格式：配置里完全没有 reviewVersions 字段时，才看旧的布尔 review
+	if (!Array.isArray(cfg.reviewVersions)) {
+		out.review = Boolean(cfg.review)
 		return out
 	}
 
-	out.review = Boolean(cfg.review)
+	const list = cfg.reviewVersions.map(String)
+	if (!list.length) {
+		out.review = false
+		return out
+	}
+
+	// 拿不到版本号：正式版必有版本号，拿不到的只可能是审核环境，保审核
+	const v = runtimeVersion()
+	out.review = v ? list.indexOf(v) !== -1 : true
 	return out
 }
 
