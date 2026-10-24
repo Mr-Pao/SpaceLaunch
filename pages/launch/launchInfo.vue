@@ -551,11 +551,18 @@ export default {
 			})
 		},
 
-		/** 卡片内容：顶部任务图 → 标题 → 时间/状态 → 关键信息 → 底部品牌 */
+		/**
+		 * 卡片内容（600x960 竖版）：
+		 * 顶部任务图（cover 裁剪 + 底部渐隐）→ 标题（≤2 行）→ 状态/时间 →
+		 * 火箭/机构/工位三行（长文本自动缩字号，尽量不截断）→ 分隔线 →
+		 * 左下品牌文案 + 右下小程序码（static/qrcode.jpg，缺失则只画文字）。
+		 */
 		_drawPoster(canvas, ctx, W, H, imgPath) {
 			const d = this.detail || {}
 			return new Promise((resolve) => {
 				const IMG_H = 320
+				const PAD = 44
+
 				// 背景
 				const bg = ctx.createLinearGradient(0, 0, 0, H)
 				bg.addColorStop(0, '#101a2e')
@@ -571,83 +578,97 @@ export default {
 					ctx.fillStyle = fade
 					ctx.fillRect(0, IMG_H - 90, W, 90)
 
-					let y = IMG_H + 56
-					// 标题：最多两行，超出省略
+					// ---- 标题：最多两行 ----
+					let y = IMG_H + 76
 					ctx.fillStyle = '#ffffff'
-					ctx.font = 'bold 36px sans-serif'
-					y = this._wrapText(ctx, this.displayName || '太空发射任务', 44, W - 88, 48, 2, y)
+					ctx.font = 'bold 40px sans-serif'
+					y = this._wrapText(ctx, this.displayName || '太空发射任务', PAD, W - PAD * 2, 54, 2, y)
 
-					// 状态 + 时间
+					// ---- 状态（带圆点）+ 时间（独立一行，不再挤在一起）----
 					const zh = (d.status && d.status.nameZh) || (d.status && d.status.abbrev) || ''
+					y += 34
 					if (zh) {
 						ctx.fillStyle = '#38bdf8'
-						ctx.font = 'bold 26px sans-serif'
-						ctx.fillText(zh, 44, y)
+						ctx.beginPath()
+						ctx.arc(PAD + 6, y - 9, 6, 0, Math.PI * 2)
+						ctx.fill()
+						ctx.font = 'bold 28px sans-serif'
+						ctx.fillText(zh, PAD + 24, y)
 					}
+					y += 42
 					ctx.fillStyle = '#8a97a8'
-					ctx.font = '26px sans-serif'
-					ctx.fillText(formatDateTime(d.net) || '', 44 + (zh ? 96 : 0), y)
-					y += 34
+					ctx.font = '27px sans-serif'
+					ctx.fillText(formatDateTime(d.net) || '', PAD, y)
 
-					// 关键信息三行
-					const c = d.rocket && d.rocket.configuration
+					// ---- 火箭 / 机构 / 工位：固定锚点排布，长文本逐级缩字号 ----
 					const rows = [
-						['火箭', rocketNameOf(d) || (c && c.name) || ''],
+						['火箭', rocketNameOf(d) || (d.rocket && d.rocket.configuration && d.rocket.configuration.name) || ''],
 						['机构', (d.launch_service_provider && d.launch_service_provider.name) || ''],
 						['工位', (d.pad && d.pad.name ? d.pad.name + ' · ' : '') + ((d.pad && d.pad.location && d.pad.location.name) || '')]
 					]
-					for (const pair of rows) {
-						const label = pair[0]
-						const value = pair[1]
+					const rowY = [640, 688, 736]
+					const valX = PAD + 84
+					for (let i = 0; i < rows.length; i++) {
+						const label = rows[i][0]
+						const value = rows[i][1]
 						if (!value) continue
-						ctx.font = '26px sans-serif'
+						ctx.font = '24px sans-serif'
 						ctx.fillStyle = '#4a5568'
-						ctx.fillText(label, 44, y)
+						ctx.fillText(label, PAD, rowY[i])
+						// 值从 27px 起，放不下逐级降到 22px，仍放不下才截断
+						const maxW = W - PAD - valX
+						let size = 27
+						ctx.font = size + 'px sans-serif'
+						while (size > 22 && ctx.measureText(value).width > maxW) {
+							size -= 1
+							ctx.font = size + 'px sans-serif'
+						}
 						ctx.fillStyle = '#e2e8f0'
-						ctx.font = '28px sans-serif'
-						ctx.fillText(this._ellipsis(ctx, value, W - 200), 110, y)
-						y += 48
+						ctx.fillText(this._ellipsis(ctx, value, maxW), valX, rowY[i])
 					}
 
-					// 底部品牌行：右侧留给小程序码（static/qrcode.png，文件缺失则只画文字）
+					// ---- 分隔线 ----
 					ctx.strokeStyle = 'rgba(255,255,255,0.08)'
 					ctx.beginPath()
-					ctx.moveTo(44, H - 230)
-					ctx.lineTo(W - 44, H - 230)
+					ctx.moveTo(PAD, 784)
+					ctx.lineTo(W - PAD, 784)
 					ctx.stroke()
-					ctx.fillStyle = '#8a97a8'
-					ctx.font = 'bold 30px sans-serif'
-					ctx.fillText('太空发射任务', 44, H - 160)
-					ctx.fillStyle = '#4a5568'
-					ctx.font = '24px sans-serif'
-					ctx.fillText('看发射 · 查火箭 · 懂航天', 44, H - 118)
-					ctx.fillStyle = '#4a5568'
-					ctx.font = '22px sans-serif'
-					ctx.fillText('扫码打开小程序', 44, H - 78)
+
+					// ---- 右下：小程序码（白底圆角衬托）----
 					if (qrImg) {
-						const S = 130
-						const qx = W - 44 - S
-						const qy = H - 212
-						// 白底圆角衬托二维码（二维码图本身多为透明底）
+						const S = 132
+						const qx = W - PAD - S
+						const qy = H - PAD - S
 						ctx.fillStyle = '#ffffff'
-						this._roundRect(ctx, qx - 8, qy - 8, S + 16, S + 16, 12)
+						this._roundRect(ctx, qx - 10, qy - 10, S + 20, S + 20, 14)
 						ctx.fill()
 						ctx.drawImage(qrImg, qx, qy, S, S)
 					}
+
+					// ---- 左下：品牌文案（右边界让开二维码）----
+					const brandW = qrImg ? W - PAD - 152 - 40 - PAD : W - PAD * 2
+					ctx.fillStyle = '#8a97a8'
+					ctx.font = 'bold 32px sans-serif'
+					ctx.fillText('太空发射任务', PAD, 830)
+					ctx.fillStyle = '#4a5568'
+					ctx.font = '24px sans-serif'
+					ctx.fillText(this._ellipsis(ctx, '看发射 · 查火箭 · 懂航天', brandW), PAD, 872)
+					ctx.fillStyle = '#4a5568'
+					ctx.font = '22px sans-serif'
+					ctx.fillText(this._ellipsis(ctx, '扫码打开小程序', brandW), PAD, 908)
 					resolve()
 				}
 
 				/**
-				 * 小程序码来源：公众平台「设置 → 基本设置 → 小程序码及线下物料下载」
-				 * 下载的固定码。无服务端调不了 getUnlimited（要 access_token），
-				 * 生成不了带 scene 的任务直达码，固定码只能指向首页——可接受。
-				 * 文件不存在时静默跳过，海报照常出。
+				 * 小程序码来源：项目根目录「小程序码.jpg」（公众平台下载的固定码）。
+				 * 无服务端调不了 getUnlimited（要 access_token），生成不了带 scene
+				 * 的任务直达码，固定码只能指向首页——可接受。文件缺失时静默跳过。
 				 */
 				const loadQr = () => {
 					const qr = canvas.createImage()
 					qr.onload = () => paint(qr)
 					qr.onerror = () => paint(null)
-					qr.src = '/static/qrcode.png'
+					qr.src = '/static/qrcode.jpg'
 				}
 
 				if (imgPath) {
