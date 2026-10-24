@@ -51,7 +51,7 @@ const FILES = {
 	agencies: 'agencies.json',
 	// 火箭型号库（532 个型号，含技术参数）
 	launchers: 'launchers.json',
-	// 统计页的原料：最近 400 次发射的极简字段，前端自己按年份/机构/轨道聚合
+	// 统计页数据：CI 侧按年预聚合好的结果，前端只负责展示与年度切换
 	stats: 'stats-years.json'
 }
 
@@ -104,18 +104,30 @@ function readStorage(name) {
 	}
 }
 
+// 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
+// upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
+const EVICT_ORDER = ['launchers', 'agencies', 'upcomingMore', 'stats', 'events', 'previous']
+
 function writeStorage(name, data) {
 	try {
 		uni.setStorageSync(cacheKey(name), data)
 	} catch (e) {
-		// 存储满了不能影响主流程：清掉本项目其它缓存再试一次，仍失败就放内存
-		console.warn('[spaceData] 写缓存失败，尝试清理旧缓存', name, e)
-		try {
-			clear()
-			uni.setStorageSync(cacheKey(name), data)
-		} catch (e2) {
-			console.warn('[spaceData] 清理后仍失败，仅保留内存缓存', e2)
+		// 存储满了不能影响主流程，也绝不能 clear() 清空全部——
+		// 那会把首页缓存一起带走，首屏体验从 0ms 退化到网络往返。
+		// 改为按淘汰顺序逐个丢别的数据集，每丢一个就重试写入。
+		console.warn('[spaceData] 写缓存失败，开始淘汰其它数据集', name, e)
+		for (const victim of EVICT_ORDER) {
+			if (victim === name) continue
+			try {
+				uni.removeStorageSync(cacheKey(victim))
+				delete memory[victim]
+				uni.setStorageSync(cacheKey(name), data)
+				return
+			} catch (e2) {
+				// 还没挤出来就继续丢下一个
+			}
 		}
+		console.warn('[spaceData] 淘汰后仍写不进去，仅保留内存缓存', name)
 	}
 }
 

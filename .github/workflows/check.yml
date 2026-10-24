@@ -1,0 +1,24 @@
+name: check-config
+
+# tabBar 配置分散在 pages.json 与 custom-tab-bar/index.js 两处（P1-4），
+# 改到相关文件时自动校验一致性，错位在 CI 就拦下来，不用等真机发现。
+
+on:
+  push:
+    paths:
+      - 'pages.json'
+      - 'custom-tab-bar/**'
+      - 'scripts/check-tabbar.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tabbar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: 校验 tabBar 配置一致性
+        run: node scripts/check-tabbar.js
