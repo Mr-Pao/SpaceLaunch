@@ -23,6 +23,11 @@ on:
     - cron: '0 20 * * *'     # 即将发射后续排期：每天 UTC 20:00 = 北京 04:00（要 4 个请求）
     - cron: '0 21 * * *'     # 火箭型号库：每天 UTC 21:00 = 北京 05:00（要 6 个请求）
     - cron: '0 22 * * *'     # 发射工位库：每天 UTC 22:00 = 北京 06:00（1 个请求）
+  # 手动触发（含本机无 API 访问时）：改 scripts/sync-request.json 里的 dataset 再 push 即可。
+  # GitHub App / 手机上也能改这个文件，是最省事的"跑一次某数据集"入口。
+  push:
+    paths:
+      - 'scripts/sync-request.json'
   workflow_dispatch:
     inputs:
       dataset:
@@ -46,7 +51,7 @@ permissions:
 
 concurrency:
   # 同一数据集不并发，避免两次抓取同时写同一个文件
-  group: sync-${{ github.event.schedule || inputs.dataset }}
+  group: sync-${{ github.event.schedule || inputs.dataset || 'push' }}
   cancel-in-progress: false
 
 jobs:
@@ -57,11 +62,17 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # checkout 必须在决定数据集之前：push 触发时数据集名要读 scripts/sync-request.json
+      - uses: actions/checkout@v4
+
       - name: 决定本次要同步哪个数据集
         id: pick
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             DS="${{ inputs.dataset }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            # 手动触发通道：文件里写 {"dataset":"pads"} 之类的单键对象
+            DS=$(node -e "try{console.log(require('./scripts/sync-request.json').dataset||'upcoming')}catch(e){console.log('upcoming')}")
           else
             case "${{ github.event.schedule }}" in
               "*/15 * * * *") DS="upcoming" ;;
@@ -77,8 +88,6 @@ jobs:
           fi
           echo "dataset=$DS" >> "$GITHUB_OUTPUT"
           echo "本次同步：$DS"
-
-      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
