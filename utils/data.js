@@ -92,7 +92,9 @@ const REQUEST_TIMEOUT = 8000
 // 数据集名 → { data, savedAt }
 const memory = {}
 
-// 数据集名 → Promise，避免同一个数据集并发发多次请求
+// 数据集名 → Promise，同一个数据集的并发请求只发一次。
+// 前台路径（load 无缓存 / force）与后台刷新共用，避免冷启动时
+// App 预热和页面 onLoad 同时 load 同一数据集发两次请求、写两次 Storage
 const inflight = {}
 
 // ============ 缓存读写 ============
@@ -215,6 +217,22 @@ function fetchDataset(name) {
 	})
 }
 
+/**
+ * 带并发去重的网络抓取：同一数据集在途时复用同一个 Promise。
+ * 无论成败都清理，失败后的下一次调用允许重新发请求。
+ */
+function fetchShared(name) {
+	if (inflight[name]) return inflight[name]
+
+	const p = fetchDataset(name)
+	inflight[name] = p
+	const clear = () => {
+		if (inflight[name] === p) delete inflight[name]
+	}
+	p.then(clear, clear)
+	return p
+}
+
 // ============ 对外接口 ============
 
 /**
@@ -237,7 +255,7 @@ export function load(name, opts) {
 
 	// ---------- 强制刷新 ----------
 	if (opts.force) {
-		return fetchDataset(name).then((d) => decorate(d, false))
+		return fetchShared(name).then((d) => decorate(d, false))
 	}
 
 	// ---------- 有缓存 ----------
@@ -257,13 +275,12 @@ export function load(name, opts) {
 	}
 
 	// ---------- 无缓存，必须等网络 ----------
-	return fetchDataset(name).then((d) => decorate(d, false))
+	// fetchShared 去重：预热与页面 onLoad 同时到达只发一次请求
+	return fetchShared(name).then((d) => decorate(d, false))
 }
 
 function refreshInBackground(name, oldGeneratedAt, onUpdate) {
-	if (inflight[name]) return
-
-	inflight[name] = fetchDataset(name)
+	fetchShared(name)
 		.then((fresh) => {
 			// generatedAt 没变说明线上还没更新，不必打扰页面
 			if (onUpdate && fresh.generatedAt !== oldGeneratedAt) {
@@ -273,9 +290,6 @@ function refreshInBackground(name, oldGeneratedAt, onUpdate) {
 		.catch((e) => {
 			// 后台刷新失败必须静默，用户手里已经有数据了
 			console.warn('[spaceData] 后台刷新失败', name, e && e.message)
-		})
-		.then(() => {
-			delete inflight[name]
 		})
 }
 

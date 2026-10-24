@@ -59,11 +59,13 @@
 				</view>
 			</view>
 
-			<!-- 简介：英文长文，折叠展示 -->
-			<view class="card" v-if="pad.description">
+			<!-- 简介：CI 回填 descriptionZh，缺失时回退英文原文 -->
+			<view class="card" v-if="pad.description || pad.descriptionZh">
 				<view class="card-title">简介</view>
-				<text class="desc" :class="{ open: descExpanded }">{{ pad.description }}</text>
-				<text class="desc-toggle" @click="descExpanded = !descExpanded">
+				<text class="desc" :class="{ open: descExpanded }">{{ descText }}</text>
+				<!-- 短简介不需要折叠：与 launchInfo 一致用 120 字阈值，
+				     之前无判断，两行文字也挂着「展开全文」 -->
+				<text class="desc-toggle" v-if="descOver" @click="descExpanded = !descExpanded">
 					{{ descExpanded ? '收起' : '展开全文' }}
 				</text>
 			</view>
@@ -85,8 +87,9 @@
 				</view>
 			</view>
 
-			<!-- 外部资料 -->
-			<view class="card" v-if="pad.info_url || pad.wiki_url">
+			<!-- 外部资料：审核态整块隐藏，与 rocket 页口径一致
+			     （审核员从任务详情 → 发射台不该绕到引导外链的入口） -->
+			<view class="card" v-if="!reviewMode && (pad.info_url || pad.wiki_url)">
 				<view class="card-title">外部资料</view>
 				<view class="row row-link" v-if="pad.wiki_url" @click="copyLink(pad.wiki_url)">
 					<text class="label">Wikipedia</text>
@@ -107,6 +110,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
+import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 
 /**
@@ -123,7 +127,20 @@ export default {
 			pad: {},
 			loading: true,
 			navSolid: false,
-			descExpanded: false
+			descExpanded: false,
+			// 审核模式：隐藏外部资料（与 rocket 页同口径）
+			reviewMode: false
+		}
+	},
+
+	computed: {
+		/** 简介优先用 CI 回填的中文，翻译没覆盖到再回退英文 */
+		descText() {
+			return this.pad.descriptionZh || this.pad.description || ''
+		},
+		/** 超过阈值才显示「展开全文」，两行的短简介折叠没有意义 */
+		descOver() {
+			return (this.descText || '').length > 120
 		}
 	},
 
@@ -132,10 +149,21 @@ export default {
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
+	// 页面实例可能被复用，开关状态跟手刷新（getConfig 有内存缓存，零开销）
+	onShow() {
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
+	},
+
 	async onLoad(query) {
 		this.padId = (query && query.id) || ''
 		// 名字兜底：新工位可能还没进库，只有 id 查不到时用名字对一遍
 		const qname = (query && query.name) ? decodeURIComponent(query.name) : ''
+		// 展示开关：审核态下外部资料整块隐藏
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
 		try {
 			let found = this.padId ? await spaceData.getById('pads', this.padId) : null
 			if (!found && qname) {

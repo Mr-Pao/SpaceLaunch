@@ -256,6 +256,8 @@ export default {
 	data() {
 		return {
 			launchId: '',
+			// 调用方带的大致时间（net），归档查找用来直接定位分片，可为空
+			netHint: '',
 			detail: null,
 			agency: null,
 			loading: true,
@@ -416,18 +418,19 @@ export default {
 		}
 	},
 
-	// 详情页自己定义分享，路径里显式带上 id，不依赖全局 mixin 去猜参数
+	// 详情页自己定义分享，路径里显式带上 id，不依赖全局 mixin 去猜参数。
+	// net 一并带上：分享出去的老任务若已滑出快照，打开时可直接定位到归档分片
 	onShareAppMessage() {
 		return {
 			title: this.shareText,
-			path: '/pages/launch/launchInfo?id=' + this.launchId,
+			path: '/pages/launch/launchInfo?id=' + this.launchId + this._netQuery(),
 			imageUrl: this.shareImg
 		}
 	},
 	onShareTimeline() {
 		return {
 			title: this.shareText,
-			query: 'id=' + this.launchId,
+			query: 'id=' + this.launchId + this._netQuery(true),
 			imageUrl: this.shareImg
 		}
 	},
@@ -450,6 +453,9 @@ export default {
 	async onLoad(query) {
 		const id = query && query.id
 		this.launchId = id || ''
+		// 大致时间提示：统计页失败复盘 / 分享路径会带上 net，
+		// 归档查找用它直接跳到目标分片，省去逐片翻找（见 utils/history.js findById）
+		this.netHint = (query && query.net) ? decodeURIComponent(query.net) : ''
 		if (!id) {
 			this.loading = false
 			return
@@ -471,8 +477,9 @@ export default {
 
 		// 快照（previous 只存最新 100 条）里没有 → 去历史归档分片里找。
 		// 统计页失败复盘、已发射页更早条目都属于这类，之前会直接白屏。
+		// netHint 可让查找直接跳到目标分片（findById 内部有限深与缓存上限）
 		if (!d) {
-			d = await findByIdInArchive(id)
+			d = await findByIdInArchive(id, this.netHint)
 		}
 
 		this.detail = d
@@ -484,6 +491,13 @@ export default {
 		}
 	},
 	methods: {
+		/** 分享路径里的 net 参数：知道大致时间才能在归档里直达目标分片 */
+		_netQuery(noLeading) {
+			const net = this.detail && this.detail.net
+			if (!net) return ''
+			return (noLeading ? '' : '&') + 'net=' + encodeURIComponent(net)
+		},
+
 		// ==================== 分享海报 ====================
 
 		/** 入口：生成海报并保存到相册（canvas 2d 离屏绘制） */

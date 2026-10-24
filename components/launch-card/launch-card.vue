@@ -28,8 +28,10 @@
 
 			<view class="meta">
 				<text class="time">{{ timeText }}</text>
-				<text class="dot">·</text>
-				<text class="date">{{ dateText }}</text>
+				<!-- 老（>30 天）任务 timeText 会回退成带年份的完整时间，
+				     与 dateText 相同时不重复展示 -->
+				<text class="dot" v-if="showDate">·</text>
+				<text class="date" v-if="showDate">{{ dateText }}</text>
 			</view>
 
 			<text class="rocket" v-if="rocketName">{{ rocketName }}</text>
@@ -76,6 +78,11 @@ export default {
 		},
 		dateText() {
 			return formatShort(this.item.net)
+		},
+		showDate() {
+			const d = this.dateText
+			// 时间待定 / 与 timeText 重复时不再显示第二份
+			return Boolean(d) && d !== '时间待定' && d !== this.timeText
 		},
 		rocketName() {
 			return rocketName(this.item.rocket && this.item.rocket.configuration)

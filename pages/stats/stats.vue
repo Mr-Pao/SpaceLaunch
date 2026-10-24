@@ -344,7 +344,10 @@ export default {
 
 		goDetail(f) {
 			if (!f.id) return
-			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + f.id })
+			// net 一起带上：失败任务多半已滑出 previous 快照，
+			// 详情页在归档里查找时可直接跳到对应分片（findById 的 netHint）
+			const net = f.net ? '&net=' + encodeURIComponent(f.net) : ''
+			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + f.id + net })
 		}
 	}
 }

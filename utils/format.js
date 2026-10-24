@@ -24,11 +24,18 @@ export function formatDateTime(value) {
 	)
 }
 
-/** 10-23 06:51（列表卡片用，省掉年份） */
+/** 10-23 06:51（列表卡片用，省掉年份）；跨年任务自动带年份：2025-04-12 08:00 */
 export function formatShort(value) {
 	const d = toDate(value)
 	if (!d) return '时间待定'
-	return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+	const hm =
+		pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' +
+		pad(d.getHours()) + ':' + pad(d.getMinutes())
+	// 老任务不带年份分不清哪年（复审 P2-6）；当年任务保持短格式
+	if (d.getFullYear() !== new Date().getFullYear()) {
+		return d.getFullYear() + '-' + hm
+	}
+	return hm
 }
 
 /**
@@ -55,6 +62,7 @@ export function relativeTime(value) {
 	if (hours < 24) return future ? `${hours} 小时后` : `${hours} 小时前`
 	if (days < 30) return future ? `${days} 天后` : `${days} 天前`
 
+	// 超过 30 天回退短格式：formatShort 对跨年任务会自动带年份
 	return formatShort(value)
 }
 

@@ -60,6 +60,7 @@
 <script>
 import spaceData from '@/utils/data.js'
 import { formatShort } from '@/utils/format.js'
+import { launchMatch, rocketMatch } from '@/utils/search-match.js'
 import navMixin from '@/utils/nav-mixin.js'
 
 /**
@@ -69,17 +70,15 @@ import navMixin from '@/utils/nav-mixin.js'
  * 不发任何搜索请求 —— 首次搜索把四份数据集拉齐（多数已有 Storage 缓存）。
  * 归档分片不参与搜索：7000+ 条逐片拉太贵，且 previous 快照已覆盖最近 100 条；
  * 搜历史任务走「已发射」列表触底翻找。
+ *
+ * 匹配逻辑在 utils/search-match.js（纯函数）：中文关键词靠 *Zh 字段与
+ * ROCKET_ZH 查表命中，verify-pure 有断言，别在这里重新内联一份。
  */
 
 // 模块级缓存：本会话内四个数据集只拉一次
 let cache = null
 
 const GROUP_LIMIT = 8
-
-function hit(haystack, kw) {
-	if (!haystack) return false
-	return String(haystack).toLowerCase().indexOf(kw) !== -1
-}
 
 export default {
 	mixins: [navMixin],
@@ -98,6 +97,14 @@ export default {
 		keyword() {
 			if (this._debounceTimer) clearTimeout(this._debounceTimer)
 			this._debounceTimer = setTimeout(() => this.runSearch(), 400)
+		}
+	},
+
+	// 页面销毁后防抖回调会落在死实例上，虽然无实害但不干净
+	onUnload() {
+		if (this._debounceTimer) {
+			clearTimeout(this._debounceTimer)
+			this._debounceTimer = null
 		}
 	},
 
@@ -140,13 +147,9 @@ export default {
 
 			const d = await this.ensureData()
 
-			// ---- 发射任务（即将 + 已发）----
-			const launchHit = (x) =>
-				hit(x.name, kw) ||
-				hit(x.mission && (x.mission.name || x.mission.nameZh), kw) ||
-				hit(x.rocket && x.rocket.configuration && (x.rocket.configuration.name || x.rocket.configuration.full_name), kw) ||
-				hit(x.launch_service_provider && x.launch_service_provider.name, kw) ||
-				hit(x.pad && x.pad.location && x.pad.location.name, kw)
+		// ---- 发射任务（即将 + 已发）----
+		// 匹配面见 search-match.js：name / nameZh / launchTitle（中文型号兜底）各自独立判断
+		const launchHit = (x) => launchMatch(x, kw)
 
 			const launchRow = (x) => ({
 				id: x.id,
@@ -162,15 +165,9 @@ export default {
 			if (prev.length) groups.push({ title: '已发射', items: prev.map(launchRow) })
 
 			// ---- 火箭型号 ----
+			// rocketMatch 内含 ROCKET_ZH 查表，「长征」「朱雀」这类中文名可命中
 			const rk = d.launchers
-				.filter(
-					(x) =>
-						hit(x.name, kw) ||
-						hit(x.full_name, kw) ||
-						hit(x.variant, kw) ||
-						hit(x.manufacturer, kw) ||
-						(Array.isArray(x.families) && x.families.some((f) => hit(f, kw)))
-				)
+				.filter((x) => rocketMatch(x, kw))
 				.slice(0, GROUP_LIMIT)
 				.map((x) => ({
 					id: x.id,

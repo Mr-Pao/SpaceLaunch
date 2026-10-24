@@ -29,7 +29,7 @@ const { slimLaunch,
 	slimLauncher } = require('./lib/slim')
 const { aggregateByYear } = require('./lib/aggregate')
 const { upload } = require('./lib/cos')
-const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies } = require('./lib/localize')
+const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
 const translate = require('./lib/translate')
 
@@ -64,6 +64,8 @@ const DATASETS = {
 	pads: {
 		file: 'pads.json',
 		cacheControl: 'public, max-age=86400',
+		// 工位简介也回填中文：251 条按原文哈希永久缓存，只有首轮是新翻译
+		localize: localizePads,
 		images: ['image', 'map_image'],
 		async fetch() {
 			const j = await getJson('/pads/?limit=300&mode=normal&format=json')

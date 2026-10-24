@@ -113,9 +113,23 @@ function localizeAgencies(list) {
 	)
 }
 
+/** pad.description → descriptionZh。
+ *  251 条简介是一次性成本（结果按原文哈希永久缓存，之后每轮零命中新文本），
+ *  首轮较慢 —— sync.yml 的 pads 任务超时已为此放宽到 30 分钟 */
+function localizePads(list) {
+	return fill(
+		list,
+		(x) => x.description,
+		(x, zh) => {
+			x.descriptionZh = zh
+		}
+	)
+}
+
 module.exports = {
 	localizeLaunches,
 	localizeLaunchNames,
 	localizeEvents,
-	localizeAgencies
+	localizeAgencies,
+	localizePads
 }

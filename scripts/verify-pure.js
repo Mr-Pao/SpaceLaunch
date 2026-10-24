@@ -121,8 +121,66 @@ async function testFormat() {
 	fs.unlinkSync(tmp)
 }
 
+// ---------- search-match.js（依赖 format.js，两个文件一起拷进临时目录）----------
+
+async function testSearchMatch() {
+	console.log('[search-match] 中文命中（2026-10-24 复审 P1-1/P1-2 的回归断言）')
+	const dir = os.tmpdir()
+
+	// format.js 先落成 format.mjs，再把 search-match 里的相对导入改指向它
+	fs.copyFileSync(path.join(__dirname, '..', 'utils', 'format.js'), path.join(dir, 'sl-format-dep.mjs'))
+	let src = fs.readFileSync(path.join(__dirname, '..', 'utils', 'search-match.js'), 'utf8')
+	src = src.replace("from './format.js'", "from './sl-format-dep.mjs'")
+	const tmp = path.join(dir, 'sl-search-match-check.mjs')
+	fs.writeFileSync(tmp, src, 'utf8')
+	const sm = await import(pathToFileURL(tmp).href)
+
+	const launch = {
+		id: 1,
+		name: 'Long March 3B/E | GOES-15',
+		net: '2026-03-15T10:00:00Z',
+		mission: { name: 'GOES-15', nameZh: '戈斯-15' },
+		rocket: { configuration: { name: 'Long March 3B/E', full_name: 'Long March 3B/E' } },
+		launch_service_provider: { name: 'CASC' },
+		pad: { location: { name: 'Xichang Satellite Launch Center' } }
+	}
+
+	eq(sm.launchMatch(launch, '戈斯'), true, '任务中文名（nameZh）可命中')
+	eq(sm.launchMatch(launch, '长征'), true, '火箭中文名（launchTitle 兜底）可命中')
+	eq(sm.launchMatch(launch, 'goes'), true, '英文任务名仍可命中')
+	eq(sm.launchMatch(launch, 'xichang'), true, '发射场名仍可命中')
+
+	// 归档老数据：没有 nameZh 时靠 launchTitle 的英文回退，不能漏
+	const oldLaunch = {
+		id: 2,
+		name: 'Falcon 9 | Starlink 6-2',
+		net: '2025-06-02T08:00:00Z',
+		mission: { name: 'Starlink 6-2' },
+		rocket: { configuration: { name: 'Falcon 9', full_name: 'Falcon 9' } }
+	}
+	eq(sm.launchMatch(oldLaunch, 'starlink'), true, '无中文名的英文任务仍可命中')
+	eq(sm.launchMatch(oldLaunch, '嫦娥'), false, '不相关中文关键词不命中')
+
+	const launcher = {
+		id: 10,
+		name: 'LM-3B/E',
+		full_name: 'Long March 3B/E',
+		variant: '3B/E',
+		manufacturer: 'China Aerospace Science and Technology Corporation',
+		families: ['Long March']
+	}
+	eq(sm.rocketMatch(launcher, '长征'), true, 'ROCKET_ZH 中文名可命中（P1-2）')
+	eq(sm.rocketMatch(launcher, 'long march'), true, '英文型号名仍可命中')
+	eq(sm.rocketMatch(launcher, 'titan'), false, '不相关关键词不命中')
+	eq(sm.launchMatch(null, 'x'), false, '空对象安全返回 false')
+
+	fs.unlinkSync(tmp)
+	fs.unlinkSync(path.join(dir, 'sl-format-dep.mjs'))
+}
+
 ;(async () => {
 	await testFormat()
+	await testSearchMatch()
 })()
 	.catch((e) => {
 		failed++

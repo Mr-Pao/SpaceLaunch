@@ -188,7 +188,14 @@ export default {
 		getConfig().then((c) => {
 			this.reviewMode = Boolean(c && c.review)
 			if (this.reviewMode) {
-				uni.switchTab({ url: '/pages/rockets/rockets' })
+				// switchTab 偶发失败（页面栈未就绪等）时审核员会停在空首页，
+				// 兜底 reLaunch 重试一次
+				uni.switchTab({
+					url: '/pages/rockets/rockets',
+					fail: () => {
+						uni.reLaunch({ url: '/pages/rockets/rockets' })
+					}
+				})
 				return
 			}
 			this.getData()

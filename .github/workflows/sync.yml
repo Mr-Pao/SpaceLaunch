@@ -52,7 +52,9 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 15 分钟对 pads 首轮不够：251 张 map_image 镜像 + 251 段工位简介翻译
+    # 都集中在第一次跑；之后按 hash / 翻译缓存跳过，几分钟内结束
+    timeout-minutes: 30
 
     steps:
       - name: 决定本次要同步哪个数据集

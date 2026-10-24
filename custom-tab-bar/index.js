@@ -11,7 +11,8 @@
  */
 Component({
 	data: {
-		// 审核模式：为 true 时 wxml 里隐藏「活动」tab（原始索引不变，go() 不受影响）
+		// 审核模式：为 true 时 wxml 里整条 tabBar 不渲染（wx:if="{{!review}}"），
+		// 审核员看到的就是一个无 tab 的单页工具；索引不受影响
 		review: false,
 		// 默认选中「即将发射」（索引 2），与小程序启动页一致
 		selected: 2,
