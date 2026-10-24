@@ -29,6 +29,9 @@ on:
     paths:
       - 'scripts/archive.js'
       - '.github/workflows/archive.yml'
+      # 手机改这个文件即触发一轮维护：schedule 会成片漏投，
+      # 想立刻补数据时不用等 cron，也不用开电脑点 Run workflow
+      - 'scripts/archive-request.json'
   workflow_dispatch:
     inputs:
       pages:

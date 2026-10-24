@@ -51,10 +51,14 @@ const MAX_PAGES = 12
 // 间隔太短就跳过，避免 push 触发时连着把配额打光。
 // 定时间隔是 15 分钟，这里必须比它小，否则每个触发点都被判为「太短」而空转
 const MIN_INTERVAL_MS = 9 * 60 * 1000
-// 抓完之后的维护模式：每次刷新最新 4 片。
+// 抓完之后的维护模式：每次至少刷新最新 4 片。
 // 新发射会把整个列表往下顶，offset 分页会因此在头部留下一道空缺，
-// 头部几片重抓一次就能补上（前端按 id 去重，重复项无害）
+// 头部几片重抓一次就能补上（前端按 id 去重，重复项无害）。
+// 但 GitHub 的 schedule 会成片地漏投（实测一天只命中两三次是常态），
+// 漏得越久头部缺口越大，所以按「距上次维护多久」加到最多 6 片。
+// 上限 6：常规数据集每小时约占 7 次配额，6 + 7 = 13，仍在 15 以内。
 const MAINT_PAGES = 4
+const MAINT_PAGES_MAX = 6
 // 覆盖 previous.json（最近 100 条）之后的数据，避免重复
 const START_OFFSET = 100
 
@@ -285,10 +289,13 @@ async function saveAndReport(state, pulled, note, head) {
  */
 async function maintain(state) {
 	const total = state.pages.length
-	const n = Math.min(MAINT_PAGES, total)
+	// 漏跑越久刷得越多：一次维护能补回的时间窗与刷新片数成正比
+	const hours = Math.max(1, Math.round(elapsedMs(state) / 3600000))
+	const want = Math.min(MAINT_PAGES_MAX, Math.max(MAINT_PAGES, hours))
+	const n = Math.min(want, total)
 	let pulled = 0
 
-	console.log(`\n=== 历史归档（维护模式）===\n  已归档 ${total} 片 / ${state.total} 条`)
+	console.log(`\n=== 历史归档（维护模式）===\n  已归档 ${total} 片 / ${state.total} 条，距上次 ${hours} 小时 → 本轮刷 ${n} 片`)
 
 	for (let i = 0; i < n; i++) {
 		const offset = START_OFFSET + PAGE_SIZE * i
