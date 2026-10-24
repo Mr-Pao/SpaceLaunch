@@ -144,8 +144,9 @@
 
 		<!-- 右下角：一个按钮，点开就是「搜索 + 筛选」抽屉（原来要展开两层） -->
 		<view class="fab" v-if="!reviewMode" hover-class="fab-hover" @click="openSheet">
-			<view class="fab-mag">
-				<view class="fab-ring"></view>
+			<view class="fab-icon">
+				<view class="fab-lens"></view>
+				<view class="fab-handle"></view>
 			</view>
 			<view class="fab-badge" v-if="activeCount">{{ activeCount }}</view>
 		</view>
@@ -786,9 +787,13 @@ export default {
 }
 
 /* ---- 右下角：搜索 + 筛选，一个按钮 ---- */
+/* 磨砂玻璃球：极淡的半透明白 + 背景模糊 + 一圈细高光边，
+   不再是实心蓝渐变——那个球在深色列表上太抢眼，盖住了内容本身。
+   Android 微信不一定认 backdrop-filter，认不出时就是一层淡淡的半透明白，
+   仍然比实心色块克制。 */
 .fab {
 	position: fixed;
-	right: 32rpx;
+	right: 30rpx;
 	/* 停在悬浮胶囊 tabBar 上方（tabBar 本体 132rpx + 间隙）。
 	   裸值必须写在最前面兜底：env() 在部分安卓内核里不识别，
 	   会让整条 calc() 失效、bottom 归零，按钮直接掉到列表最末尾 */
@@ -799,62 +804,69 @@ export default {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 104rpx;
-	height: 104rpx;
+	width: 68rpx;
+	height: 68rpx;
 	border-radius: 50%;
-	background: linear-gradient(135deg, #2f7ff5, #38bdf8);
-	box-shadow: 0 10rpx 28rpx rgba(56, 189, 248, 0.35);
+	background: rgba(255, 255, 255, 0.06);
+	-webkit-backdrop-filter: blur(26rpx) saturate(150%);
+	backdrop-filter: blur(26rpx) saturate(150%);
+	border: 1rpx solid rgba(255, 255, 255, 0.16);
+	box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.26), inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
 }
 
 .fab-hover {
-	opacity: 0.86;
+	background: rgba(255, 255, 255, 0.12);
 }
 
-/* 放大镜：圆 + 45° 手柄，纯 CSS（字符图标在部分安卓机缺字会变方块） */
-.fab-mag {
+/* 放大镜：细线圆环 + 45° 手柄，纯 CSS。
+   实际尺寸都在 44rpx 的盒子里精调过：
+   圆环直径 30rpx（含 3rpx 边），圆心在 (19,19)，
+   手柄从圆周右下 45° 点 (29,29) 接出去，接缝才顺 */
+.fab-icon {
 	position: relative;
-	width: 46rpx;
-	height: 46rpx;
+	width: 32rpx;
+	height: 32rpx;
 }
 
-.fab-ring {
+.fab-lens {
 	position: absolute;
-	left: 2rpx;
-	top: 2rpx;
-	width: 31rpx;
-	height: 31rpx;
-	border: 5rpx solid #ffffff;
+	left: 3rpx;
+	top: 3rpx;
+	width: 22rpx;
+	height: 22rpx;
+	border: 2.5rpx solid rgba(255, 255, 255, 0.94);
 	border-radius: 50%;
 	box-sizing: border-box;
 }
 
-.fab-ring::after {
-	content: '';
+.fab-handle {
 	position: absolute;
-	right: -12rpx;
-	bottom: -10rpx;
-	width: 15rpx;
-	height: 5rpx;
-	background: #ffffff;
-	border-radius: 3rpx;
+	left: 21rpx;
+	top: 22rpx;
+	width: 10rpx;
+	height: 2.5rpx;
+	border-radius: 2rpx;
+	background: rgba(255, 255, 255, 0.94);
 	transform: rotate(45deg);
+	transform-origin: left center;
 }
 
 /* 生效条件数角标：不用红点，红点看不出筛了几项 */
 .fab-badge {
 	position: absolute;
-	top: -2rpx;
-	right: -2rpx;
-	min-width: 36rpx;
-	height: 36rpx;
-	padding: 0 8rpx;
-	border-radius: 18rpx;
-	background: #f5c33b;
+	top: -3rpx;
+	right: -3rpx;
+	min-width: 28rpx;
+	height: 28rpx;
+	padding: 0 6rpx;
+	border-radius: 14rpx;
+	background: rgba(245, 195, 59, 0.94);
 	color: #10151f;
-	font-size: 20rpx;
+	font-size: 17rpx;
 	font-weight: 600;
-	line-height: 36rpx;
+	line-height: 28rpx;
 	text-align: center;
 	box-sizing: border-box;
+	border: 1rpx solid rgba(255, 255, 255, 0.28);
 }
 </style>
