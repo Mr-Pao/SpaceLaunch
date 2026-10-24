@@ -170,6 +170,13 @@ async function testFormat() {
 	eq(f.seriesName('PSLV'), 'PSLV', '系列名：未收录保留英文')
 	eq(f.seriesName(''), '', '系列名：空值安全返回')
 
+	// 视觉宽度：中文按双宽算，用来判断简介要不要折叠
+	eq(f.textUnits(''), 0, '视觉宽度：空值 0')
+	eq(f.textUnits('abc'), 3, '视觉宽度：纯英文按字母数')
+	eq(f.textUnits('猎鹰九号'), 8, '视觉宽度：中文一字记 2')
+	eq(f.textUnits('猎鹰 9 号'), 9, '视觉宽度：中英混排各按各的算')
+	eq(f.textUnits(null), 0, '视觉宽度：null 安全返回 0')
+
 	fs.unlinkSync(tmp)
 }
 

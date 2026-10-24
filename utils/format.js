@@ -403,6 +403,25 @@ export function agencyLabel(name) {
 	return name.length > 16 ? name.slice(0, 15) + '…' : name
 }
 
+/**
+ * 一段文字的「视觉宽度」：半角记 1，中日韩全角记 2。
+ *
+ * 为什么不用 length：详情页简介按行数折叠（CSS 里 line-clamp 4），
+ * 而中文一个字占的位置差不多是英文的两倍。纯按字符数判断，
+ * 英文 160 字大约是 3 行、中文 160 字已经是 6 行——中文会被悄悄截掉
+ * 却因为没到阈值而不显示「展开全部」，那就真的读不到了。
+ * 用统一单位算，中英文落在同一把尺子上。
+ */
+export function textUnits(s) {
+	let n = 0
+	for (const ch of String(s == null ? '' : s)) {
+		const c = ch.codePointAt(0)
+		// CJK 统一表意文字、假名、谚文、全角标点都算双宽
+		n += c >= 0x2e80 ? 2 : 1
+	}
+	return n
+}
+
 const FINAL_STATUS = ['Success', 'Failure', 'Deployed', 'Partial']
 
 /**

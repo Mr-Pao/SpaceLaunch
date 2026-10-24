@@ -228,7 +228,8 @@ import {
 	seriesName,
 	agencyLabel,
 	countryOf,
-	isStillUpcoming
+	isStillUpcoming,
+	textUnits
 } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -353,11 +354,10 @@ export default {
 				const fail = Number(x.failed_launches) || 0
 				const rate = ok + fail > 0 ? ((ok / (ok + fail)) * 100).toFixed(1).replace(/\.0$/, '') + '%' : ''
 
+				// 只留战绩：造价已经在上面 paramList 的格子里了，再写一遍等于重复
 				const foot = []
 				if (rate) foot.push('成功率 ' + rate)
 				if (x.total_launch_count) foot.push(x.total_launch_count + ' 次发射')
-				const cost = costText(x.launch_cost)
-				if (cost) foot.push(cost)
 
 				return {
 					id: x.id,
@@ -385,8 +385,13 @@ export default {
 			return c.descriptionZh || c.description || ''
 		},
 
+		/**
+		 * 简介按 4 行折叠（样式里 line-clamp），所以判断「要不要给展开按钮」
+		 * 不能数字符数：中文一个字约占英文两倍宽度，160 个中文字已经是 6 行。
+		 * 这里统一换算成视觉宽度，200 大约等于 4 行 × 50 个单位。
+		 */
 		needFold() {
-			return this.descText.length > 160
+			return textUnits(this.descText) > 200
 		},
 
 		/** 该系列的各型 id，用来从发射快照里筛记录 */
