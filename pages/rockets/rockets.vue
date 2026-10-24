@@ -303,10 +303,14 @@ export default {
 				itemList: ['展示', '正常'],
 				success: (res) => {
 					if (res.tapIndex === 0) {
+						// 展示 = 强制审核态（写覆盖，任何环境都生效）
 						setOverride(true)
 						relaunch('/pages/rockets/rockets')
 					} else if (res.tapIndex === 1) {
-						setOverride(false)
+						// 正常 = 清除本机覆盖，回到环境默认：
+						// 开发版(HBuilderX)→完整态，正式版→跟随 COS。
+						// 清除而非写 false，storage 里任何残留覆盖都一并清掉
+						setOverride(null)
 						relaunch('/pages/index/index')
 					}
 				}
