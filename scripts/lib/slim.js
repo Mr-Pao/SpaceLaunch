@@ -306,9 +306,5 @@ module.exports = {
 	slimEvent,
 	slimAgency,
 	slimLauncher,
-	slimStatLaunch,
-	imageUrl,
-	joinNames,
-	statusZh,
-	STATUS_ZH
+	slimStatLaunch
 }

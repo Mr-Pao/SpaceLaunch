@@ -254,4 +254,4 @@ function summary() {
 	return { ...stats }
 }
 
-module.exports = { mirrorImages, mirrorOne, summary, MAX_BYTES }
+module.exports = { mirrorImages }

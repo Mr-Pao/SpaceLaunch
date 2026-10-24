@@ -60,7 +60,18 @@ function request(url) {
 	})
 }
 
-async function getJson(pathOrUrl, { retries = 1 } = {}) {
+/**
+ * 抓取一个 JSON（带退避重试）
+ *
+ * @param {string} pathOrUrl 站内路径（自动拼 base）或完整 URL
+ * @param {object} [opts]
+ * @param {number}  [opts.retries=1]      失败后的重试次数
+ * @param {number}  [opts.backoffMs=3000] 每次重试前的等待
+ * @param {boolean} [opts.retryOn429=false]
+ *   429 默认不重试（重试只会继续烧配额）；
+ *   归档场景显式开启 —— 匿名限额按小时滚动，等 30 秒常能救回一页
+ */
+async function getJson(pathOrUrl, { retries = 1, backoffMs = 3000, retryOn429 = false } = {}) {
 	const b = base()
 	const url = /^https?:\/\//.test(pathOrUrl) ? pathOrUrl : b + pathOrUrl
 	let lastErr
@@ -75,9 +86,8 @@ async function getJson(pathOrUrl, { retries = 1 } = {}) {
 		} catch (e) {
 			lastErr = e
 			console.warn(`  ! 第 ${i + 1} 次失败: ${e.message}`)
-			// 429 不要重试，重试只会继续消耗并且仍然失败，等下一轮定时任务
-			if (e.message.includes('429')) break
-			if (i < retries) await new Promise((r) => setTimeout(r, 3000))
+			if (e.message.includes('429') && !retryOn429) break
+			if (i < retries) await new Promise((r) => setTimeout(r, backoffMs))
 		}
 	}
 

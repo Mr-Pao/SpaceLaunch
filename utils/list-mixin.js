@@ -1,5 +1,6 @@
 import spaceData from '@/utils/data.js'
 import { snapshot as favSnapshot } from '@/utils/favorites.js'
+import { loadIndex, loadPage, clearIndex } from '@/utils/history.js'
 
 /**
  * 收藏的条目排到最前，其余保持快照原有顺序（后端已经按 net 排好，不要打乱）
@@ -42,10 +43,23 @@ function favoriteIds(list) {
  *
  * @param {string} dataset     数据集名，对应 utils/data.js 里的 FILES
  * @param {number} pageSize    每页条数
- * @param {boolean} favorite   是否把收藏的条目置顶（只有发射列表需要）
+ * @param {boolean|'mark'} favorite
+ *   true  = 收藏置顶 + 标记（首页）
+ *   'mark'= 只标记不置顶（已发射页：历史数据重排会打乱时间序）
  * @param {Function} filter    条目过滤，(item) => boolean，用来剔掉不该显示的条目
+ * @param {boolean}  archive   开启「触底接归档分片」能力（已发射页专用：
+ *                             快照只有最近 100 条，更早的要在触底时按片去 CDN 拉）
  */
-export function createListMixin({ dataset, pageSize = 12, favorite = false, filter = null }) {
+export function createListMixin({
+	dataset,
+	pageSize = 12,
+	favorite = false,
+	filter = null,
+	archive = false
+}) {
+	const FAV_TOP = favorite === true
+	const FAV_MARK = FAV_TOP || favorite === 'mark'
+
 	return {
 		data() {
 			return {
@@ -56,8 +70,14 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 				error: '',
 				// 已收藏的 id，交给卡片画标记；重排时一起刷新
 				favIds: [],
-				// 快照本身只有 50 条，分页纯本地切，不发网络请求
-				listNum: pageSize
+				// 快照本身只有 50/100 条，分页纯本地切，不发网络请求
+				listNum: pageSize,
+				// ---- 归档分片（archive: true 时启用）----
+				loadingMore: false,
+				loadError: '',
+				// 归档索引与已加载到的分片序号
+				index: null,
+				pageIndex: 0
 			}
 		},
 
@@ -66,7 +86,11 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 				return this.list.slice(0, this.listNum)
 			},
 			hasMore() {
-				return this.listNum < this.list.length
+				if (!archive) return this.listNum < this.list.length
+				// 本地还有没渲染的，或 COS 上还有没下载的分片
+				const idx = this.index
+				const hasArchivePage = !!(idx && idx.pages && this.pageIndex < idx.pages.length)
+				return this.listNum < this.list.length || hasArchivePage
 			}
 		},
 
@@ -96,21 +120,21 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 				let raw = d.list || []
 				if (filter) raw = raw.filter(filter)
 
-				this.list = favorite ? favoriteFirst(raw) : raw
-				this.favIds = favorite ? favoriteIds(this.list) : []
+				this.list = FAV_TOP ? favoriteFirst(raw) : raw
+				this.favIds = FAV_MARK ? favoriteIds(this.list) : []
 				this.total = d.count || this.list.length
 				this.freshText = spaceData.freshnessText(d.generatedAt)
 			},
 
-			// 从详情页收藏回来时列表要重排，但不需要重新请求数据
+			// 从详情页收藏回来时列表要更新：置顶模式重排，标记模式只刷标记
 			reorder() {
-				if (!favorite || !this.list.length) return
-				this.list = favoriteFirst(this.list)
+				if (!FAV_MARK || !this.list.length) return
+				if (FAV_TOP) this.list = favoriteFirst(this.list)
 				this.favIds = favoriteIds(this.list)
 			},
 
 			/**
-			 * 追加一批条目（用于「翻到底后再去 CDN 拉下一段」）
+			 * 追加一批条目（「翻到底后再去 CDN 拉下一段」共用）
 			 * 按 id 去重：分段拉取时中间有新任务插入会导致整体错位
 			 * @returns {number} 实际追加的条数
 			 */
@@ -124,17 +148,63 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 				if (!add.length) return 0
 
 				this.list = this.list.concat(add)
-				if (favorite) this.favIds = favoriteIds(this.list)
+				if (FAV_MARK) this.favIds = favoriteIds(this.list)
 				return add.length
 			},
 
 			loadMore() {
-				if (!this.hasMore) return
-				this.listNum += pageSize
+				if (!archive) {
+					if (this.listNum >= this.list.length) return
+					this.listNum += pageSize
+					return
+				}
+				// archive 模式的触底：先放本地剩余，本地见底再去拉下一个分片
+				if (this.listNum < this.list.length) {
+					this.listNum += pageSize
+					return
+				}
+				this.loadArchive()
 			},
 
 			resetPaging() {
 				this.listNum = pageSize
+			},
+
+			// ---- 归档分片（archive: true 时启用）----
+
+			// 索引很小，先拿到手才能知道总共分了多少片
+			async prepareArchive(force) {
+				try {
+					if (force) clearIndex()
+					this.index = await loadIndex()
+					this.pageIndex = 0
+				} catch (e) {
+					// 归档还没跑过 / 还没生成索引，属于正常情况，只显示快照那 100 条
+					console.log('[' + dataset + '] 暂无历史归档索引', e && e.message)
+					this.index = null
+				}
+			},
+
+			async loadArchive() {
+				const idx = this.index
+				if (this.loadingMore) return
+				if (!(idx && idx.pages && this.pageIndex < idx.pages.length)) return
+
+				this.loadingMore = true
+				this.loadError = ''
+
+				try {
+					const page = idx.pages[this.pageIndex]
+					const items = await loadPage(page)
+					const added = this.appendMore(items)
+					if (added) this.listNum += pageSize
+					this.pageIndex++
+				} catch (e) {
+					console.warn('[' + dataset + '] 加载归档分片失败', e)
+					this.loadError = '加载失败'
+				} finally {
+					this.loadingMore = false
+				}
 			}
 		}
 	}

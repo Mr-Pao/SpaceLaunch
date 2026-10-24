@@ -42,51 +42,25 @@
 </template>
 
 <script>
-import spaceData from '@/utils/data.js'
+import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
-import { loadIndex, loadPage, clearIndex } from '@/utils/history.js'
-import { snapshot as favSnapshot } from '@/utils/favorites.js'
 import { getConfig } from '@/utils/config.js'
 
 const STEP = 12
 
 export default {
+	// 数据获取 / 本地分页 / 收藏标记 / 归档分片全部来自 mixin；
+	// favorite 用 'mark'：历史页只标记不置顶，置顶会打乱时间序（首页才置顶）
+	mixins: [createListMixin({ dataset: 'previous', pageSize: STEP, favorite: 'mark', archive: true })],
+
 	data() {
 		return {
-			// 已从 CDN 拉下来的全部条目（首屏 100 条 + 逐片追加）
-			list: [],
-			total: 0,
-			freshText: '',
-			loading: true,
-			loadingMore: false,
-			loadError: '',
-			favIds: [],
-			// 一次渲染太多卡片会掉帧，先给 12 张，触底再放
-			listNum: STEP,
-			// 归档索引与已加载到的分片
-			index: null,
-			pageIndex: 0,
 			// 审核模式：整页只显示空态
 			reviewMode: false
 		}
 	},
 
 	computed: {
-		visible() {
-			return this.list.slice(0, this.listNum)
-		},
-		// 本地还有没渲染出来的
-		hasLocal() {
-			return this.listNum < this.list.length
-		},
-		// COS 上还有没下载的分片
-		hasArchive() {
-			const idx = this.index
-			return !!(idx && idx.pages && this.pageIndex < idx.pages.length)
-		},
-		hasMore() {
-			return this.hasLocal || this.hasArchive
-		},
 		progressText() {
 			const idx = this.index
 			if (!idx || !idx.total) return this.freshText
@@ -112,8 +86,7 @@ export default {
 	onShow() {
 		syncTabBar(1)
 		// 从详情页收藏/取消收藏返回时，列表的琥珀色标记要跟着变
-		// （首页有同样的处理，这里之前漏了）
-		this.refreshFav()
+		this.reorder()
 	},
 
 	onPullDownRefresh() {
@@ -121,7 +94,7 @@ export default {
 			uni.stopPullDownRefresh()
 			return
 		}
-		this.listNum = STEP
+		this.resetPaging()
 		this.pageIndex = 0
 		this.index = null
 		Promise.all([this.getData(true), this.prepareArchive(true)]).then(() => uni.stopPullDownRefresh())
@@ -129,84 +102,10 @@ export default {
 
 	onReachBottom() {
 		if (this.reviewMode) return
-		if (this.hasLocal) {
-			this.listNum += STEP
-			return
-		}
 		this.loadMore()
 	},
 
 	methods: {
-		async getData(force) {
-			this.loading = true
-			try {
-				const d = await spaceData.load('previous', { force: !!force })
-				this.list = (d && d.list) || []
-				this.total = (d && d.count) || this.list.length
-				this.freshText = spaceData.freshnessText(d && d.generatedAt)
-				this.refreshFav()
-			} catch (e) {
-				console.warn('[previous] 获取历史发射失败', e)
-			} finally {
-				this.loading = false
-			}
-		},
-
-		// 索引很小，先拿到手才能知道总共分了多少片
-		async prepareArchive(force) {
-			try {
-				if (force) clearIndex()
-				this.index = await loadIndex()
-				this.pageIndex = 0
-			} catch (e) {
-				// 归档还没跑过 / 还没生成索引，属于正常情况，只显示最近 100 条
-				console.log('[previous] 暂无历史归档索引', e && e.message)
-				this.index = null
-			}
-		},
-
-		async loadMore() {
-			if (this.loadingMore || !this.hasArchive) return
-
-			this.loadingMore = true
-			this.loadError = ''
-
-			try {
-				const page = this.index.pages[this.pageIndex]
-				const list = await loadPage(page)
-
-				// 归档按 offset 抓取，新任务插入会导致轻微错位，按 id 去重
-				const seen = new Set()
-				for (const x of this.list) if (x.id) seen.add(x.id)
-
-				const add = list.filter((x) => x.id && !seen.has(x.id))
-				if (add.length) {
-					this.list = this.list.concat(add)
-					this.listNum += STEP
-					this.refreshFav()
-				}
-
-				this.pageIndex++
-			} catch (e) {
-				console.warn('[previous] 加载归档分片失败', e)
-				this.loadError = '加载失败'
-			} finally {
-				this.loadingMore = false
-			}
-		},
-
-		refreshFav() {
-			const set = favSnapshot()
-			if (!set.size) {
-				this.favIds = []
-				return
-			}
-			// 只标记已加载部分，避免每次翻页都全量扫
-			const ids = []
-			for (const x of this.list) if (set.has(x.id)) ids.push(x.id)
-			this.favIds = ids
-		},
-
 		goDetail(item) {
 			if (!item || !item.id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + item.id })

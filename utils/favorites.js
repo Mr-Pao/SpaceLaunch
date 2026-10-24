@@ -26,11 +26,6 @@ function writeAll(arr) {
 	}
 }
 
-/** 全部收藏 id，最近收藏在前 */
-export function list() {
-	return readAll()
-}
-
 /** 一次取出成 Set，批量判断时避免 N 次读 Storage */
 export function snapshot() {
 	return new Set(readAll())
@@ -39,10 +34,6 @@ export function snapshot() {
 export function has(id) {
 	if (!id) return false
 	return readAll().indexOf(id) !== -1
-}
-
-export function count() {
-	return readAll().length
 }
 
 /**
@@ -64,16 +55,4 @@ export function toggle(id) {
 	arr.splice(i, 1)
 	writeAll(arr)
 	return false
-}
-
-export function remove(id) {
-	const arr = readAll()
-	const i = arr.indexOf(id)
-	if (i === -1) return
-	arr.splice(i, 1)
-	writeAll(arr)
-}
-
-export function clear() {
-	writeAll([])
 }

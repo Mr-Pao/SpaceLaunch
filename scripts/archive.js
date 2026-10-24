@@ -32,6 +32,7 @@
 const path = require('path')
 const fs = require('fs')
 const { slimLaunch } = require('./lib/slim')
+const { getJson } = require('./lib/fetch')
 const { upload } = require('./lib/cos')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
@@ -55,60 +56,21 @@ const MAINT_PAGES = 4
 // 覆盖 previous.json（最近 100 条）之后的数据，避免重复
 const START_OFFSET = 100
 
-function baseUrl() {
-	return process.env.LL2_BASE === 'dev'
-		? 'https://lldev.thespacedevs.com/2.3.0'
-		: 'https://ll.thespacedevs.com/2.3.0'
-}
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
- * 带退避的抓取
- * LL2 匿名限 15 次/小时，超限返回 429。以前是直接 break 放弃整轮，
- * 现在先等 30 秒重试一次，还是 429 才认输。
- * 返回 null 表示这一页拿不到，交给调用方收尾。
+ * 带退避的抓取（HTTP/重试/退避统一走 lib/fetch.js，这里只留归档特有的语义）：
+ * - 429 也值得等 30 秒重试一次：匿名限额按小时滚动，等一轮常能救回一页；
+ * - 最终失败返回 null 而不是抛错，交给调用方收尾，整轮不崩。
+ * fetch.js 的超时同样是 120 秒；与旧实现唯一的差别是超时后也会重试一次。
  */
 async function getJsonWithRetry(pathAndQuery) {
-	const headers = { 'User-Agent': 'SpaceLaunch/1.1 (+https://github.com/Mr-Pao/SpaceLaunch)' }
-	if (process.env.LL2_TOKEN) headers.Authorization = 'Token ' + process.env.LL2_TOKEN
-
-	for (let attempt = 0; attempt < 2; attempt++) {
-		const ctrl = new AbortController()
-		const timer = setTimeout(() => ctrl.abort(), 120000)
-
-		try {
-			const res = await fetch(baseUrl() + pathAndQuery, { headers, signal: ctrl.signal })
-
-			if (res.status === 429 || res.status >= 500) {
-				if (attempt === 0) {
-					console.warn(`  ! 被限流（HTTP ${res.status}），等 30 秒重试`)
-					await sleep(30000)
-					continue
-				}
-				console.warn(`  ! 仍被限流（HTTP ${res.status}），本轮到此为止`)
-				return null
-			}
-
-			if (!res.ok) throw new Error('HTTP ' + res.status)
-			return await res.json()
-		} catch (e) {
-			if (e && e.name === 'AbortError') {
-				console.warn('  ! 请求超时，本轮到此为止')
-				return null
-			}
-			if (attempt === 0) {
-				console.warn(`  ! 请求失败（${e.message}），等 10 秒重试`)
-				await sleep(10000)
-				continue
-			}
-			console.warn(`  ! 仍然失败（${e.message}），本轮到此为止`)
-			return null
-		} finally {
-			clearTimeout(timer)
-		}
+	try {
+		return await getJson(pathAndQuery, { retries: 1, backoffMs: 30000, retryOn429: true })
+	} catch (e) {
+		console.warn(`  ! ${e.message.includes('429') ? '仍被限流' : '仍然失败'}（${e.message}），本轮到此为止`)
+		return null
 	}
-	return null
 }
 
 /** 读 COS 上的状态文件；没有就从头开始。桶是公有读，直接走 CDN 地址即可 */
@@ -268,7 +230,8 @@ async function pullPage(offset, name, index, keepZh) {
 
 	await putJson(
 		{
-			v: 6,
+			// av：归档分片自己的结构版本，与 DATA_VERSION（前端快照版本）语义无关
+			av: 6,
 			dataset: 'history',
 			page: index,
 			generatedAt: new Date().toISOString(),
@@ -295,7 +258,8 @@ async function saveAndReport(state, pulled, note, head) {
 	// 索引单独一份，前端只读它，避免把 state 的内部字段暴露出去
 	await putJson(
 		{
-			v: 6,
+			// av：归档分片自己的结构版本，与 DATA_VERSION（前端快照版本）语义无关
+			av: 6,
 			generatedAt: state.updatedAt,
 			total: state.total,
 			archived: state.next,
