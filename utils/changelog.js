@@ -10,8 +10,9 @@ export const CHANGELOG = [
 		date: '2023-07-22',
 		title: '初版上线',
 		items: [
+			'SpaceX 火箭发射信息查询，数据来自 SpaceX 开源 API',
 			'发射排期、历史发射、近期活动、机构信息等页面',
-			'数据由 EMAS 云函数实时获取'
+			'支持订阅发射提醒'
 		]
 	},
 	{
