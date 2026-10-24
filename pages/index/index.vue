@@ -57,6 +57,33 @@
 			</view>
 
 			<view class="content" v-else>
+			<!-- 视图切换：排期列表 / 日历 -->
+			<view class="mode-bar">
+				<view class="mode-opt" :class="{ on: viewMode === 'list' }" @click="viewMode = 'list'">排期</view>
+				<view class="mode-opt" :class="{ on: viewMode === 'calendar' }" @click="viewMode = 'calendar'">日历</view>
+			</view>
+
+			<template v-if="viewMode === 'calendar'">
+				<!-- 日历模式：月网格打点 + 当日任务 -->
+				<launch-calendar :items="list" @pick="onPickDay" />
+				<view class="day-head" v-if="dayLaunches.length">
+					<text class="day-title">{{ pickedDate }} 的发射（{{ dayLaunches.length }}）</text>
+				</view>
+				<view class="list" v-if="dayLaunches.length">
+					<launch-card
+						v-for="item in dayLaunches"
+						:key="'cal' + item.id"
+						:item="item"
+						:fav="favIds.indexOf(item.id) !== -1"
+						@select="goDetail"
+					/>
+				</view>
+				<view class="cal-hint" v-if="!dayLaunches.length">
+					<text class="cal-hint-text">点有黄点的日期，看当天的发射任务</text>
+				</view>
+			</template>
+
+			<template v-else>
 			<!-- 最近一次发射 + 倒计时。放在列表上方当视觉焦点 -->
 			<view class="next-wrap" v-if="nextLaunch && visible.length">
 				<next-launch :item="nextLaunch" @select="goDetail" />
@@ -89,6 +116,7 @@
 				<text v-else-if="moreDone">已显示全部 {{ list.length }} 条</text>
 				<text v-else>{{ hasMore ? '上拉加载更多' : '上拉加载后续排期' }}</text>
 			</view>
+			</template>
 			</view>
 		</block>
 
@@ -120,7 +148,12 @@ export default {
 			loadingMore: false,
 			moreDone: false,
 			// 审核模式：列表卡片不带大图，观感是排期表而不是图文资讯流
-			reviewMode: false
+			reviewMode: false,
+			// 视图模式：排期列表 / 发射日历
+			viewMode: 'list',
+			// 日历模式选中的那天：{ dateStr, launches }
+			pickedDate: '',
+			dayLaunches: []
 		}
 	},
 
@@ -204,6 +237,8 @@ export default {
 
 	onReachBottom() {
 		if (this.reviewMode) return
+		// 日历模式下没有「加载更多」的概念
+		if (this.viewMode !== 'list') return
 		// 本地还有没渲染出来的，先把它们放出来
 		if (this.hasMore) {
 			this.loadMore()
@@ -227,6 +262,12 @@ export default {
 		// 右上角搜索入口
 		goSearch() {
 			uni.navigateTo({ url: '/pages/search/search' })
+		},
+
+		// 日历选中某天：渲染当天任务
+		onPickDay({ dateStr, launches }) {
+			this.pickedDate = dateStr
+			this.dayLaunches = launches || []
 		},
 
 		/**
@@ -432,5 +473,47 @@ export default {
 
 .next-wrap {
 	margin-bottom: 14rpx;
+}
+
+/* 视图切换（排期 / 日历） */
+.mode-bar {
+	display: inline-flex;
+	padding: 4rpx;
+	margin-bottom: 18rpx;
+	background: #141a26;
+	border-radius: 32rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+}
+
+.mode-opt {
+	padding: 10rpx 34rpx;
+	border-radius: 28rpx;
+	color: #6b7891;
+	font-size: 25rpx;
+}
+
+.mode-opt.on {
+	background: rgba(56, 189, 248, 0.16);
+	color: #38bdf8;
+}
+
+/* 日历模式 */
+.day-head {
+	margin: 20rpx 0 4rpx;
+}
+
+.day-title {
+	color: #8a97a8;
+	font-size: 26rpx;
+}
+
+.cal-hint {
+	padding: 24rpx 0 60rpx;
+	text-align: center;
+}
+
+.cal-hint-text {
+	color: #3d4a5c;
+	font-size: 24rpx;
 }
 </style>
