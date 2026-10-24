@@ -123,7 +123,7 @@ export default {
 
 	.nav-title {
 		color: #ffffff;
-		font-size: 38rpx;
+		font-size: 42rpx;
 		font-weight: 600;
 		letter-spacing: 2rpx;
 	}
