@@ -18,6 +18,15 @@ const CONFIG_URL =
 const KEY = 'appReviewConfig'
 const TTL = 5 * 60 * 1000
 
+// 开发期保护开关：为 true 时，本机没有暗门覆盖（override）就一律按正常态处理，
+// 无视 COS 上的 review 值 —— 等审核期间 COS 停着 review:true，本机照样开发调试。
+// 暗门「展示/正常」不受影响（有覆盖时优先覆盖，两种态都能预览）。
+//
+// ⚠️⚠️ 提审前必须改回 false！⚠️⚠️
+// 审核员设备没有 override，这个开关若还是 true，审核员会看到完整版，
+// COS 开关等于失效。（custom-tab-bar/index.js 里有一份同样的开关，两处一起改！）
+const DEV_FORCE_NORMAL = true
+
 // 会话内存缓存：tabBar、首页、详情页多处调用共享一次请求
 let mem = null
 let inflight = null
@@ -108,11 +117,15 @@ async function fetchOnce() {
 
 /**
  * 取展示开关，永远 resolve 一个对象（任何失败都兜底 review:false）。
- * 优先级：本机覆盖 > 内存缓存 > 本地缓存 > 远程。
+ * 优先级：本机覆盖 > 开发期强制正常 > 内存缓存 > 本地缓存 > 远程。
  */
 export function getConfig() {
 	const ov = readOverride()
 	if (ov) return Promise.resolve(ov)
+
+	// 开发期：没有覆盖就强制正常态，不读任何远程/缓存，
+	// COS 上停着 review:true 也不影响本机调试完整版
+	if (DEV_FORCE_NORMAL) return Promise.resolve({ review: false })
 
 	if (mem && Date.now() - mem.ts < TTL) return Promise.resolve(mem.data)
 	if (inflight) return inflight

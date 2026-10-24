@@ -300,8 +300,7 @@ export default {
 				})
 
 			uni.showActionSheet({
-				// 文案带后果说明，防止把第一项「展示」当成「正常」点出去
-				itemList: ['展示（审核态，只有火箭大全）', '正常（完整版，有首页和 tabBar）'],
+				itemList: ['展示', '正常'],
 				success: (res) => {
 					if (res.tapIndex === 0) {
 						setOverride(true)
