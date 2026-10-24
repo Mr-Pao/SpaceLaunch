@@ -39,7 +39,7 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 // v6: 增加任务名中文 mission.nameZh
 // v7: stats 增加任务 id / 名称 / 发射场
 // v8: stats 改为按年预聚合输出
-const DATA_VERSION = 8
+const DATA_VERSION = 9
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {

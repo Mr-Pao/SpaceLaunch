@@ -29,7 +29,7 @@ const { slimLaunch,
 	slimLauncher } = require('./lib/slim')
 const { aggregateByYear } = require('./lib/aggregate')
 const { upload } = require('./lib/cos')
-const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads } = require('./lib/localize')
+const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
 const translate = require('./lib/translate')
 
@@ -41,7 +41,7 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v6: 增加 mission.nameZh（任务名中文），标题不再整行英文
 // v7: stats 增加 id / name / site（发射场），支撑年度回顾
 // v8: stats 改为「按年预聚合」输出，不再下发原始数据；数据源换成最新快照 + 历史归档
-const DATA_VERSION = 8
+const DATA_VERSION = 9
 
 /** 读 COS 上已生成的 JSON。桶是公有读，直接走 CDN 地址 */
 async function readCosJson(key) {
@@ -193,6 +193,9 @@ const DATASETS = {
 		file: 'launchers.json',
 		cacheControl: 'public, max-age=86400',
 		images: ['image'],
+		// 型号简介回填中文：471 条，首轮 20 万字符，之后按原文哈希零命中。
+		// 详情页「简介」卡片只有这一段正文，不翻就永远是英文段落。
+		localize: localizeLaunchers,
 		async fetch() {
 			const all = []
 			let count = 0

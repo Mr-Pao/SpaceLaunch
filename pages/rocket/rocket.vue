@@ -174,7 +174,14 @@
 							<text class="section-title">即将发射</text>
 							<text class="section-note">{{ upcoming.length }} 次</text>
 						</view>
-						<launch-card v-for="item in upcoming" :key="item.id" :item="item" @select="goDetail" />
+						<launch-card v-for="item in upcomingShown" :key="item.id" :item="item" @select="goDetail" />
+						<view
+							class="more-btn"
+							v-if="upcoming.length > FOLD"
+							@click="upcomingOpen = !upcomingOpen"
+						>
+							<text class="more-text">{{ upcomingOpen ? '收起' : '展开全部 ' + upcoming.length + ' 次' }}</text>
+						</view>
 					</view>
 
 					<!-- 历史发射：快照只有最近的记录，标题如实写「近期」 -->
@@ -184,8 +191,12 @@
 							<text class="section-note">近期 {{ history.length }} 次</text>
 						</view>
 						<launch-card v-for="item in historyShown" :key="item.id" :item="item" @select="goDetail" />
-						<view class="more-btn" v-if="history.length > historyLimit" @click="historyLimit += 8">
-							<text class="more-text">显示更早的发射</text>
+						<view
+							class="more-btn"
+							v-if="history.length > FOLD"
+							@click="historyOpen = !historyOpen"
+						>
+							<text class="more-text">{{ historyOpen ? '收起' : '展开全部 ' + history.length + ' 次' }}</text>
 						</view>
 					</view>
 
@@ -225,8 +236,8 @@ import navMixin from '@/utils/nav-mixin.js'
 // 同系列构型少于这个数就不当「系列」看：Falcon 家族里只有 Falcon 1 / Falcon Heavy
 // 两种互不相干的火箭，标题写「猎鹰」反而不如直接写型号名
 const SERIES_MIN = 3
-// 历史发射一次渲染多少条，点「显示更早」再加
-const HISTORY_STEP = 8
+// 发射列表默认露几条，其余收起来（参考页也是先给几条，想看再展开）
+const FOLD = 3
 
 export default {
 	mixins: [navMixin],
@@ -243,7 +254,10 @@ export default {
 			// 审核模式：隐藏外部资料、发射场地与发射列表
 			reviewMode: false,
 			descOpen: false,
-			historyLimit: HISTORY_STEP
+			// 发射列表默认折叠到 FOLD 条，点「展开全部」再看完整列表
+			FOLD,
+			upcomingOpen: false,
+			historyOpen: false
 		}
 	},
 
@@ -387,12 +401,16 @@ export default {
 			return this.records.filter((x) => isStillUpcoming(x)).sort(byNetAsc)
 		},
 
+		upcomingShown() {
+			return this.upcomingOpen ? this.upcoming : this.upcoming.slice(0, FOLD)
+		},
+
 		history() {
 			return this.records.filter((x) => !isStillUpcoming(x)).sort(byNetDesc)
 		},
 
 		historyShown() {
-			return this.history.slice(0, this.historyLimit)
+			return this.historyOpen ? this.history : this.history.slice(0, FOLD)
 		},
 
 		/**

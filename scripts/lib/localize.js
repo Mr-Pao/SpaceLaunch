@@ -126,10 +126,29 @@ function localizePads(list) {
 	)
 }
 
+/**
+ * launcher.description → descriptionZh
+ *
+ * 471 条型号简介，是详情页「简介」卡片唯一的正文 ——
+ * 不翻的话那一整块永远是英文段落，和全中文界面格格不入。
+ * 同样按原文哈希永久缓存，只有首轮是真的在翻（约 20 万字符），
+ * 之后每天零命中。launchers 任务本身超时是 30 分钟，够用。
+ */
+function localizeLaunchers(list) {
+	return fill(
+		list,
+		(x) => x.description,
+		(x, zh) => {
+			x.descriptionZh = zh
+		}
+	)
+}
+
 module.exports = {
 	localizeLaunches,
 	localizeLaunchNames,
 	localizeEvents,
 	localizeAgencies,
-	localizePads
+	localizePads,
+	localizeLaunchers
 }
