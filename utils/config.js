@@ -31,6 +31,10 @@
 const CONFIG_URL =
 	'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-data/app-config.json'
 const KEY = 'appReviewConfig'
+// 判定结论（布尔）单独落一份，给 custom-tab-bar 那个原生组件读。
+// 它是 wxml/wxss 直接拷贝、不过 uni-app 编译，没法 import 本文件，
+// 早先只能自己读配置里的布尔 review —— 白名单机制对它完全失效。
+const RESOLVED_KEY = 'appReviewResolved'
 const TTL = 5 * 60 * 1000
 
 /**
@@ -257,10 +261,29 @@ async function loadRaw() {
 }
 
 /**
+ * 把判定结论写一份给原生 tabBar 组件读。
+ * 只存布尔 + 时间戳，不存配置原文 —— tabBar 那边只需要「藏还是不藏」。
+ */
+function writeResolved(review) {
+	try {
+		uni.setStorageSync(RESOLVED_KEY, { review: !!review, ts: Date.now() })
+	} catch (e) {
+		// 写不进去就靠页面 onShow 的 syncTabBar 兜底
+	}
+}
+
+/**
  * 取展示开关，永远 resolve 一个对象（任何失败都兜底 review:false）。
  * 优先级：本机覆盖 > 非正式版完整态 > 内存缓存 > 本地缓存 > 远程。
  */
 export function getConfig() {
+	return resolveConfig().then((c) => {
+		writeResolved(c && c.review)
+		return c
+	})
+}
+
+function resolveConfig() {
 	const ov = readOverride()
 
 	// 本机覆盖：模拟某个版本号 → 走正式版口径，

@@ -9,6 +9,47 @@
  * 悬浮胶囊造型：原生 tabBar 只能整条铺满底部、不能圆角不能浮动，
  * 想要这个样式只能自己画，再到 pages.json 里开 tabBar.custom。
  */
+/**
+ * 审核态判定 —— **规则必须与 utils/config.js 的 applyVersionRule 完全一致**。
+ *
+ * 为什么要在这里重复一份：custom-tab-bar 是原生组件，uni-app 编译器直接
+ * 拷贝该目录、不做模块打包，所以 import 不到 utils/config.js。
+ * 两份一致性由 scripts/verify-config.js 用同一组真值表对拍（改一边必须同步另一边）。
+ */
+function matchVersionList(raw, version) {
+	const cfg = raw || {}
+	// 旧格式兼容：配置里没有 reviewVersions 字段时才看布尔 review
+	if (!Array.isArray(cfg.reviewVersions)) return Boolean(cfg.review)
+
+	const list = cfg.reviewVersions.map(String)
+	if (!list.length) return false
+	// 拿不到版本号的正式版只可能是审核环境，判工具态（保审核）
+	return version ? list.indexOf(version) !== -1 : true
+}
+
+function resolveReview(raw, override) {
+	if (override) {
+		if (typeof override.review === 'boolean') return override.review
+		if (typeof override.version === 'string' && override.version) {
+			// 暗门模拟版本号：按正式版口径判定
+			return matchVersionList(raw, override.version)
+		}
+	}
+
+	let envVersion = ''
+	let version = ''
+	try {
+		const info = wx.getAccountInfoSync()
+		envVersion = (info && info.miniProgram && info.miniProgram.envVersion) || ''
+		version = String((info && info.miniProgram && info.miniProgram.version) || '').trim()
+	} catch (e) {}
+
+	// 开发版/体验版永远完整态
+	if (envVersion !== 'release') return false
+
+	return matchVersionList(raw, version)
+}
+
 Component({
 	data: {
 		// 审核模式：为 true 时 wxml 里整条 tabBar 不渲染（wx:if="{{!review}}"），
@@ -52,41 +93,38 @@ Component({
 
 	lifetimes: {
 		attached() {
-			// 审核模式开关：与 utils/config.js 读同一份 COS 配置、同一个 storage key。
-			// 原生组件不走 uni-app 编译，这里单独用 wx.request 拉一次。
-			// 优先级与页面端一致：本机覆盖 > 远程缓存 > 远程请求 ——
-			// 否则暗门切回正常态后，bar 会被过期的远程审核态缓存藏掉。
 			const KEY = 'appReviewConfig'
 			const OVERRIDE_KEY = 'appReviewConfigOverride'
+			const RESOLVED_KEY = 'appReviewResolved'
 			const TTL = 5 * 60 * 1000
 
-			// 1) 本机覆盖（暗门切的）最高优先
+			let override = null
 			try {
 				const ov = wx.getStorageSync(OVERRIDE_KEY)
-				if (ov && typeof ov.review === 'boolean') {
-					this.setData({ review: ov.review })
+				if (ov && typeof ov === 'object') override = ov
+			} catch (e) {}
+
+			// 1) 页面端算好的结论优先 —— 唯一权威判定在 utils/config.js，
+			//    它每次 getConfig 都会把结果写进 appReviewResolved
+			try {
+				const r = wx.getStorageSync(RESOLVED_KEY)
+				if (r && typeof r.review === 'boolean' && r.ts && Date.now() - r.ts < TTL) {
+					this.setData({ review: r.review })
 					return
 				}
 			} catch (e) {}
 
-			// 1.5) 审核态只在正式版（release）生效：开发版/体验版一律正常态，
-			//      不读远程。与 utils/config.js 的 isReleaseBuild() 同一逻辑
-			try {
-				if (wx.getAccountInfoSync().miniProgram.envVersion !== 'release') return
-			} catch (e) {}
-
-			// 2) 远程开关的 5 分钟内缓存
+			// 2) 还没有结论（冷启动首帧）：用本地缓存的配置自己算，
+			//    避免先渲染完整 tabBar 再闪一下消失
 			try {
 				const cached = wx.getStorageSync(KEY)
 				if (cached && cached.ts && cached.data && Date.now() - cached.ts < TTL) {
-					if (cached.data.review) this.setData({ review: true })
+					this.setData({ review: resolveReview(cached.data, override) })
 					return
 				}
-			} catch (e) {
-				// 没缓存就走请求
-			}
+			} catch (e) {}
 
-			// 3) 远程请求（成功结果与页面端共用一份缓存，谁先拉到都行）
+			// 3) 连缓存都没有：先按完整态展示，拉一次远程算出来再修正
 			wx.request({
 				url: 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-data/app-config.json',
 				timeout: 5000,
@@ -95,7 +133,7 @@ Component({
 					try {
 						wx.setStorageSync(KEY, { ts: Date.now(), data: res.data })
 					} catch (e) {}
-					if (res.data.review) this.setData({ review: true })
+					this.setData({ review: resolveReview(res.data, override) })
 				},
 				fail: () => {}
 			})

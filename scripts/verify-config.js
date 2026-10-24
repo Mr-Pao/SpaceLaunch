@@ -64,20 +64,64 @@ const CASES = [
 	['强制完整态优先于命中白名单', 'release', '3.1.0', { reviewVersions: ['3.1.0'] }, false, { review: false }]
 ]
 
+/**
+ * 与 custom-tab-bar 的判定对拍
+ *
+ * custom-tab-bar 是原生组件（uni-app 直接拷贝目录、不打包），
+ * 没法 import utils/config.js，只能自带一份同规则实现。
+ * 这里把那份实现的源码抠出来跑同一组用例，两边结果必须逐条相等 ——
+ * 否则「审核员看不到 tabBar、普通用户看得到」这条就会分叉。
+ */
+function loadBarRule() {
+	const file = path.join(__dirname, '..', 'custom-tab-bar', 'index.js')
+	const src = require('fs').readFileSync(file, 'utf8')
+
+	const pick = (name) => {
+		const start = src.indexOf('function ' + name + '(')
+		if (start === -1) throw new Error('custom-tab-bar 里找不到 ' + name)
+		let depth = 0
+		let opened = false
+		for (let i = start; i < src.length; i++) {
+			const ch = src[i]
+			if (ch === '{') {
+				depth++
+				opened = true
+			} else if (ch === '}') {
+				depth--
+				if (opened && depth === 0) return src.slice(start, i + 1)
+			}
+		}
+		throw new Error(name + ' 未闭合')
+	}
+
+	// eslint-disable-next-line no-new-func
+	return new Function(
+		pick('matchVersionList') +
+			'\n' +
+			pick('resolveReview') +
+			'\nreturn { matchVersionList: matchVersionList, resolveReview: resolveReview }'
+	)()
+}
+
 ;(async () => {
+	const bar = loadBarRule()
+
 	let ok = 0
 	for (const [name, env, v, cfg, want, ov] of CASES) {
-		let got
+		let got, gotBar
 		try {
 			got = await decide(env, v, cfg, ov)
+			// decide() 已经设过 wx 桩，这里直接复用
+			gotBar = bar.resolveReview(cfg, ov || null)
 		} catch (e) {
 			console.log(`✗ ${name}  抛错: ${e.message}`)
 			continue
 		}
-		const pass = got === want
+		const pass = got === want && gotBar === got
 		if (pass) ok++
-		console.log(`${pass ? '✓' : '✗'} ${name}  review=${got}（期望 ${want}）`)
+		const note = gotBar === got ? '' : `  ⚠ tabBar 判成 ${gotBar}，与页面端不一致`
+		console.log(`${pass ? '✓' : '✗'} ${name}  review=${got}（期望 ${want}）${note}`)
 	}
-	console.log(`\n${ok}/${CASES.length} 通过`)
+	console.log(`\n${ok}/${CASES.length} 通过（含 custom-tab-bar 一致性对拍）`)
 	process.exit(ok === CASES.length ? 0 : 1)
 })()
