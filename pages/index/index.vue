@@ -93,6 +93,7 @@ import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { isStillUpcoming } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
+import spaceData from '@/utils/data.js'
 
 export default {
 	// filter 用来剔掉 LL2 还挂在 upcoming 里的「已发射成功」任务

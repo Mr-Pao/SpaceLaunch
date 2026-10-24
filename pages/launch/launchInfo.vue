@@ -227,6 +227,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
+import { findById as findByIdInArchive } from '@/utils/history.js'
 import { formatDateTime, relativeTime, launchTitle, rocketName as rocketNameOf, zhValue } from '@/utils/format.js'
 import * as fav from '@/utils/favorites.js'
 import { getConfig } from '@/utils/config.js'
@@ -437,7 +438,13 @@ export default {
 		// 同一条发射在跨过"当前时刻"后会从 upcoming 挪到 previous，
 		// 用户刚看过列表就点进来时可能已经换边了，所以两边都查。
 		// findLaunchById 内部先扫缓存，命中则零网络开销。
-		const d = await spaceData.findLaunchById(id)
+		let d = await spaceData.findLaunchById(id)
+
+		// 快照（previous 只存最新 100 条）里没有 → 去历史归档分片里找。
+		// 统计页失败复盘、已发射页更早条目都属于这类，之前会直接白屏。
+		if (!d) {
+			d = await findByIdInArchive(id)
+		}
 
 		this.detail = d
 		this.loading = false
