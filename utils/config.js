@@ -75,7 +75,7 @@ function runtimeVersion() {
  * 按远程配置算出这台设备该不该进工具态。
  *
  * 判定顺序：
- *   1. 非正式版 → 永远完整态（开发/体验不受远程开关影响）
+ *   1. 非正式版且没指定模拟版本号 → 永远完整态（开发/体验不受远程开关影响）
  *   2. 配了 reviewVersions 且当前版本在其中 → 工具态
  *   3. 配了 reviewVersions 但拿不到版本号 → 工具态
  *      （正式版一定有版本号，拿不到只可能是无版本号的审核环境，宁可保审核）
@@ -84,13 +84,17 @@ function runtimeVersion() {
  * 注意第 3 条的代价：启用白名单后，若某天正式版异常拿不到版本号，
  * 用户会看到工具态。但这是「审核不过」与「体验降级」之间选，
  * 审核不过影响发版且要重走流程，体验降级可通过改配置立刻恢复，故选保审核。
+ *
+ * simulated：暗门里填的模拟版本号。给了它就走正式版口径（跳过环境判断），
+ * 用这个假版本号代替真实版本号 —— 开发版/体验版也能看到审核员视角。
  */
-function applyVersionRule(raw) {
+function applyVersionRule(raw, simulated) {
 	const cfg = raw || {}
 	// 除 review 外的字段原样透传，以后配置加新开关不用改这里
 	const out = Object.assign({}, cfg)
+	const sim = typeof simulated === 'string' && simulated ? simulated : null
 
-	if (!isReleaseBuild()) {
+	if (!sim && !isReleaseBuild()) {
 		out.review = false
 		return out
 	}
@@ -108,7 +112,7 @@ function applyVersionRule(raw) {
 	}
 
 	// 拿不到版本号：正式版必有版本号，拿不到的只可能是审核环境，保审核
-	const v = runtimeVersion()
+	const v = sim || runtimeVersion()
 	out.review = v ? list.indexOf(v) !== -1 : true
 	return out
 }
@@ -153,23 +157,47 @@ const OVERRIDE_KEY = KEY + 'Override'
 /**
  * 本机覆盖（开发者暗门用）：写在 storage 里的强制值，
  * 优先级高于远程开关 —— 只影响本机，审核员的设备拿不到。
+ *
+ * 两种形态：
+ *   { version: '3.1.0' }  模拟运行在正式版 3.1.0，走真实白名单判定
+ *                         （看到的就是审核员跑 3.1.0 时的界面）
+ *   { review: true }      不讲道理地强制工具态（旧用法，保留）
  */
 function readOverride() {
 	try {
 		const o = uni.getStorageSync(OVERRIDE_KEY)
-		if (o && typeof o.review === 'boolean') return o
+		if (!o || typeof o !== 'object') return null
+		if (typeof o.version === 'string' && o.version) return o
+		if (typeof o.review === 'boolean') return o
 	} catch (e) {
 		// 没有覆盖
 	}
 	return null
 }
 
-function setOverride(review) {
+/**
+ * 写本机覆盖。
+ *   setOverride('3.1.0')  模拟版本号
+ *   setOverride(true)     强制工具态
+ *   setOverride(false)    强制完整态
+ *   setOverride(null)     清除，回到环境默认
+ */
+function setOverride(val) {
 	try {
-		if (review === null) {
+		if (val === null || val === undefined || val === '') {
 			uni.removeStorageSync(OVERRIDE_KEY)
+		} else if (typeof val === 'string') {
+			uni.setStorageSync(OVERRIDE_KEY, { version: val.trim() })
+		} else if (typeof val === 'object') {
+			if (typeof val.version === 'string' && val.version) {
+				uni.setStorageSync(OVERRIDE_KEY, { version: val.version.trim() })
+			} else if (typeof val.review === 'boolean') {
+				uni.setStorageSync(OVERRIDE_KEY, { review: val.review })
+			} else {
+				uni.removeStorageSync(OVERRIDE_KEY)
+			}
 		} else {
-			uni.setStorageSync(OVERRIDE_KEY, { review: Boolean(review) })
+			uni.setStorageSync(OVERRIDE_KEY, { review: Boolean(val) })
 		}
 	} catch (e) {}
 }
@@ -198,40 +226,81 @@ async function fetchOnce() {
 }
 
 /**
- * 取展示开关，永远 resolve 一个对象（任何失败都兜底 review:false）。
- * 优先级：本机覆盖 > 非正式版完整态 > 内存缓存 > 本地缓存 > 远程。
+ * 取原始配置（含 reviewVersions），判定每次现算 ——
+ * 同一份缓存要能被「真实版本号」和「模拟版本号」两种口径分别解释，
+ * 所以缓存只存原文，绝不在写入时就把 review 算死。
  */
-export function getConfig() {
-	const ov = readOverride()
-	if (ov) return Promise.resolve(ov)
-
-	// 审核态只在正式版生效：开发版/体验版永远完整态，不读 COS
-	if (!isReleaseBuild()) return Promise.resolve({ review: false })
-
-	if (mem && Date.now() - mem.ts < TTL) return Promise.resolve(applyVersionRule(mem.data))
+async function loadRaw() {
+	if (mem && Date.now() - mem.ts < TTL) return mem.data
 	if (inflight) return inflight
 
 	inflight = (async () => {
 		const local = readLocal()
 		if (local) {
 			mem = { data: local, ts: Date.now() }
-			inflight = null
-			return applyVersionRule(local)
+			return local
 		}
 
 		const remote = await fetchOnce()
-		// 缓存里存原始配置（含 reviewVersions），判定结果每次现算，
-		// 这样同一份缓存能被不同版本号的设备正确解释
 		const data = remote || {}
 		mem = { data, ts: Date.now() }
 		// 远程拉取成功才落缓存；失败结果不缓存，下次进页面再试
 		if (remote) writeLocal(data)
-		inflight = null
-		return applyVersionRule(data)
+		return data
 	})()
 
-	return inflight
+	try {
+		return await inflight
+	} finally {
+		inflight = null
+	}
 }
 
-// 开发者面板（版本页暗门）用：覆盖与刷新不进常规 import 面
-export { setOverride, refreshRemote }
+/**
+ * 取展示开关，永远 resolve 一个对象（任何失败都兜底 review:false）。
+ * 优先级：本机覆盖 > 非正式版完整态 > 内存缓存 > 本地缓存 > 远程。
+ */
+export function getConfig() {
+	const ov = readOverride()
+
+	// 本机覆盖：模拟某个版本号 → 走正式版口径，
+	// 开发版/体验版也能看到审核员跑那个版本时的界面
+	if (ov && ov.version) {
+		return loadRaw().then((raw) => applyVersionRule(raw, ov.version))
+	}
+
+	// 本机覆盖：强制工具态 / 强制完整态
+	if (ov && typeof ov.review === 'boolean') {
+		return Promise.resolve({ review: ov.review })
+	}
+
+	// 审核态只在正式版生效：开发版/体验版永远完整态，不读 COS
+	if (!isReleaseBuild()) return Promise.resolve({ review: false })
+
+	return loadRaw().then((raw) => applyVersionRule(raw))
+}
+
+/**
+ * 开发者面板用：一次性给出现场信息，不做任何判定。
+ * 面板要能回答三件事 —— 我现在是什么环境、真实版本号多少、远程白名单是什么。
+ */
+function getDebugInfo() {
+	let envVersion = 'unknown'
+	let version = ''
+	// #ifdef MP-WEIXIN
+	try {
+		const info = wx.getAccountInfoSync()
+		envVersion = (info && info.miniProgram && info.miniProgram.envVersion) || 'unknown'
+		version = String((info && info.miniProgram && info.miniProgram.version) || '').trim()
+	} catch (e) {}
+	// #endif
+	const ov = readOverride()
+	return {
+		envVersion,
+		version,
+		override: ov ? (ov.version ? { version: ov.version } : { review: ov.review }) : null
+	}
+}
+
+// 开发者面板（火箭大全暗门）用：覆盖、刷新、现场信息不进常规 import 面
+export { setOverride, refreshRemote, getDebugInfo }

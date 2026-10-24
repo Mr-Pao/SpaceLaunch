@@ -21,12 +21,14 @@ const { pathToFileURL } = require('url')
 
 const CONFIG_URL = pathToFileURL(path.join(__dirname, '..', 'utils', 'config.js')).href
 
-function stub(envVersion, version, remote) {
+function stub(envVersion, version, remote, override) {
 	globalThis.wx = {
 		getAccountInfoSync: () => ({ miniProgram: { envVersion, version } })
 	}
 	globalThis.uni = {
-		getStorageSync: () => '',
+		// 暗门覆盖存在 storage 的这个键下（config.js 的 OVERRIDE_KEY）
+		getStorageSync: (k) =>
+			override && k === 'appReviewConfigOverride' ? override : '',
 		setStorageSync: () => {},
 		removeStorageSync: () => {},
 		request: (o) => o.success({ statusCode: 200, data: remote })
@@ -34,8 +36,8 @@ function stub(envVersion, version, remote) {
 }
 
 let seq = 0
-async function decide(envVersion, version, remote) {
-	stub(envVersion, version, remote)
+async function decide(envVersion, version, remote, override) {
+	stub(envVersion, version, remote, override)
 	const mod = await import(CONFIG_URL + '?t=' + ++seq)
 	const cfg = await mod.getConfig()
 	return cfg.review
@@ -50,15 +52,24 @@ const CASES = [
 	['兼容旧格式 review:false', 'release', '3.0.9', { review: false }, false],
 	['多版本白名单命中', 'release', '3.0.10', { reviewVersions: ['3.0.9', '3.0.10'] }, true],
 	['体验版永远完整态', 'trial', '3.0.10', { reviewVersions: ['3.0.10'] }, false],
-	['开发版永远完整态', 'develop', '3.0.10', { reviewVersions: ['3.0.10'] }, false]
+	['开发版永远完整态', 'develop', '3.0.10', { reviewVersions: ['3.0.10'] }, false],
+
+	// 暗门：模拟版本号（开发版也能看审核员视角）
+	['模拟 3.1.0 命中白名单（开发版）', 'develop', '', { reviewVersions: ['3.1.0'] }, true, { version: '3.1.0' }],
+	['模拟 3.0.9 未命中（开发版）', 'develop', '', { reviewVersions: ['3.1.0'] }, false, { version: '3.0.9' }],
+	['模拟版本号覆盖真实版本号（正式版）', 'release', '3.1.0', { reviewVersions: ['3.1.0'] }, false, { version: '3.0.9' }],
+	['模拟版本号遇空白名单 → 完整态', 'develop', '', { reviewVersions: [] }, false, { version: '3.1.0' }],
+	// 暗门：强制布尔（旧用法仍要能用）
+	['强制工具态优先于空白名单', 'develop', '', { reviewVersions: [] }, true, { review: true }],
+	['强制完整态优先于命中白名单', 'release', '3.1.0', { reviewVersions: ['3.1.0'] }, false, { review: false }]
 ]
 
 ;(async () => {
 	let ok = 0
-	for (const [name, env, v, cfg, want] of CASES) {
+	for (const [name, env, v, cfg, want, ov] of CASES) {
 		let got
 		try {
-			got = await decide(env, v, cfg)
+			got = await decide(env, v, cfg, ov)
 		} catch (e) {
 			console.log(`✗ ${name}  抛错: ${e.message}`)
 			continue

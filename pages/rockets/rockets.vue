@@ -133,6 +133,51 @@
 				<text v-else>已显示全部 {{ filtered.length }} 个型号</text>
 			</view>
 		</view>
+
+		<!-- 暗门面板（3 秒内连点标题 5 次）：模拟版本号，检查审核员看到的界面 -->
+		<view class="dbg-mask" v-if="dbgShow" @click="dbgShow = false">
+			<view class="dbg-panel" @click.stop>
+				<view class="dbg-title">审核视角调试</view>
+
+				<view class="dbg-row">
+					<text class="dbg-k">当前环境</text>
+					<text class="dbg-v">{{ dbgEnv }}</text>
+				</view>
+				<view class="dbg-row">
+					<text class="dbg-k">真实版本号</text>
+					<text class="dbg-v">{{ dbgRealVer }}</text>
+				</view>
+				<view class="dbg-row">
+					<text class="dbg-k">远程白名单</text>
+					<text class="dbg-v">{{ dbgWhite }}</text>
+				</view>
+				<view class="dbg-row">
+					<text class="dbg-k">本机覆盖</text>
+					<text class="dbg-v">{{ dbgOverrideText }}</text>
+				</view>
+
+				<view class="dbg-hint">
+					填一个版本号，本机就按「正式版 + 该版本号」判定，看到的就是审核员跑这一版时的界面。
+				</view>
+
+				<input
+					class="dbg-input"
+					v-model="dbgInput"
+					type="text"
+					placeholder="如 3.1.0"
+					placeholder-class="dbg-ph"
+					confirm-type="done"
+				/>
+
+				<view class="dbg-btns">
+					<view class="dbg-btn" @click="applySim">模拟该版本</view>
+					<view class="dbg-btn" @click="simReal">用真实版本号</view>
+				</view>
+				<view class="dbg-btns">
+					<view class="dbg-btn dbg-btn-danger" @click="clearSim">清除覆盖，恢复正常</view>
+				</view>
+			</view>
+		</view>
 	</view>
 </template>
 
@@ -140,7 +185,7 @@
 import spaceData from '@/utils/data.js'
 import { rocketName } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
-import { setOverride } from '@/utils/config.js'
+import { setOverride, refreshRemote, getDebugInfo } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 
 const STEP = 14
@@ -180,9 +225,16 @@ export default {
 			family: '',
 			cnOnly: false,
 			listNum: STEP,
-			// 暗门计数：3 秒内连点 5 次「火箭大全」标题呼出开关
+			// 暗门计数：3 秒内连点 5 次「火箭大全」标题呼出审核视角调试面板
 			taps: 0,
 			tapTimer: null,
+			// 调试面板状态
+			dbgShow: false,
+			dbgEnv: '',
+			dbgRealVer: '',
+			dbgWhite: '',
+			dbgOverrideText: '',
+			dbgInput: '',
 			statusOptions: [
 				{ label: '全部', value: 'all' },
 				{ label: '现役', value: 'active' },
@@ -301,36 +353,90 @@ export default {
 
 			if (this.taps >= 5) {
 				this.taps = 0
-				this.showPanel()
+				this.openDebug()
 			}
 		},
 
-		// 只有两项，静默切换：切完直接跳到对应首页，
-		// 「展示」后的界面与审核员看到的一致（火箭大全，无 tabBar）。
-		// reLaunch 失败时页面栈不会被清空，旧实例（尤其详情页）会卡在旧状态，
-		// 所以失败必须给出提示，不能静默。
-		showPanel() {
-			const relaunch = (url) =>
-				uni.reLaunch({
-					url,
-					fail: () => uni.showToast({ title: '切换失败，请重试', icon: 'none' })
-				})
+		/**
+		 * 审核视角调试面板。
+		 *
+		 * 为什么按版本号而不是「展示/正常」二选一：
+		 * 判定依据就是「当前版本号在不在远程白名单里」，
+		 * 所以只要能让本机假装成某个版本号，看到的就正好是审核员跑那一版时的界面。
+		 * 开发版/体验版本来永远完整态，靠这个假版本号才能看到工具态。
+		 */
+		openDebug() {
+			const info = getDebugInfo()
+			const envMap = { release: '正式版', trial: '体验版', develop: '开发版' }
 
-			uni.showActionSheet({
-				itemList: ['展示', '正常'],
-				success: (res) => {
-					if (res.tapIndex === 0) {
-						// 展示 = 强制审核态（写覆盖，任何环境都生效）
-						setOverride(true)
-						relaunch('/pages/rockets/rockets')
-					} else if (res.tapIndex === 1) {
-						// 正常 = 清除本机覆盖，回到环境默认：
-						// 开发版(HBuilderX)→完整态，正式版→跟随 COS。
-						// 清除而非写 false，storage 里任何残留覆盖都一并清掉
-						setOverride(null)
-						relaunch('/pages/index/index')
-					}
+			this.dbgEnv = envMap[info.envVersion] || info.envVersion
+			this.dbgRealVer = info.version || '无（开发版/体验版不返回）'
+			this.dbgOverrideText = info.override
+				? info.override.version
+					? '模拟 ' + info.override.version
+					: info.override.review
+						? '强制工具态'
+						: '强制完整态'
+				: '无'
+			this.dbgInput = (info.override && info.override.version) || ''
+			this.dbgWhite = '读取中…'
+			this.dbgShow = true
+			this.loadWhite()
+		},
+
+		// 顺手把远程白名单拉出来给个准数：绕过缓存直取，看到的才是线上真实配置
+		async loadWhite() {
+			try {
+				const raw = await refreshRemote()
+				if (!raw) {
+					this.dbgWhite = '读取失败（网络）'
+					return
 				}
+				if (!Array.isArray(raw.reviewVersions)) {
+					this.dbgWhite = '无此字段（旧格式，看 review）'
+					return
+				}
+				this.dbgWhite = raw.reviewVersions.length
+					? raw.reviewVersions.join('、')
+					: '空（所有版本都完整态）'
+			} catch (e) {
+				this.dbgWhite = '读取失败'
+			}
+		},
+
+		applySim() {
+			const v = (this.dbgInput || '').trim()
+			if (!v) {
+				uni.showToast({ title: '请填版本号，如 3.1.0', icon: 'none' })
+				return
+			}
+			setOverride(v)
+			this.resetAndGo('/pages/rockets/rockets')
+		},
+
+		// 用本机真实版本号判定：正式版等于是「不做任何模拟」，
+		// 开发版没有版本号，会命中「拿不到版本号 → 保审核」那条
+		simReal() {
+			const info = getDebugInfo()
+			if (!info.version) {
+				uni.showToast({ title: '开发版没有版本号，请手动填', icon: 'none' })
+				return
+			}
+			setOverride(info.version)
+			this.resetAndGo('/pages/rockets/rockets')
+		},
+
+		clearSim() {
+			setOverride(null)
+			this.resetAndGo('/pages/index/index')
+		},
+
+		// reLaunch 失败时页面栈不会清空，旧实例会卡在旧状态，必须提示
+		resetAndGo(url) {
+			this.dbgShow = false
+			uni.reLaunch({
+				url,
+				fail: () => uni.showToast({ title: '切换失败，请重试', icon: 'none' })
 			})
 		},
 
@@ -701,5 +807,107 @@ function leoOf(kg) {
 	text-align: center;
 	color: #3d4a5c;
 	font-size: 22rpx;
+}
+
+/* ==================== 暗门：审核视角调试面板 ==================== */
+.dbg-mask {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 40rpx;
+	background: rgba(4, 8, 16, 0.74);
+}
+
+.dbg-panel {
+	width: 100%;
+	padding: 34rpx 32rpx 28rpx;
+	box-sizing: border-box;
+	background: #131c2c;
+	border: 1rpx solid rgba(120, 160, 220, 0.18);
+	border-radius: 24rpx;
+	box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.5);
+}
+
+.dbg-title {
+	margin-bottom: 20rpx;
+	color: #ffffff;
+	font-size: 32rpx;
+	font-weight: 600;
+}
+
+.dbg-row {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 10rpx 0;
+}
+
+.dbg-k {
+	flex-shrink: 0;
+	color: #7c8aa5;
+	font-size: 25rpx;
+}
+
+.dbg-v {
+	flex: 1;
+	margin-left: 24rpx;
+	color: #dbe6f7;
+	font-size: 25rpx;
+	text-align: right;
+	word-break: break-all;
+}
+
+.dbg-hint {
+	margin: 18rpx 0;
+	color: #6f7d95;
+	font-size: 23rpx;
+	line-height: 1.6;
+}
+
+.dbg-input {
+	height: 78rpx;
+	padding: 0 22rpx;
+	box-sizing: border-box;
+	color: #ffffff;
+	font-size: 28rpx;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1rpx solid rgba(120, 160, 220, 0.22);
+	border-radius: 14rpx;
+}
+
+.dbg-ph {
+	color: #4a566b;
+}
+
+.dbg-btns {
+	display: flex;
+	margin-top: 20rpx;
+}
+
+.dbg-btn {
+	flex: 1;
+	height: 78rpx;
+	line-height: 78rpx;
+	margin-right: 16rpx;
+	text-align: center;
+	color: #38bdf8;
+	font-size: 27rpx;
+	background: rgba(56, 189, 248, 0.14);
+	border-radius: 14rpx;
+}
+
+.dbg-btn:last-child {
+	margin-right: 0;
+}
+
+.dbg-btn-danger {
+	color: #f87171;
+	background: rgba(248, 113, 113, 0.12);
 }
 </style>

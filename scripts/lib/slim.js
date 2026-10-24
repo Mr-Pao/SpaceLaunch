@@ -189,7 +189,9 @@ function slimPad(p) {
 		latitude: num(p.latitude),
 		longitude: num(p.longitude),
 		active: Boolean(p.active),
-		country_code: (Array.isArray(p.country) && p.country.length && p.country[0].alpha_2_code) || '',
+		// 实测 country 是**对象**（{id,name,alpha_2_code,...}），不是数组。
+		// 早先按 p.country[0].alpha_2_code 取，Array.isArray 恒为假 → 国家代码全空
+		country_code: (p.country && p.country.alpha_2_code) || '',
 		total_launch_count: num(p.total_launch_count),
 		location: {
 			id: (p.location && p.location.id) ?? null,

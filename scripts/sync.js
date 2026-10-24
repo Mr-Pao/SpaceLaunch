@@ -57,7 +57,9 @@ async function readCosJson(key) {
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {
 	/**
-	 * 发射工位（pad）全量：/pads/ 共 251 条，一页拉完。
+	 * 发射工位（pad）全量：/pads/ 共 251 条，**必须翻页**。
+	 * 实测服务端把 limit 截到 100（limit=300 也只回 100 条），
+	 * 早先按"一页拉完"写，结果只入库 100 个工位、少了 151 个。
 	 * 变化极慢，每天刷一次足够；pad 详情页（地图 + 累计发射数）用。
 	 * map_image 全量镜像首轮较慢，之后按 hash 跳过已上传、几乎零成本。
 	 */
@@ -68,8 +70,20 @@ const DATASETS = {
 		localize: localizePads,
 		images: ['image', 'map_image'],
 		async fetch() {
-			const j = await getJson('/pads/?limit=300&mode=normal&format=json')
-			return { count: j.count, list: j.results.map(slimPad) }
+			const all = []
+			let offset = 0
+			let count = 0
+
+			for (;;) {
+				const j = await getJson(`/pads/?limit=100&offset=${offset}&mode=normal&format=json`)
+				count = j.count
+				all.push(...j.results)
+				offset += j.results.length
+				if (!j.next || j.results.length === 0 || offset >= count) break
+				if (offset > 600) throw new Error('工位分页异常，已超过 600 条')
+			}
+
+			return { count, list: all.map(slimPad) }
 		}
 	},
 
