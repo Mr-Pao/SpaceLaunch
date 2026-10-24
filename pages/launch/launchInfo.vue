@@ -264,7 +264,7 @@
 					<view class="padrow" @click="goPad">
 						<view class="padrow-main">
 							<text class="padrow-name">{{ detail.pad.name }}</text>
-							<text class="padrow-loc" v-if="padLocation">{{ padLocation }}</text>
+							<text class="padrow-loc" v-if="padPlace">{{ padPlace }}</text>
 						</view>
 						<text class="arrow">›</text>
 					</view>
@@ -319,6 +319,7 @@ import {
 	orbitName,
 	missionTypeName,
 	agencyLabel,
+	countryOf,
 	clock,
 	longDate,
 	spanText,
@@ -565,6 +566,16 @@ export default {
 			const p = this.detail && this.detail.pad
 			if (!p || p.latitude == null || p.longitude == null) return ''
 			return p.latitude.toFixed(2) + ', ' + p.longitude.toFixed(2)
+		},
+		// 场地写法：设施名 + 中文国家。直接铺 "Jiuquan Satellite Launch Center,
+		// People's Republic of China" 会占两行而且全是英文
+		padPlace() {
+			const name = this.padLocation
+			if (!name) return ''
+			const first = name.split(',')[0].trim()
+			const country = countryOf(this.detail)
+			if (!country || first === country) return first || country
+			return first + ' · ' + country
 		},
 		// 工位卫星图：同步阶段按 750px 镜像到 COS，点开可全屏看
 		padMapImage() {
