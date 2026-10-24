@@ -141,8 +141,6 @@
 					class="dbg-input"
 					v-model="dbgInput"
 					type="text"
-					placeholder="如 3.1.0"
-					placeholder-class="dbg-ph"
 					confirm-type="done"
 				/>
 
@@ -770,10 +768,6 @@ function leoOf(kg) {
 	background: rgba(255, 255, 255, 0.05);
 	border: 1rpx solid rgba(120, 160, 220, 0.22);
 	border-radius: 14rpx;
-}
-
-.dbg-ph {
-	color: #4a566b;
 }
 
 .dbg-btns {
