@@ -72,3 +72,17 @@ jobs:
           COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
           COS_ACL: public-read
         run: node archive.js --pages=${{ inputs.pages || 'auto' }}
+
+      # 归档推进后立刻重算统计：stats 独立 cron 一天只跑一次，
+      # 会在归档补齐期间长期滞后（2025 年只剩 11/12 月那种）。
+      # 纯读 COS 已有分片 + 上传，不碰 LL2，零配额成本。
+      - name: 重算年度统计
+        if: always()
+        working-directory: scripts
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET || 'spacelaunch-1258113633' }}
+          COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
+          COS_ACL: public-read
+        run: node sync.js --dataset=stats
