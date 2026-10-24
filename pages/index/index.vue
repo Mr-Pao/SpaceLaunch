@@ -819,9 +819,9 @@ export default {
 }
 
 /* 放大镜：细线圆环 + 45° 手柄，纯 CSS。
-   实际尺寸都在 44rpx 的盒子里精调过：
-   圆环直径 30rpx（含 3rpx 边），圆心在 (19,19)，
-   手柄从圆周右下 45° 点 (29,29) 接出去，接缝才顺 */
+   尺寸在 32rpx 的盒子里对齐过：
+   圆环外径 22rpx（含 2.5rpx 描边），圆心在 (14,14)，
+   手柄从圆周右下 45° 点 (21.8,21.8) 接出去，接缝才顺 */
 .fab-icon {
 	position: relative;
 	width: 32rpx;
@@ -851,20 +851,21 @@ export default {
 	transform-origin: left center;
 }
 
-/* 生效条件数角标：不用红点，红点看不出筛了几项 */
+/* 生效条件数角标：不用红点，红点看不出筛了几项。
+   球只有 68rpx，角标按球的 1/3 取 24rpx，再大就把放大镜压没了 */
 .fab-badge {
 	position: absolute;
-	top: -3rpx;
-	right: -3rpx;
-	min-width: 28rpx;
-	height: 28rpx;
-	padding: 0 6rpx;
-	border-radius: 14rpx;
+	top: -2rpx;
+	right: -2rpx;
+	min-width: 24rpx;
+	height: 24rpx;
+	padding: 0 5rpx;
+	border-radius: 12rpx;
 	background: rgba(245, 195, 59, 0.94);
 	color: #10151f;
-	font-size: 17rpx;
+	font-size: 15rpx;
 	font-weight: 600;
-	line-height: 28rpx;
+	line-height: 24rpx;
 	text-align: center;
 	box-sizing: border-box;
 	border: 1rpx solid rgba(255, 255, 255, 0.28);
