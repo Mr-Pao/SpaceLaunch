@@ -115,12 +115,6 @@
 						/>
 					</view>
 				</block>
-
-				<view class="footer-hint">
-					<text v-if="reviewMode">数据每日自动同步</text>
-					<text v-else-if="records.length">发射记录来自小程序缓存的最近 100 次</text>
-					<text v-else>暂无该型号的发射记录</text>
-				</view>
 			</view>
 		</block>
 	</view>
@@ -549,12 +543,5 @@ function cost(usd) {
 	margin: 36rpx 8rpx 16rpx;
 	color: #8a97a8;
 	font-size: 28rpx;
-}
-
-.footer-hint {
-	margin-top: 30rpx;
-	text-align: center;
-	color: #3d4a5c;
-	font-size: 22rpx;
 }
 </style>
