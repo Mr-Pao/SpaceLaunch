@@ -6,7 +6,25 @@
  */
 export const CHANGELOG = [
 	{
-		version: '3.0',
+		version: '1.0.0',
+		date: '2023-07-22',
+		title: '初版上线',
+		items: [
+			'发射排期、历史发射、近期活动、机构信息等页面',
+			'数据由 EMAS 云函数实时获取'
+		]
+	},
+	{
+		version: '2.0.0',
+		date: '2026-10-22',
+		title: '架构重做',
+		items: [
+			'数据改为每日自动同步的静态快照，加载更快、更稳定',
+			'升级开发框架并移除旧组件库，启动更轻快'
+		]
+	},
+	{
+		version: '3.0.0',
 		date: '2026-10-23',
 		title: '整体重构与内容补全',
 		items: [
@@ -18,7 +36,7 @@ export const CHANGELOG = [
 		]
 	},
 	{
-		version: '3.1',
+		version: '3.1.0',
 		date: '2026-10-23',
 		title: '收藏、统计与新页面',
 		items: [
