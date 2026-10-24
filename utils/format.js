@@ -217,6 +217,120 @@ export function zhValue(value) {
 	return s
 }
 
+/**
+ * 发射所在国家/地区的中文名。
+ *
+ * 快照里的国家信息只有一个来源：`pad.location.name`，形如
+ * "Vandenberg SFB, CA, USA" / "Jiuquan, People's Republic of China"，
+ * 取最后一个逗号后面的那一段。没有独立的 country 字段（LL2 有，但瘦身后没留）。
+ *
+ * 这一段的取值并不总是国家名：
+ *   - "Andøya Spaceport" / "Esrange Space Center" 是发射场名（挪威 / 瑞典）；
+ *   - "Sea Launch" 是海上平台，没有国家；
+ *   - "Moon" 是目的地，出现在月球任务上。
+ * 所以既要有映射表，也要有无命中时的原文兜底 —— 宁可显示英文，也不要瞎归因。
+ */
+const COUNTRY_ZH = {
+	USA: '美国',
+	'United States': '美国',
+	'United States of America': '美国',
+	"People's Republic of China": '中国',
+	China: '中国',
+	'Haiyang Oriental Spaceport': '中国',
+	'Russian Federation': '俄罗斯',
+	Russia: '俄罗斯',
+	USSR: '苏联',
+	'Republic of Kazakhstan': '哈萨克斯坦',
+	Kazakhstan: '哈萨克斯坦',
+	'New Zealand': '新西兰',
+	India: '印度',
+	Japan: '日本',
+	'South Korea': '韩国',
+	'Republic of Korea': '韩国',
+	'French Guiana': '法属圭亚那',
+	'Andøya Spaceport': '挪威',
+	Norway: '挪威',
+	'Esrange Space Center': '瑞典',
+	Sweden: '瑞典',
+	'Sea Launch': '海上发射',
+	Kenya: '肯尼亚',
+	Iran: '伊朗',
+	Israel: '以色列',
+	Brazil: '巴西',
+	Alcantara: '巴西',
+	Australia: '澳大利亚',
+	'Marshall Islands': '马绍尔群岛',
+	Kwajalein: '马绍尔群岛',
+	'Wallops Island': '美国',
+	Mexico: '墨西哥',
+	Argentina: '阿根廷',
+	Spain: '西班牙',
+	Italy: '意大利',
+	Germany: '德国',
+	'United Kingdom': '英国',
+	Moon: '月球'
+}
+
+/** 一条发射的发射国家/地区（中文，用于显示和筛选，同义值会合并） */
+export function countryOf(item) {
+	const loc = item && item.pad && item.pad.location && item.pad.location.name
+	if (!loc) return ''
+	const segs = String(loc).split(',')
+	const last = segs[segs.length - 1].trim()
+	if (!last) return ''
+	if (COUNTRY_ZH[last]) return COUNTRY_ZH[last]
+	// 没命中就保留原文，太长截断（"XX Space Center" 之类会撑爆一个 chip）
+	return last.length > 12 ? last.slice(0, 11) + '…' : last
+}
+
+/**
+ * 常见发射机构的中文短名。
+ *
+ * LL2 给的是官方长名，比如 "China Aerospace Science and Technology Corporation"，
+ * 在筛选抽屉的横向 chip 里一行都放不下一个，一排英文长句看着就是一团乱。
+ * 这里只收常见的大机构，其余保留原文 —— 译错机构名比不译更糟。
+ * 只影响显示，筛选用的值始终是原始英文名。
+ */
+const AGENCY_ZH = {
+	'China Aerospace Science and Technology Corporation': '中国航天科技',
+	'China Aerospace Science and Industry Corporation': '中国航天科工',
+	'China Rocket Co. Ltd.': '中国火箭',
+	ExPace: '航天科工火箭',
+	Landspace: '蓝箭航天',
+	'Galactic Energy': '星河动力',
+	'Space Pioneer': '天兵科技',
+	'i-Space': '星际荣耀',
+	'Deep Blue Aerospace': '深蓝航天',
+	Orienspace: '东方空间',
+	'United Launch Alliance': 'ULA',
+	'Rocket Lab': '火箭实验室',
+	'Indian Space Research Organization': '印度空间研究组织',
+	'Russian Federal Space Agency (ROSCOSMOS)': '俄罗斯航天局',
+	'European Space Agency': '欧空局',
+	'Japan Aerospace Exploration Agency': 'JAXA',
+	'National Aeronautics and Space Administration': 'NASA',
+	'Agency for Defense Development': '韩国国防科学研究所',
+	'Korea Aerospace Research Institute': '韩国航空宇宙研究院',
+	'Mitsubishi Heavy Industries': '三菱重工',
+	'Firefly Aerospace': '萤火虫航天',
+	'Relativity Space': '相对论空间',
+	'Blue Origin': '蓝色起源',
+	'Rocket Factory Augsburg': 'RFA',
+	'Isar Aerospace': 'Isar',
+	ArianeGroup: '阿丽亚娜集团',
+	'Space One': '太空一号',
+	'Interstellar Technologies': '星际科技',
+	'Virgin Galactic': '维珍银河',
+	'Sea Launch': '海上发射'
+}
+
+/** 机构显示名：命中中文表用中文，否则原文（超长截断，一个 chip 别占满屏） */
+export function agencyLabel(name) {
+	if (!name) return ''
+	if (AGENCY_ZH[name]) return AGENCY_ZH[name]
+	return name.length > 16 ? name.slice(0, 15) + '…' : name
+}
+
 const FINAL_STATUS = ['Success', 'Failure', 'Deployed', 'Partial']
 
 /**

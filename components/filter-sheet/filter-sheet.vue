@@ -333,8 +333,10 @@ export default {
 }
 
 /* ---- 分组 ---- */
+/* 必须是 flex: 0 0 auto：面板高度由内容决定，让 body 参与伸缩（flex:1 或 1 1 auto）
+   都会把它压到剩余空间里，最后一行 chips 被 overflow 裁掉露不出来 */
 .fs-body {
-	flex: 1;
+	flex: 0 0 auto;
 	min-height: 0;
 	padding: 6rpx 0 0;
 }

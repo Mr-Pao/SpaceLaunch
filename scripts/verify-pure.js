@@ -129,6 +129,27 @@ async function testFormat() {
 	eq(f.rocketName({ name: 'Falcon 9 Block 5' }), 'Falcon 9 Block 5', '非中国型号保留英文原文')
 	eq(f.rocketName({ full_name: 'Long March 5', name: 'Long March' }), '长征五号', 'full_name 优先于 name')
 
+	// countryOf：国家只能从 pad.location.name 的末段推，末段不一定是国家名
+	const loc = (name) => ({ pad: { location: { name } } })
+	eq(f.countryOf(loc('Vandenberg SFB, CA, USA')), '美国', '国家：USA → 美国')
+	eq(f.countryOf(loc('United States')), '美国', '国家：单段 United States 也命中')
+	eq(f.countryOf(loc("Jiuquan, People's Republic of China")), '中国', '国家：PRC → 中国')
+	eq(f.countryOf(loc('Haiyang Oriental Spaceport')), '中国', '国家：海上发射场归中国')
+	eq(f.countryOf(loc('Mahia Peninsula, New Zealand')), '新西兰', '国家：新西兰')
+	eq(f.countryOf(loc('Baikonur Cosmodrome, Republic of Kazakhstan')), '哈萨克斯坦', '国家：拜科努尔')
+	eq(f.countryOf(loc('Plesetsk Cosmodrome, Russian Federation')), '俄罗斯', '国家：俄罗斯')
+	eq(f.countryOf(loc('Kourou, French Guiana')), '法属圭亚那', '国家：法属圭亚那')
+	eq(f.countryOf(loc('Andøya Spaceport')), '挪威', '国家：末段是发射场名也要能认')
+	eq(f.countryOf(loc('Esrange Space Center')), '瑞典', '国家：Esrange → 瑞典')
+	eq(f.countryOf(loc('Sea Launch')), '海上发射', '国家：海上平台不是国家')
+	eq(f.countryOf({ pad: { location: null } }), '', '国家：location 为 null 返回空串')
+	eq(f.countryOf(null), '', '国家：入参为空安全返回')
+	eq(
+		f.countryOf(loc('Somewhere, Velayat-e Semnan Space Center Province')),
+		'Velayat-e S…',
+		'国家：未命中映射时保留原文并截断'
+	)
+
 	fs.unlinkSync(tmp)
 }
 

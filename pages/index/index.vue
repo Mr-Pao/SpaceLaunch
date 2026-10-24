@@ -168,77 +168,27 @@
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar, setTabBarHidden } from '@/utils/tabbar.js'
-import { isStillUpcoming, rocketName } from '@/utils/format.js'
+import { isStillUpcoming, rocketName, countryOf, agencyLabel } from '@/utils/format.js'
 import { launchMatch } from '@/utils/search-match.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 import spaceData from '@/utils/data.js'
 
 const STEP = 12
-// 筛选维度：键要跟 filters 对象、filterGroups 的 key 一致
-const FILTER_KEYS = ['year', 'agency', 'rocket', 'orbit']
+// 筛选维度：键要跟 filters 对象、filterGroups 的 key 一致。
+// 只留三维 —— 年份和轨道用过一次就没人再点，白占位置还挤掉真正有用的维度
+const FILTER_KEYS = ['country', 'agency', 'rocket']
 // 每个维度最多给多少个候选值（横向滑动，给太多会用不着）
-const OPT_LIMIT = { year: 20, agency: 20, rocket: 20, orbit: 12 }
+const OPT_LIMIT = { country: 20, agency: 24, rocket: 24 }
 
 /**
- * 常见发射机构的中文短名。
- *
- * 机构全名里 LL2 给的是官方长名，比如
- * "China Aerospace Science and Technology Corporation"——横滑一行都放不下一个，
- * 一排英文长句看着就是一团乱。这里只收常见的大机构，其余保留原名。
- * 只影响显示（label），筛选用的值始终是原始名。
+ * 一条发射在某个维度上的取值；空串表示这条在该维度上没有信息。
+ * country 直接取中文名做值：USA / United States 这类同义写法会自然合并成一个选项。
  */
-const AGENCY_ZH = {
-	'China Aerospace Science and Technology Corporation': '中国航天科技',
-	'China Aerospace Science and Industry Corporation': '中国航天科工',
-	'China Rocket Co. Ltd.': '中国火箭',
-	'ExPace': '航天科工火箭',
-	'Landspace': '蓝箭航天',
-	'Galactic Energy': '星河动力',
-	'Space Pioneer': '天兵科技',
-	'i-Space': '星际荣耀',
-	'Deep Blue Aerospace': '深蓝航天',
-	'Orienspace': '东方空间',
-	'United Launch Alliance': 'ULA',
-	'Rocket Lab': '火箭实验室',
-	'Indian Space Research Organization': '印度空间研究组织',
-	'Russian Federal Space Agency (ROSCOSMOS)': '俄罗斯航天局',
-	'European Space Agency': '欧空局',
-	'Japan Aerospace Exploration Agency': 'JAXA',
-	'National Aeronautics and Space Administration': 'NASA',
-	'Agency for Defense Development': '韩国国防科学研究所',
-	'Korea Aerospace Research Institute': '韩国航空宇宙研究院',
-	'Mitsubishi Heavy Industries': '三菱重工',
-	'Firefly Aerospace': '萤火虫航天',
-	'Relativity Space': '相对论空间',
-	'Blue Origin': '蓝色起源',
-	'Rocket Factory Augsburg': 'RFA',
-	'Isar Aerospace': 'Isar',
-	'ArianeGroup': '阿丽亚娜集团',
-	'Space One': '太空一号',
-	'Interstellar Technologies': '星际科技',
-	'Virgin Galactic': '维珍银河'
-}
-
-/** 机构显示名：命中中文表用中文，否则原文（长名截断，避免一个 chip 占满屏） */
-function agencyLabel(name) {
-	if (!name) return ''
-	if (AGENCY_ZH[name]) return AGENCY_ZH[name]
-	return name.length > 16 ? name.slice(0, 15) + '…' : name
-}
-
-/** 轨道取 abbrev，缺了退回全名 */
-function orbitOf(x) {
-	const o = x.mission && x.mission.orbit
-	return (o && (o.abbrev || o.name)) || ''
-}
-
-/** 一条发射在某个维度上的取值；空串表示这条在该维度上没有信息 */
 function dimValue(x, key) {
-	if (key === 'year') return (x.net || '').slice(0, 4)
+	if (key === 'country') return countryOf(x)
 	if (key === 'agency') return (x.launch_service_provider && x.launch_service_provider.name) || ''
 	if (key === 'rocket') return (x.rocket && x.rocket.configuration && x.rocket.configuration.name) || ''
-	if (key === 'orbit') return orbitOf(x)
 	return ''
 }
 
@@ -282,7 +232,7 @@ export default {
 			// 搜索词：与 filters 一起作用于列表，实时生效
 			keyword: '',
 			// 各维度选中值；'' = 不筛选。两个 feed 共用一套，切 feed 时清空
-			filters: { year: '', agency: '', rocket: '', orbit: '' }
+			filters: { country: '', agency: '', rocket: '' }
 		}
 	},
 
@@ -404,14 +354,13 @@ export default {
 				}
 			}
 
-			const labels = { year: '年份', agency: '发射机构', rocket: '运载火箭', orbit: '目标轨道' }
+			const labels = { country: '国家/地区', agency: '发射机构', rocket: '运载火箭' }
 			const groups = []
 
 			for (const k of FILTER_KEYS) {
 				const entries = [...buckets[k].entries()]
-				// 年份按时间倒序（近的在前），其余按出现次数
-				if (k === 'year') entries.sort((a, b) => b[0].localeCompare(a[0]))
-				else entries.sort((a, b) => b[1] - a[1])
+				// 一律按出现次数排：常用的在前面，横滑时不用找
+				entries.sort((a, b) => b[1] - a[1])
 
 				const options = entries.slice(0, OPT_LIMIT[k] || 20).map(([value, n]) => ({
 					value,
