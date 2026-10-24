@@ -185,13 +185,13 @@ const DATASETS = {
 	 * 技术参数（长度/直径/起飞质量/运力）**只在 mode=detailed 下返回**。
 	 *
 	 * 532 个型号、limit=100 → 6 页，型号参数几乎不变，每天跑一次足够。
-	 * 图片只镜像现役型号（161 张）：532 张全镜像会把 CI 顶到超时，
-	 * 退役型号的图在 slim 阶段就被置空了。
+	 * 图片全量镜像（约 400 张有图）：详情页的「不同构型」把同系列各型号并排列出，
+	 * 只给现役留图的话，Falcon 9 v1.0 / Block 4 这些恰恰全成了占位图。
+	 * 镜像按 COS 上是否已存在跳过，只有首次要下满，之后每天只做 headObject。
 	 */
 	launchers: {
 		file: 'launchers.json',
 		cacheControl: 'public, max-age=86400',
-		// 只镜像现役型号的图（161 张），退役的在 slim 阶段就把 image 置空了
 		images: ['image'],
 		async fetch() {
 			const all = []

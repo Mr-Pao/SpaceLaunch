@@ -327,9 +327,11 @@ function slimLauncher(c) {
 		// 中文由 backfill 任务慢慢补，前端回退英文
 		descriptionZh: '',
 
-		// 只给现役型号保留图片：532 张全镜像会把 CI 顶到超时，
-		// 退役型号的图访客也很少看，留空用占位图即可
-		image: c.active ? imageUrl(c.image) : '',
+		// 每个构型都要在详情页露脸，退役型号也不例外（Falcon 9 v1.0 / Block 4
+		// 这些正是「不同构型」列表的主角，全空着就成了一排占位图）。
+		// 镜像按 COS 已存在跳过，所以只有首次会真的下载 400 多张，
+		// 之后每天那一轮只做 headObject，几秒钟就过。
+		image: imageUrl(c.image),
 		info_url: str(c.info_url),
 		wiki_url: str(c.wiki_url)
 	}

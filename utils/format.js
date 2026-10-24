@@ -171,6 +171,78 @@ export function rocketName(config) {
 }
 
 /**
+ * 型号所属「系列」的聚合键。
+ *
+ * LL2 的 families 是层级路径，由粗到细：
+ *   Falcon 9 Block 5 → ["Falcon", "Falcon 9"]
+ *   Long March 2C    → ["Long March", "Long March 2"]
+ *   Titan 34D IUS    → ["Titan", "Titan 34D", "Titan III"]
+ *
+ * 取第二层刚好是「型号系列」这一级：Falcon 9 / Long March 2 / Titan 34D，
+ * 同系列的各构型（v1.0、v1.1、Block 5…）就能聚合到一起。
+ * 只有一层的（Falcon 1 → ["Falcon"]）退回第一层；
+ * 连系列都没有的（74 个早期探空火箭）用 name 自成一组。
+ */
+export function seriesKey(config) {
+	if (!config) return ''
+	const fams = (config.families || []).filter(Boolean)
+	if (fams.length >= 2) return fams[1]
+	return fams[0] || config.name || ''
+}
+
+/**
+ * 系列名的中文显示。
+ *
+ * 和 rocketName 一样只收确定的译名：译错比不译更糟。
+ * 长征走规则推导（"Long March 2" → 长征二号），其余查表，未命中保留英文。
+ */
+const SERIES_ZH = {
+	Falcon: '猎鹰',
+	'Falcon 1': '猎鹰1号',
+	'Falcon 9': '猎鹰9号',
+	'Falcon Heavy': '猎鹰重型',
+	Starship: '星舰',
+	Electron: '电子号',
+	Neutron: '中子号',
+	'Soyuz 2': '联盟二号',
+	'Soyuz': '联盟号',
+	'Proton / UR-500': '质子号',
+	'Ariane 1': '阿丽亚娜1号',
+	'Ariane 2': '阿丽亚娜2号',
+	'Ariane 3': '阿丽亚娜3号',
+	'Ariane 4': '阿丽亚娜4号',
+	'Ariane 5': '阿丽亚娜5号',
+	'Ariane 6': '阿丽亚娜6号',
+	Vulcan: '火神',
+	'New Glenn': '新格伦',
+	'Atlas V': '宇宙神五号',
+	'Delta II': '德尔塔二号',
+	'Delta IV': '德尔塔四号',
+	Zhuque: '朱雀',
+	'Zhuque-2': '朱雀二号',
+	'Zhuque-3': '朱雀三号',
+	'Ceres-1': '谷神星一号',
+	'Kuaizhou 1': '快舟一号',
+	'Kuaizhou 11': '快舟十一号'
+}
+
+/** 长征系列：Long March 2 → 长征二号；没有编号的 Long March → 长征 */
+function zhLongMarchSeries(raw) {
+	const m = /^Long March(?:\s+(\d+))?$/i.exec(String(raw).trim())
+	if (!m) return ''
+	if (!m[1]) return '长征'
+	const num = CN_NUM[m[1]]
+	return num ? '长征' + num + '号' : ''
+}
+
+/** 系列名的中文显示，未收录的保留英文原文 */
+export function seriesName(raw) {
+	if (!raw) return ''
+	const s = String(raw).trim()
+	return SERIES_ZH[s] || zhLongMarchSeries(s) || s
+}
+
+/**
  * 机翻术语修正
  *
  * 任务名走的是通用翻译接口，几个高频词固定译错：

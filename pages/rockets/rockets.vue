@@ -98,12 +98,13 @@
 				hover-class="card-hover"
 				@click="goRocket(r)"
 			>
-				<!-- 型号缩略图：现役型号 CI 已镜像到 COS；退役/无图给占位 -->
+				<!-- 型号缩略图：现役与退役都镜像到了 COS，没有图的给占位 -->
 				<image
 					class="thumb"
 					v-if="r.image"
 					:src="r.image"
 					mode="aspectFill"
+					lazy-load
 				/>
 				<view class="thumb thumb-ph" v-else>
 					<text class="thumb-ph-icon">🚀</text>

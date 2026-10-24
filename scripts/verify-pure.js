@@ -150,6 +150,26 @@ async function testFormat() {
 		'国家：未命中映射时保留原文并截断'
 	)
 
+	// seriesKey：families 是「由粗到细」的层级，取第二层才是型号系列这一级。
+	// 取错了会把 Falcon 1 和 Falcon 9 并成一组，详情页的「不同构型」就乱套。
+	eq(f.seriesKey({ families: ['Falcon', 'Falcon 9'] }), 'Falcon 9', '系列：两层取第二层')
+	eq(f.seriesKey({ families: ['Long March', 'Long March 2'] }), 'Long March 2', '系列：长征二号')
+	eq(f.seriesKey({ families: ['Titan', 'Titan 34D', 'Titan III'] }), 'Titan 34D', '系列：三层也只取第二层')
+	eq(f.seriesKey({ families: ['Falcon'] }), 'Falcon', '系列：只有一层就用它自己')
+	eq(f.seriesKey({ families: [], name: 'Black Arrow' }), 'Black Arrow', '系列：没有 families 用 name 兜底')
+	eq(f.seriesKey({ name: 'Ares I-X' }), 'Ares I-X', '系列：families 缺失也不炸')
+	eq(f.seriesKey(null), '', '系列：入参为空安全返回')
+
+	// seriesName：只收确定的中文名，未收录保留英文（译错比不译更糟）
+	eq(f.seriesName('Falcon 9'), '猎鹰9号', '系列名：Falcon 9')
+	eq(f.seriesName('Long March 2'), '长征二号', '系列名：Long March 2 走规则')
+	eq(f.seriesName('Long March 12'), '长征十二号', '系列名：两位数字')
+	eq(f.seriesName('Long March'), '长征', '系列名：无编号不产生「长征号」')
+	eq(f.seriesName('Long March 2C'), 'Long March 2C', '系列名：带字母的是型号不是系列，保留原文')
+	eq(f.seriesName('Vulcan'), '火神', '系列名：Vulcan')
+	eq(f.seriesName('PSLV'), 'PSLV', '系列名：未收录保留英文')
+	eq(f.seriesName(''), '', '系列名：空值安全返回')
+
 	fs.unlinkSync(tmp)
 }
 
