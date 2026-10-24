@@ -55,8 +55,8 @@ Component({
 		// 审核模式：为 true 时 wxml 里整条 tabBar 不渲染（wx:if="{{!review}}"），
 		// 审核员看到的就是一个无 tab 的单页工具；索引不受影响
 		review: false,
-		// 默认选中「即将发射」（索引 2），与小程序启动页一致
-		selected: 2,
+		// 默认选中「发射」（索引 1），与小程序启动页一致
+		selected: 1,
 		list: [
 			{
 				pagePath: 'pages/rockets/rockets',
@@ -65,14 +65,9 @@ Component({
 				iconActive: '/static/image/tabbar/rocket2.png'
 			},
 			{
-				pagePath: 'pages/previous/previous',
-				text: '已发射',
-				icon: '/static/image/tabbar/fashe1.png',
-				iconActive: '/static/image/tabbar/fashe2.png'
-			},
-			{
+				// 「待发射 / 已发射」合并成一页，入口沿用原来的火箭图标
 				pagePath: 'pages/index/index',
-				text: '即将发射',
+				text: '发射',
 				icon: '/static/image/tabbar/huojian1.png',
 				iconActive: '/static/image/tabbar/huojian2.png'
 			},

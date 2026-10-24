@@ -101,7 +101,7 @@ export default {
 	},
 
 	onShow() {
-		syncTabBar(3)
+		syncTabBar(2)
 	},
 
 	onPullDownRefresh() {
