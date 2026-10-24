@@ -1,5 +1,6 @@
 <script>
 import { getConfig } from '@/utils/config.js'
+import spaceData from '@/utils/data.js'
 
 export default {
 	data() {
@@ -16,6 +17,8 @@ export default {
 		// 预热远程展示开关：首页 / tabBar / 详情页各自会取，
 		// 这里先发一次请求，各处就能共享这份内存缓存（失败静默，走兜底）
 		getConfig().catch(() => {})
+		// 预热各 tab 的数据集（错开时间片，不挤占启动）
+		this.warmData()
 	},
 
 	onShow() {
@@ -27,6 +30,30 @@ export default {
 	},
 
 	methods: {
+		/**
+		 * 预热各 tab 页的数据。
+		 *
+		 * 每个tab 页是独立 webview，首次切入的卡顿主要来自：
+		 * 同一瞬间要「读 Storage 大 JSON + JSON.parse + 首屏渲染」三件事一起干。
+		 * 启动后错开几百毫秒把数据读到内存缓存，等用户真的切过去时
+		 * 数据层直接命中内存，首切只剩渲染一件事。
+		 * 顺序按「用户最可能先逛的页面」排，load 全程 catch 静默。
+		 */
+		warmData() {
+			const warm = [
+				['launchers', 600],
+				['previous', 1400],
+				['events', 2200],
+				['agencies', 3000],
+				['stats', 3800]
+			]
+			for (const pair of warm) {
+				setTimeout(() => {
+					spaceData.load(pair[0]).catch(() => {})
+				}, pair[1])
+			}
+		},
+
 		/**
 		 * 小程序版本更新。
 		 *
@@ -96,8 +123,8 @@ export default {
 
 	.nav-title {
 		color: #ffffff;
-		font-size: 34rpx;
+		font-size: 38rpx;
 		font-weight: 600;
-		letter-spacing: 1rpx;
+		letter-spacing: 2rpx;
 	}
 </style>
