@@ -21,17 +21,26 @@
 				<text class="year-label">年度航天回顾</text>
 			</view>
 
-			<!-- 年度切换。可选年份直接来自 CI 预聚合好的结果 -->
+			<!-- 年度切换。可选年份直接来自 CI 预聚合好的结果。
+			     归档补齐后覆盖 1957 年起 70 个年份，默认只展开最近 12 个，
+			     更早的收进「更多年份」，免得整屏灰胶囊 -->
 			<view class="year-picker" v-if="availableYears.length > 1">
 				<view
 					class="year-chip"
-					v-for="y in availableYears"
+					v-for="y in shownYears"
 					:key="y"
 					:class="{ on: year === y }"
 					@click="year = y"
 				>
 					{{ y }}
 				</view>
+			</view>
+			<view
+				class="year-more"
+				v-if="availableYears.length > 12"
+				@click="yearExpanded = !yearExpanded"
+			>
+				{{ yearExpanded ? '收起年份 ▴' : '更多年份 ▾' }}
 			</view>
 
 			<!-- 主数字 -->
@@ -201,6 +210,8 @@ export default {
 			// CI 已经按年聚合好，前端只负责挑一年出来渲染
 			years: [],
 			year: new Date().getFullYear(),
+			// 年份选择器折叠态：默认只显示最近 12 个年份
+			yearExpanded: false,
 			sourceCount: 0,
 			freshText: '',
 			// 审核模式：整页只显示空态
@@ -211,6 +222,15 @@ export default {
 	computed: {
 		availableYears() {
 			return this.years.map((y) => y.year)
+		},
+
+		/** 折叠时只露最近 12 个；选中的年份被收起来就追加在尾部，保证高亮可见 */
+		shownYears() {
+			const all = this.availableYears
+			if (this.yearExpanded || all.length <= 12) return all
+			const head = all.slice(0, 12)
+			if (head.indexOf(this.year) === -1) head.push(this.year)
+			return head
 		},
 
 		current() {
@@ -420,6 +440,15 @@ function countryOf(agency) {
 	border-color: rgba(56, 189, 248, 0.45);
 	color: #38bdf8;
 	font-weight: 600;
+}
+
+/* 年份折叠开关 */
+.year-more {
+	margin: 0 32rpx 18rpx;
+	text-align: center;
+	color: #5d6a7d;
+	font-size: 24rpx;
+	padding: 6rpx 0;
 }
 
 .hero-card {
