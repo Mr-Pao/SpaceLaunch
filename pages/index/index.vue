@@ -416,7 +416,6 @@ export default {
 .mode-search-icon {
 	font-size: 28rpx;
 }
-}
 
 .mode-opt {
 	padding: 10rpx 34rpx;
