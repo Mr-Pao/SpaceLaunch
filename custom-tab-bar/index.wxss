@@ -9,13 +9,12 @@
 	display: flex;
 	align-items: center;
 	height: 112rpx;
-	/* 提亮底色并与页面背景(#0a0e17)/卡片(#141a26)拉开层次：渐变 + 亮描边 + 顶部高光 */
-	background: linear-gradient(180deg, #232e44 0%, #182234 100%);
-	border: 1rpx solid rgba(140, 180, 240, 0.22);
+	/* 半透明毛玻璃：与星空背景区分开但不挡背景，去掉边框更轻盈 */
+	background: rgba(30, 40, 60, 0.62);
+	backdrop-filter: blur(20rpx);
+	-webkit-backdrop-filter: blur(20rpx);
 	border-radius: 56rpx;
-	box-shadow:
-		0 12rpx 40rpx rgba(0, 0, 0, 0.6),
-		inset 0 1rpx 0 rgba(255, 255, 255, 0.08);
+	box-shadow: 0 12rpx 40rpx rgba(0, 0, 0, 0.5);
 }
 
 .ctb-tab {
