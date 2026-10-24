@@ -3,27 +3,16 @@
 		<!-- 全屏星空：组件化后 5 个 tab 页共用同一套星点层 -->
 		<star-field />
 
-		<!-- 沉浸式头部：statusBarH 只负责让出状态栏，内容从状态栏下方开始；
-		     紧凑横排（logo + 标题一行 + 右上搜索），不再占半屏 -->
-		<view class="header" :style="{ paddingTop: statusBarH + 'px' }">
-			<view class="header-row">
-				<image
-					class="logo"
-					src="/static/logo.png"
-					mode="aspectFill"
-					@click="goVersion"
-				></image>
-				<view class="header-text">
-					<text class="title">太空发射任务</text>
-					<!-- 副标题写成功能描述而不是宣传语：
-					     审核按「内容型小程序」判定类目，文案越像口号越容易被归到资讯 -->
-					<text class="subtitle">实时排期 · 发射倒计时</text>
-				</view>
-				<!-- 全局搜索入口：右上角一枚图标，点了进搜索页 -->
-				<view class="search-entry" @click="goSearch">
-					<text class="search-entry-icon">🔍</text>
-				</view>
-			</view>
+		<!-- 导航行：标题靠左，与右上角微信胶囊同排（右侧留白，避免重叠） -->
+		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
+			<!-- 点 logo 看版本记录 -->
+			<image
+				class="nav-logo"
+				src="/static/logo.png"
+				mode="aspectFill"
+				@click="goVersion"
+			></image>
+			<text class="nav-title">太空发射任务</text>
 		</view>
 
 		<!-- 审核模式下整页换成静态展示卡：无列表、无动态数据、无 tab 入口，
@@ -54,10 +43,15 @@
 			</view>
 
 			<view class="content" v-else>
-			<!-- 视图切换：排期列表 / 日历 -->
+			<!-- 操作行：视图切换 + 全局搜索，统一靠右（胶囊下方，不与其重叠） -->
 			<view class="mode-bar">
-				<view class="mode-opt" :class="{ on: viewMode === 'list' }" @click="viewMode = 'list'">排期</view>
-				<view class="mode-opt" :class="{ on: viewMode === 'calendar' }" @click="viewMode = 'calendar'">日历</view>
+				<view class="mode-seg">
+					<view class="mode-opt" :class="{ on: viewMode === 'list' }" @click="viewMode = 'list'">排期</view>
+					<view class="mode-opt" :class="{ on: viewMode === 'calendar' }" @click="viewMode = 'calendar'">日历</view>
+				</view>
+				<view class="mode-search" hover-class="mode-search-hover" @click="goSearch">
+					<text class="mode-search-icon">🔍</text>
+				</view>
 			</view>
 
 			<template v-if="viewMode === 'calendar'">
@@ -292,64 +286,21 @@ export default {
 	overflow: hidden;
 }
 
-.header {
+/* 导航行：与胶囊同排，标题靠左（主体样式来自 App.vue 全局 .nav-row）；
+   首页 .page 没有横向内边距，这里自己补 */
+.nav-row {
 	position: relative;
 	z-index: 1;
-	/* 左右留白与列表对齐；paddingTop 由 statusBarH 动态给 */
-	padding: 10rpx 24rpx 20rpx;
+	padding: 0 24rpx;
 }
 
-.header-row {
-	display: flex;
-	align-items: center;
-}
-
-.logo {
-	width: 76rpx;
-	height: 76rpx;
+.nav-logo {
+	width: 60rpx;
+	height: 60rpx;
 	border-radius: 50%;
-	box-shadow: 0 0 30rpx rgba(56, 189, 248, 0.3);
+	box-shadow: 0 0 24rpx rgba(56, 189, 248, 0.3);
 	flex-shrink: 0;
-}
-
-.header-text {
-	flex: 1;
-	min-width: 0;
-	margin-left: 20rpx;
-}
-
-.title {
-	display: block;
-	color: #ffffff;
-	font-size: 36rpx;
-	font-weight: 600;
-	letter-spacing: 2rpx;
-	text-shadow: 0 0 24rpx rgba(56, 189, 248, 0.35);
-}
-
-.subtitle {
-	display: block;
-	margin-top: 4rpx;
-	color: #6b7891;
-	font-size: 22rpx;
-	letter-spacing: 3rpx;
-}
-
-/* 右上角搜索入口 */
-.search-entry {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 68rpx;
-	height: 68rpx;
-	border-radius: 50%;
-	background: rgba(255, 255, 255, 0.06);
-	border: 1rpx solid rgba(255, 255, 255, 0.08);
-	flex-shrink: 0;
-}
-
-.search-entry-icon {
-	font-size: 30rpx;
+	margin-right: 16rpx;
 }
 
 /* 加载：火箭小动画 + 骨架卡（sk-list 里是 skeleton-card 组件） */
@@ -430,12 +381,41 @@ export default {
 
 /* 视图切换（排期 / 日历） */
 .mode-bar {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	margin-bottom: 18rpx;
+}
+
+/* 排期/日历 分段器 */
+.mode-seg {
 	display: inline-flex;
 	padding: 4rpx;
-	margin-bottom: 18rpx;
 	background: #141a26;
 	border-radius: 32rpx;
 	border: 1rpx solid rgba(255, 255, 255, 0.05);
+}
+
+/* 全局搜索圆钮 */
+.mode-search {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 64rpx;
+	height: 64rpx;
+	margin-left: 16rpx;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	border-radius: 50%;
+}
+
+.mode-search-hover {
+	background: #1a2231;
+}
+
+.mode-search-icon {
+	font-size: 28rpx;
+}
 }
 
 .mode-opt {

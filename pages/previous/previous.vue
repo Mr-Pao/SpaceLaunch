@@ -1,8 +1,12 @@
 <template>
 	<view class="page">
 		<star-field />
+		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
+			<text class="nav-title">历史发射</text>
+		</view>
+
 		<block v-if="!reviewMode">
-		<view class="stat" v-if="total" :style="{ paddingTop: statusBarH + 10 + 'px' }">
+		<view class="stat" v-if="total" style="padding-top: 8rpx">
 			<text class="stat-main">已发射 {{ total }} 次</text>
 			<text class="stat-sub">{{ progressText }}</text>
 		</view>

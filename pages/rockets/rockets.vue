@@ -1,9 +1,11 @@
 <template>
 	<view class="page">
 		<star-field />
-		<view class="header" :style="{ paddingTop: statusBarH + 'px' }">
+		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
 			<!-- 连点 5 次呼出展示开关（静默切换）：入口隐藏，普通用户与审核不可见 -->
-			<text class="title" @click="onTitleTap">火箭大全</text>
+			<text class="nav-title" @click="onTitleTap">火箭大全</text>
+		</view>
+		<view class="header-sub">
 			<text class="subtitle">主流现役与历史型号，按发射次数排序</text>
 		</view>
 
@@ -96,6 +98,17 @@
 				hover-class="card-hover"
 				@click="goRocket(r)"
 			>
+				<!-- 型号缩略图：现役型号 CI 已镜像到 COS；退役/无图给占位 -->
+				<image
+					class="thumb"
+					v-if="r.image"
+					:src="r.image"
+					mode="aspectFill"
+				/>
+				<view class="thumb thumb-ph" v-else>
+					<text class="thumb-ph-icon">🚀</text>
+				</view>
+
 				<view class="info">
 					<view class="name-line">
 						<text class="name">{{ r.zhName || r.name }}</text>
@@ -410,24 +423,34 @@ function leoOf(kg) {
 	box-sizing: border-box;
 }
 
-.header {
-	/* paddingTop 由 statusBarH 动态给（沉浸式），这里只管内容间距 */
-	padding: 10rpx 8rpx 24rpx;
-}
 
-.title {
-	display: block;
-	color: #ffffff;
-	font-size: 44rpx;
-	font-weight: 600;
-	letter-spacing: 2rpx;
+.header-sub {
+	padding: 0 24rpx 12rpx;
 }
 
 .subtitle {
-	display: block;
-	margin-top: 10rpx;
 	color: #6b7891;
-	font-size: 24rpx;
+	font-size: 23rpx;
+}
+
+.thumb {
+	width: 96rpx;
+	height: 128rpx;
+	border-radius: 12rpx;
+	margin-right: 20rpx;
+	flex-shrink: 0;
+	background: #0f1520;
+}
+
+.thumb-ph {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.thumb-ph-icon {
+	font-size: 44rpx;
+	opacity: 0.45;
 }
 
 /* 顶部四格统计 */

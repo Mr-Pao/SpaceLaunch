@@ -84,4 +84,20 @@ export default {
 	page {
 		background-color: #0a0e17;
 	}
+
+	/* 统一导航行：标题靠左，与右上角微信胶囊同排，右侧永远留白给胶囊。
+	   paddingTop 由各页用 statusBarH 内联给出，这里固定 44px 与胶囊排等高 */
+	.nav-row {
+		display: flex;
+		align-items: center;
+		height: 44px;
+		box-sizing: content-box;
+	}
+
+	.nav-title {
+		color: #ffffff;
+		font-size: 34rpx;
+		font-weight: 600;
+		letter-spacing: 1rpx;
+	}
 </style>

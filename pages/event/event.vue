@@ -4,8 +4,12 @@
 		<!-- 审核模式下整页只留空态：活动是资讯感最重的一块，
 		     开关来自 COS 的 app-config.json（utils/config.js），
 		     失败兜底正常展示，不影响普通用户 -->
+		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
+			<text class="nav-title">近期活动</text>
+		</view>
+
 		<block v-if="!reviewMode">
-			<view class="stat" v-if="list.length" :style="{ paddingTop: statusBarH + 10 + 'px' }">
+			<view class="stat" v-if="list.length" style="padding-top: 8rpx">
 				<text class="stat-main">近期活动 {{ list.length }} 项</text>
 				<text class="stat-sub">{{ freshText }}</text>
 			</view>

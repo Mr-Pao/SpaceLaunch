@@ -1,6 +1,9 @@
 <template>
-	<view class="page" :style="{ paddingTop: statusBarH + 'px' }">
+	<view class="page">
 		<star-field />
+		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
+			<text class="nav-title">数据统计</text>
+		</view>
 		<block v-if="!reviewMode">
 		<view class="loading" v-if="loading">
 			<text class="hint-text">统计中...</text>

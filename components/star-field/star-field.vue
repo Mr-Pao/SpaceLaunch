@@ -1,6 +1,6 @@
 <template>
 	<!-- 全屏星空：fixed 铺满、不接事件、压在页面背景之上内容之下（z-index: -1）。
-	     星点全部由 box-shadow 画出（约 100 颗，onLoad 一次生成），
+	     星点全部由 box-shadow 画出（约 160 颗，onLoad 一次生成），
 	     整层只跑一条 twinkle 动画 —— 多页共用，合成开销恒为一条 -->
 	<view class="star-field" aria-hidden="true">
 		<view class="stars" :style="{ boxShadow: shadow }"></view>
@@ -28,7 +28,7 @@ export default {
 		try {
 			const info = uni.getSystemInfoSync()
 			const dots = []
-			for (let i = 0; i < 100; i++) {
+			for (let i = 0; i < 160; i++) {
 				const x = (Math.random() * info.windowWidth).toFixed(1)
 				const y = (Math.random() * info.windowHeight).toFixed(1)
 				const size = Math.random() > 0.85 ? 1 : 0
