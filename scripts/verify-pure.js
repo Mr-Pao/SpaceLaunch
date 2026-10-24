@@ -205,6 +205,19 @@ async function testFormat() {
 	eq(f.missionTypeName('Government/Top Secret'), '政府/保密', '任务类型：带斜杠的也能命中')
 	eq(f.missionTypeName('Weird Type'), 'Weird Type', '任务类型：未收录保留原文')
 
+	// 航天器的三个枚举：名称本身不翻，只翻类型/状态/目的地
+	eq(f.craftTypeName('Capsule'), '载人舱', '航天器类型：Capsule')
+	eq(f.craftTypeName('Space Station'), '空间站', '航天器类型：带空格的也能命中')
+	eq(f.craftTypeName('Hovercraft'), 'Hovercraft', '航天器类型：未收录保留原文')
+	eq(f.craftStatusName('Active'), '在役', '航天器状态：Active')
+	eq(f.craftStatusName('Destroyed'), '已损毁', '航天器状态：Destroyed（不能显示成在役）')
+	eq(f.craftStatusName('Weird'), 'Weird', '航天器状态：未收录保留原文')
+	eq(f.destName('International Space Station'), '国际空间站', '目的地：ISS')
+	eq(f.destName('Lunar Orbit'), '月球轨道', '目的地：月球轨道')
+	// ISS 不在轨道表里，月球既有目的地表也有轨道表，都得能命中
+	eq(f.destName('Sun-Synchronous Orbit'), '太阳同步轨道', '目的地：回退到轨道表')
+	eq(f.destName('Kepler-186f'), 'Kepler-186f', '目的地：未收录保留原文')
+
 	fs.unlinkSync(tmp)
 }
 
@@ -388,11 +401,69 @@ async function testTimeline() {
 	fs.unlinkSync(tmp)
 }
 
+// ---------- slimCraft（航天器裁剪）----------
+
+/**
+ * 样本取自真实响应（launches/{DM-1 id}/），字段名都是实测的，别凭印象改。
+ * 注意 spacecraft_stage 是**数组**，且列表端点完全没有这个键 ——
+ * 只有单条详情才有，所以由 timeline 流程顺路抓。
+ */
+async function testCraft() {
+	console.log('[timeline] 航天器裁剪')
+	const { slimCraft } = require('./timeline')
+
+	const stage = [
+		{
+			destination: 'International Space Station',
+			spacecraft: {
+				name: 'Crew Dragon C204',
+				serial_number: 'C204',
+				status: { id: 3, name: 'Destroyed' },
+				description: 'Crew Dragon C204 is the Crew Dragon spacecraft launched on the SpaceX DM-1 mission.',
+				image: { image_url: 'https://x/a.jpeg', thumbnail_url: 'https://x/a_thumb.jpeg', credit: 'NASA' },
+				flights_count: 1,
+				spacecraft_config: {
+					name: 'Crew Dragon 2',
+					type: { id: 2, name: 'Capsule' },
+					agency: { name: 'SpaceX' },
+					human_rated: true,
+					crew_capacity: 4,
+					payload_capacity: 6000,
+					height: 7.2,
+					diameter: 3.7,
+					flight_life: 'Able to fly for up to one week',
+					maiden_flight: '2019-03-02'
+				}
+			}
+		}
+	]
+
+	const c = slimCraft(stage)
+	eq(c !== null, true, '航天器：正常样本不返回 null')
+	eq(c.name, 'Crew Dragon C204', '航天器：名称原样保留（官方代号不翻）')
+	eq(c.serial, 'C204', '航天器：编号单独存')
+	eq(c.config, 'Crew Dragon 2', '航天器：构型名单独存')
+	eq(c.status, 'Destroyed', '航天器：状态存英文枚举，翻译在前端')
+	eq(c.image, 'https://x/a_thumb.jpeg', '航天器：优先缩略图')
+	eq([c.height, c.diameter, c.crew, c.payload], [7.2, 3.7, 4, 6000], '航天器：尺寸 / 载员 / 运力')
+	eq(c.human, true, '航天器：可载人标记')
+
+	// 长征这类不公开载荷的任务，spacecraft_stage 恒为 []，此时整卡不显示
+	eq(slimCraft([]), null, '航天器：空数组 → null')
+	eq(slimCraft(null), null, '航天器：null → null')
+	eq(slimCraft([{ spacecraft: null }]), null, '航天器：空壳 → null（不能出只有标题的空卡）')
+
+	// 超长描述会撑爆 timelines.json，必须截断
+	const long = slimCraft([{ spacecraft: { name: 'X', description: 'a'.repeat(2000) } }])
+	eq(long.desc.length, 221, '航天器：长描述截断到 220 字（含省略号 221）')
+}
+
 ;(async () => {
 	await testFormat()
 	await testSearchMatch()
 	await testMedia()
 	await testTimeline()
+	await testCraft()
 })()
 	.catch((e) => {
 		failed++

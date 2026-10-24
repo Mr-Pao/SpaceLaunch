@@ -366,6 +366,70 @@ export function missionTypeName(value) {
 }
 
 /**
+ * 航天器（飞船 / 载荷本体）的三个封闭枚举
+ *
+ * 只在单条详情里才有（rocket.spacecraft_stage），由 scripts/timeline.js 顺路抓。
+ * 名称本身（Crew Dragon C204 / 长征 XX）保留原文：航天器的官方代号没有约定俗成的
+ * 中译，硬翻反而认不出来。只翻「类型 / 状态 / 目的地」这种有限集合。
+ */
+const CRAFT_TYPE_ZH = {
+	capsule: '载人舱',
+	spaceplane: '航天飞机',
+	lander: '着陆器',
+	rover: '巡视器',
+	satellite: '卫星',
+	probe: '探测器',
+	'space station': '空间站',
+	'station module': '空间站舱段',
+	tug: '太空拖船',
+	'cargo spacecraft': '货运飞船',
+	'manned spacecraft': '载人飞船',
+	'unmanned spacecraft': '无人飞船'
+}
+
+const CRAFT_STATUS_ZH = {
+	active: '在役',
+	retired: '已退役',
+	destroyed: '已损毁',
+	lost: '已失联',
+	preserved: '封存展示',
+	'under construction': '建造中',
+	'in development': '研制中'
+}
+
+const DEST_ZH = {
+	'international space station': '国际空间站',
+	moon: '月球',
+	'lunar orbit': '月球轨道',
+	'lunar surface': '月面',
+	mars: '火星',
+	'mars orbit': '火星轨道',
+	'sun-earth l1': '日地 L1 点',
+	'sun-earth l2': '日地 L2 点',
+	'trans-lunar injection': '地月转移轨道',
+	'low earth orbit': '近地轨道'
+}
+
+export function craftTypeName(value) {
+	const s = zhValue(value)
+	if (!s) return ''
+	return CRAFT_TYPE_ZH[s.toLowerCase()] || s
+}
+
+export function craftStatusName(value) {
+	const s = zhValue(value)
+	if (!s) return ''
+	return CRAFT_STATUS_ZH[s.toLowerCase()] || s
+}
+
+/** 目的地：先查航天器专用表（ISS / 月球这类不是轨道），再回退轨道表 */
+export function destName(value) {
+	const s = zhValue(value)
+	if (!s) return ''
+	return DEST_ZH[s.toLowerCase()] || ORBIT_ZH[s.toLowerCase()] || s
+}
+
+/**
  * 发射所在国家/地区的中文名。
  *
  * 快照里的国家信息只有一个来源：`pad.location.name`，形如

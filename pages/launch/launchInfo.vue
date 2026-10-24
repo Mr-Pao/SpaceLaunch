@@ -233,6 +233,49 @@
 					</view>
 				</view>
 
+			<!-- 航天器：这次运的飞船/载荷本体。数据只在单条详情里有，
+			     由 scripts/timeline.js 顺路抓（和时间线一起），没抓到整卡不显示。
+			     排版直接复用火箭卡的 .rhead/.rspec，两卡视觉保持一致 -->
+			<view class="card" v-if="craftTitle">
+				<view class="card-title">航天器</view>
+
+				<view class="rhead">
+					<image
+						class="rimg"
+						v-if="craftImage"
+						:src="craftImage"
+						mode="aspectFill"
+						lazy-load
+						@click="preview(craftImage)"
+					></image>
+					<view class="rmain">
+						<view class="rname-row">
+							<text class="rname">{{ craftTitle }}</text>
+							<text class="rtag" v-if="craftStatusText" :class="craftLive ? 'rtag-on' : 'rtag-off'">
+								{{ craftStatusText }}
+							</text>
+						</view>
+						<text class="rsub" v-if="craftSub">{{ craftSub }}</text>
+						<view class="rtag-row" v-if="craftDest">
+							<text class="rtag">目的地 · {{ craftDest }}</text>
+						</view>
+					</view>
+				</view>
+
+				<text class="rdesc" v-if="craftDesc">{{ craftDesc }}</text>
+
+				<view class="rspec" v-if="craftSpecs.length">
+					<view class="rspec-cell" v-for="(p, i) in craftSpecs" :key="i">
+						<text class="rspec-v">{{ p.v }}</text>
+						<text class="rspec-k">{{ p.k }}</text>
+					</view>
+				</view>
+
+				<view class="rmeta" v-if="craftMeta.length">
+					<text class="rmeta-item" v-for="(m, i) in craftMeta" :key="i">{{ m }}</text>
+				</view>
+			</view>
+
 			<!-- 发射条件：概率和天气顾虑都是 LL2 的可选字段，没有就整块不显示。
 			     审核模式下天气顾虑是长文，整块藏掉（概率保留） -->
 			<view class="card" v-if="probabilityText || (weatherText && !reviewMode)">
@@ -318,6 +361,9 @@ import {
 	rocketName as rocketNameOf,
 	orbitName,
 	missionTypeName,
+	craftTypeName,
+	craftStatusName,
+	destName,
 	agencyLabel,
 	countryOf,
 	clock,
@@ -347,6 +393,8 @@ export default {
 			descExpanded: false,
 			// 发射时间线（T- 序列）原始节点，来自 timelines.json，可能为空
 			timeline: [],
+			// 本次任务的航天器（飞船本体），和 timeline 同一个来源，可能为 null
+			craft: null,
 			// 时间线是展开全部还是只给接下来几步
 			tlOpen: false,
 			// 审核模式：隐藏任务描述 / 天气顾虑 / 失败原因等长文，只留参数
@@ -460,6 +508,74 @@ export default {
 			if (b.launch_mass) out.push('起飞质量 ' + b.launch_mass + ' 吨')
 			if (b.launch_cost) out.push('单次造价 ' + costText(b.launch_cost))
 			if (b.maiden_flight) out.push('首飞 ' + b.maiden_flight)
+			return out
+		},
+
+		/* ---------- 航天器 ---------- */
+
+		// 飞船名就是官方代号（Crew Dragon C204），不翻译；
+		// 没有 name 的极少见，退回构型名
+		craftTitle() {
+			const c = this.craft
+			if (!c) return ''
+			return c.name || c.config || ''
+		},
+		// 副行：构型 · 类型 · 承制方（名称里已经含构型时不重复）
+		craftSub() {
+			const c = this.craft
+			if (!c) return ''
+			const out = []
+			if (c.config && c.config !== c.name) out.push(c.config)
+			if (c.type) out.push(craftTypeName(c.type))
+			if (c.agency) out.push(agencyLabel(c.agency))
+			return out.join(' · ')
+		},
+		craftStatusText() {
+			const c = this.craft
+			return (c && c.status && craftStatusName(c.status)) || ''
+		},
+		// 只有 Active 算「在役」，Destroyed / Lost / Retired 都用灰标签 ——
+		// 别把「已损毁」染成绿色
+		craftLive() {
+			const s = (this.craft && this.craft.status) || ''
+			return /^active$/i.test(s)
+		},
+		craftDest() {
+			const c = this.craft
+			return (c && c.dest && destName(c.dest)) || ''
+		},
+		craftDesc() {
+			return (this.craft && this.craft.desc) || ''
+		},
+		craftImage() {
+			return (this.craft && this.craft.image) || ''
+		},
+		craftSpecs() {
+			const c = this.craft
+			if (!c) return []
+			const cells = []
+			const push = (k, v) => {
+				if (v) cells.push({ k, v })
+			}
+			push('高度', c.height ? c.height + ' 米' : '')
+			push('直径', c.diameter ? c.diameter + ' 米' : '')
+			// crew_capacity 是「能坐几个人」，无人飞船是 0，这里不显示 0
+			push('载员', c.crew ? c.crew + ' 人' : '')
+			push('运载能力', c.payload ? massText(c.payload) : '')
+			// 值和标签上下排，别写成 push('本次是第', '1 次飞行') ——
+			// 那样读起来是「本次是第 / 1 次飞行」，主谓被拆到两行
+			push('本次飞行', c.flights ? '第 ' + c.flights + ' 次' : '')
+			return cells
+		},
+		craftMeta() {
+			const c = this.craft
+			if (!c) return []
+			const out = []
+			if (c.human) out.push('可载人')
+			// flight_life 是英文长句（"Able to fly for up to one week of free
+			// flight or two years docked."），混在中文参数里像没切干净，
+			// 又不值得为它引机器翻译，直接不显示
+			if (c.maiden) out.push('构型首飞 ' + c.maiden)
 			return out
 		},
 
@@ -682,20 +798,23 @@ export default {
 	},
 	methods: {
 		/**
-		 * 读发射时间线
+		 * 读发射时间线 + 航天器
 		 *
-		 * LL2 的列表端点 timeline 恒为空，只有单条详情才有，
-		 * 配额又只够 CI 分批抓，所以大多数任务拿不到 —— 拿不到就整块不显示，
-		 * 不能编造也不能拿别的任务的时间线顶上。
+		 * LL2 的列表端点 timeline 恒为空、rocket.spacecraft_stage 干脆不存在，
+		 * 两者都只有单条详情才有，配额又只够 CI 分批抓，所以大多数任务拿不到 ——
+		 * 拿不到就整块不显示，不能编造也不能拿别的任务的数据顶上。
+		 * 它们在同一个文件里（同一次请求抓回来的），一起读掉。
 		 */
 		async loadTimeline(id) {
 			try {
 				const d = await spaceData.load('timelines')
 				const row = ((d && d.list) || []).find((x) => String(x.id) === String(id))
 				this.timeline = (row && row.items) || []
+				this.craft = (row && row.craft) || null
 			} catch (e) {
 				// COS 上还没生成 timelines.json，或网络失败：静默降级
 				this.timeline = []
+				this.craft = null
 			}
 		},
 
