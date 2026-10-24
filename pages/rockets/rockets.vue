@@ -134,11 +134,9 @@
 			</view>
 		</view>
 
-		<!-- 暗门面板（3 秒内连点标题 5 次）：模拟版本号，检查审核员看到的界面 -->
+		<!-- 暗门（3 秒内连点标题 5 次）：填版本号模拟审核视角，两个按钮 -->
 		<view class="dbg-mask" v-if="dbgShow" @click="dbgShow = false">
 			<view class="dbg-panel" @click.stop>
-				<view class="dbg-title">审核视角调试</view>
-
 				<input
 					class="dbg-input"
 					v-model="dbgInput"
@@ -149,11 +147,8 @@
 				/>
 
 				<view class="dbg-btns">
-					<view class="dbg-btn" @click="applySim">模拟该版本</view>
-					<view class="dbg-btn" @click="simReal">用真实版本号</view>
-				</view>
-				<view class="dbg-btns">
-					<view class="dbg-btn dbg-btn-danger" @click="clearSim">清除覆盖，恢复正常</view>
+					<view class="dbg-btn" @click="applySim">模拟</view>
+					<view class="dbg-btn dbg-btn-danger" @click="clearSim">清除</view>
 				</view>
 			</view>
 		</view>
@@ -333,7 +328,7 @@ export default {
 		},
 
 		/**
-		 * 审核视角调试面板：只做一件事 —— 填版本号，本机按该版本号判定。
+		 * 暗门：只做一件事 —— 填版本号，本机按该版本号判定。
 		 *
 		 * 判定依据就是「当前版本号在不在远程白名单里」，所以只要能让本机
 		 * 假装成某个版本号，看到的就正好是审核员跑那一版时的界面。
@@ -355,18 +350,7 @@ export default {
 			this.resetAndGo('/pages/rockets/rockets')
 		},
 
-		// 用本机真实版本号判定：正式版等于是「不做任何模拟」，
-		// 开发版没有版本号，会命中「拿不到版本号 → 保审核」那条
-		simReal() {
-			const info = getDebugInfo()
-			if (!info.version) {
-				uni.showToast({ title: '开发版没有版本号，请手动填', icon: 'none' })
-				return
-			}
-			setOverride(info.version)
-			this.resetAndGo('/pages/rockets/rockets')
-		},
-
+		// 清除本机覆盖，回到环境默认（开发版完整态 / 正式版跟随 COS）
 		clearSim() {
 			setOverride(null)
 			this.resetAndGo('/pages/index/index')
@@ -775,13 +759,6 @@ function leoOf(kg) {
 	border: 1rpx solid rgba(120, 160, 220, 0.18);
 	border-radius: 24rpx;
 	box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.5);
-}
-
-.dbg-title {
-	margin-bottom: 20rpx;
-	color: #ffffff;
-	font-size: 32rpx;
-	font-weight: 600;
 }
 
 .dbg-input {
