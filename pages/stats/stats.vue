@@ -368,7 +368,6 @@ function countryOf(agency) {
 
 .page {
 	min-height: 100vh;
-	background: #0a0e17;
 	padding-bottom: 200rpx;
 	box-sizing: border-box;
 }

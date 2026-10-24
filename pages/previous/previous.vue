@@ -261,7 +261,6 @@ export default {
 	min-height: 100vh;
 	/* 顶部留白由 .stat 的 statusBarH 动态给 */
 	padding: 0 24rpx 200rpx;
-	background: #0a0e17;
 	box-sizing: border-box;
 }
 

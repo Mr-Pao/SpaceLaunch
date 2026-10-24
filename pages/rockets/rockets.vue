@@ -407,7 +407,6 @@ function leoOf(kg) {
 .page {
 	min-height: 100vh;
 	padding: 0 24rpx 200rpx;
-	background: #0a0e17;
 	box-sizing: border-box;
 }
 

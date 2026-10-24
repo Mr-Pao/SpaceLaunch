@@ -289,7 +289,6 @@ export default {
 	min-height: 100vh;
 	/* 底部要给悬浮胶囊 tabBar 让位，否则最后一张卡片会被盖住 */
 	padding-bottom: 200rpx;
-	background: #0a0e17;
 	overflow: hidden;
 }
 
