@@ -142,41 +142,34 @@
 		<!-- 审核态：整页不放内容，getConfig 回来后直接切到火箭大全页 -->
 		<view v-else></view>
 
-		<!-- 右下角悬浮钮：搜索 + 筛选。原来右上角那个小放大镜太难发现，
-		     而且和「排期/日历」挤在一行 -->
-		<view class="fab" v-if="!reviewMode">
-			<view class="fab-item" v-for="a in actions" :key="a.key" v-show="fabOpen" @click="onAction(a.key)">
-				<text class="fab-label">{{ a.label }}</text>
-				<view class="fab-icon">
-					<view v-if="a.key === 'search'" class="fi-search"></view>
-					<view v-else class="fi-filter">
-						<view class="fi-line fi-line-1"></view>
-						<view class="fi-line fi-line-2"></view>
-						<view class="fi-line fi-line-3"></view>
-					</view>
-				</view>
+		<!-- 右下角：一个按钮，点开就是「搜索 + 筛选」抽屉（原来要展开两层） -->
+		<view class="fab" v-if="!reviewMode" hover-class="fab-hover" @click="openSheet">
+			<view class="fab-mag">
+				<view class="fab-ring"></view>
 			</view>
-
-			<view class="fab-main" :class="{ open: fabOpen }" hover-class="fab-main-hover" @click="fabOpen = !fabOpen">
-				<view class="fab-plus"></view>
-			</view>
+			<view class="fab-badge" v-if="activeCount">{{ activeCount }}</view>
 		</view>
 
 		<filter-sheet
 			:visible="sheetVisible"
 			:groups="filterGroups"
 			:value="filters"
-			@close="sheetVisible = false"
-			@apply="applyFilters"
-			@reset="onResetFilters"
+			:keyword="keyword"
+			:count="filteredList.length"
+			:lift="sheetLift"
+			@close="closeSheet"
+			@pick="onPick"
+			@search="setKeyword"
+			@reset="resetFilters"
 		/>
 	</view>
 </template>
 
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
-import { syncTabBar } from '@/utils/tabbar.js'
-import { isStillUpcoming } from '@/utils/format.js'
+import { syncTabBar, setTabBarHidden } from '@/utils/tabbar.js'
+import { isStillUpcoming, rocketName } from '@/utils/format.js'
+import { launchMatch } from '@/utils/search-match.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 import spaceData from '@/utils/data.js'
@@ -184,8 +177,55 @@ import spaceData from '@/utils/data.js'
 const STEP = 12
 // 筛选维度：键要跟 filters 对象、filterGroups 的 key 一致
 const FILTER_KEYS = ['year', 'agency', 'rocket', 'orbit']
-// 每个维度最多给多少个候选值（全量列出来会撑爆抽屉）
-const OPT_LIMIT = { year: 30, agency: 24, rocket: 24, orbit: 16 }
+// 每个维度最多给多少个候选值（横向滑动，给太多会用不着）
+const OPT_LIMIT = { year: 20, agency: 20, rocket: 20, orbit: 12 }
+
+/**
+ * 常见发射机构的中文短名。
+ *
+ * 机构全名里 LL2 给的是官方长名，比如
+ * "China Aerospace Science and Technology Corporation"——横滑一行都放不下一个，
+ * 一排英文长句看着就是一团乱。这里只收常见的大机构，其余保留原名。
+ * 只影响显示（label），筛选用的值始终是原始名。
+ */
+const AGENCY_ZH = {
+	'China Aerospace Science and Technology Corporation': '中国航天科技',
+	'China Aerospace Science and Industry Corporation': '中国航天科工',
+	'China Rocket Co. Ltd.': '中国火箭',
+	'ExPace': '航天科工火箭',
+	'Landspace': '蓝箭航天',
+	'Galactic Energy': '星河动力',
+	'Space Pioneer': '天兵科技',
+	'i-Space': '星际荣耀',
+	'Deep Blue Aerospace': '深蓝航天',
+	'Orienspace': '东方空间',
+	'United Launch Alliance': 'ULA',
+	'Rocket Lab': '火箭实验室',
+	'Indian Space Research Organization': '印度空间研究组织',
+	'Russian Federal Space Agency (ROSCOSMOS)': '俄罗斯航天局',
+	'European Space Agency': '欧空局',
+	'Japan Aerospace Exploration Agency': 'JAXA',
+	'National Aeronautics and Space Administration': 'NASA',
+	'Agency for Defense Development': '韩国国防科学研究所',
+	'Korea Aerospace Research Institute': '韩国航空宇宙研究院',
+	'Mitsubishi Heavy Industries': '三菱重工',
+	'Firefly Aerospace': '萤火虫航天',
+	'Relativity Space': '相对论空间',
+	'Blue Origin': '蓝色起源',
+	'Rocket Factory Augsburg': 'RFA',
+	'Isar Aerospace': 'Isar',
+	'ArianeGroup': '阿丽亚娜集团',
+	'Space One': '太空一号',
+	'Interstellar Technologies': '星际科技',
+	'Virgin Galactic': '维珍银河'
+}
+
+/** 机构显示名：命中中文表用中文，否则原文（长名截断，避免一个 chip 占满屏） */
+function agencyLabel(name) {
+	if (!name) return ''
+	if (AGENCY_ZH[name]) return AGENCY_ZH[name]
+	return name.length > 16 ? name.slice(0, 15) + '…' : name
+}
 
 /** 轨道取 abbrev，缺了退回全名 */
 function orbitOf(x) {
@@ -200,6 +240,14 @@ function dimValue(x, key) {
 	if (key === 'rocket') return (x.rocket && x.rocket.configuration && x.rocket.configuration.name) || ''
 	if (key === 'orbit') return orbitOf(x)
 	return ''
+}
+
+/** 维度取值的中文显示名（筛选值本身始终是原始名，只有显示走这里） */
+function dimLabel(key, value) {
+	if (key === 'agency') return agencyLabel(value)
+	// 火箭型号复用全局映射：长征系列在这里也是中文
+	if (key === 'rocket') return rocketName({ name: value })
+	return value
 }
 
 export default {
@@ -227,13 +275,12 @@ export default {
 			// 日历模式选中的那天：{ dateStr, launches }
 			pickedDate: '',
 			dayLaunches: [],
-			// 右下角悬浮钮
-			fabOpen: false,
+			// 「搜索 + 筛选」抽屉
 			sheetVisible: false,
-			actions: [
-				{ key: 'search', label: '搜索' },
-				{ key: 'filter', label: '筛选' }
-			],
+			// tabBar 隐藏失败时把抽屉抬高避开它（降级路径）
+			sheetLift: false,
+			// 搜索词：与 filters 一起作用于列表，实时生效
+			keyword: '',
 			// 各维度选中值；'' = 不筛选。两个 feed 共用一套，切 feed 时清空
 			filters: { year: '', agency: '', rocket: '', orbit: '' }
 		}
@@ -262,22 +309,32 @@ export default {
 			return best
 		},
 
+		/** 生效中的条件个数（悬浮钮角标） */
+		activeCount() {
+			let n = 0
+			for (const k of FILTER_KEYS) if (this.filters[k]) n++
+			if (this.keyword) n++
+			return n
+		},
+
 		hasFilter() {
-			return FILTER_KEYS.some((k) => this.filters[k])
+			return this.activeCount > 0
 		},
 
 		/**
-		 * 筛选后的列表。只过滤已加载的部分，
+		 * 筛选 + 搜索后的列表。只过滤已加载的部分，
 		 * 归档触底拉下来的新条目自动进入筛选范围。
 		 */
 		filteredList() {
 			if (!this.hasFilter) return this.list
 			const f = this.filters
+			// 统一小写，与 search-match 内部的匹配口径保持一致
+			const kw = this.keyword.trim().toLowerCase()
 			return this.list.filter((x) => {
 				for (const k of FILTER_KEYS) {
 					if (f[k] && dimValue(x, k) !== f[k]) return false
 				}
-				return true
+				return kw ? launchMatch(x, kw) : true
 			})
 		},
 
@@ -319,8 +376,9 @@ export default {
 
 		filterSummary() {
 			const parts = []
+			if (this.keyword) parts.push('「' + this.keyword + '」')
 			for (const k of FILTER_KEYS) {
-				if (this.filters[k]) parts.push(this.filters[k])
+				if (this.filters[k]) parts.push(dimLabel(k, this.filters[k]))
 			}
 			return parts.join(' · ')
 		},
@@ -340,6 +398,8 @@ export default {
 				for (const k of FILTER_KEYS) {
 					const v = dimValue(x, k)
 					if (!v) continue
+					// "Unknown" 是占位值，选它等于「没有机构」，放进候选只是噪音
+					if (k === 'agency' && /^unknown$/i.test(v)) continue
 					buckets[k].set(v, (buckets[k].get(v) || 0) + 1)
 				}
 			}
@@ -355,7 +415,8 @@ export default {
 
 				const options = entries.slice(0, OPT_LIMIT[k] || 20).map(([value, n]) => ({
 					value,
-					label: value + ' (' + n + ')'
+					label: dimLabel(k, value),
+					count: n
 				}))
 				if (options.length > 1) groups.push({ key: k, label: labels[k], options })
 			}
@@ -388,6 +449,11 @@ export default {
 	onShow() {
 		syncTabBar(1)
 		this.reorder()
+	},
+
+	onHide() {
+		// 抽屉还开着就切走了的话，tabBar 会一直保持隐藏，回来时底部是空的
+		if (this.sheetVisible) this.closeSheet()
 	},
 
 	onPullDownRefresh() {
@@ -451,8 +517,7 @@ export default {
 		 */
 		setFeed(name) {
 			if (name === this.feed) return
-			this.fabOpen = false
-			this.sheetVisible = false
+			this.closeSheet()
 			this.pickedDate = ''
 			this.dayLaunches = []
 			// moreDone 不重置：切走再切回来时后续排期已经并进 list 了，
@@ -469,19 +534,33 @@ export default {
 			this.dayLaunches = launches || []
 		},
 
-		onAction(key) {
-			this.fabOpen = false
-			if (key === 'search') {
-				uni.navigateTo({ url: '/pages/search/search' })
-				return
-			}
+		/**
+		 * 打开「搜索 + 筛选」抽屉。
+		 *
+		 * 打开前先把 tabBar 藏掉：自定义 tabBar 渲染在页面之上的独立层，
+		 * 页面里的遮罩盖不住它，抽屉贴底时会被它压住一截。
+		 * 藏不掉（拿不到实例）就让抽屉抬高 150rpx 避开，功能不受影响。
+		 */
+		openSheet() {
+			this.sheetLift = !setTabBarHidden(true)
 			this.sheetVisible = true
 		},
 
-		applyFilters(next) {
-			this.filters = Object.assign({}, this.filters, next)
+		closeSheet() {
+			if (this.sheetVisible) setTabBarHidden(false)
 			this.sheetVisible = false
+		},
+
+		// 抽屉里的 chips：立即生效，不再走「草稿 + 确定」
+		onPick({ key, value }) {
+			if (!key) return
+			this.filters = Object.assign({}, this.filters, { [key]: value })
 			// 筛选基线变了，分页从头开始
+			this.resetPaging()
+		},
+
+		setKeyword(kw) {
+			this.keyword = kw || ''
 			this.resetPaging()
 		},
 
@@ -494,6 +573,7 @@ export default {
 			const empty = {}
 			for (const k of FILTER_KEYS) empty[k] = ''
 			this.filters = empty
+			this.keyword = ''
 			if (!keepPaging) this.resetPaging()
 		},
 
@@ -635,7 +715,7 @@ export default {
 }
 
 .next-wrap {
-	margin-bottom: 14rpx;
+	margin-bottom: 22rpx;
 }
 
 /* ---- 控制行：左「待发射/已发射」，右「排期/日历」 ---- */
@@ -756,47 +836,17 @@ export default {
 	font-size: 24rpx;
 }
 
-/* ---- 右下角悬浮钮 ---- */
+/* ---- 右下角：搜索 + 筛选，一个按钮 ---- */
 .fab {
 	position: fixed;
 	right: 32rpx;
-	/* 停在悬浮胶囊 tabBar 上方（胶囊 112rpx + 内外边距） */
-	bottom: calc(160rpx + env(safe-area-inset-bottom));
+	/* 停在悬浮胶囊 tabBar 上方（tabBar 本体 132rpx + 间隙）。
+	   裸值必须写在最前面兜底：env() 在部分安卓内核里不识别，
+	   会让整条 calc() 失效、bottom 归零，按钮直接掉到列表最末尾 */
+	bottom: 166rpx;
+	bottom: calc(166rpx + constant(safe-area-inset-bottom));
+	bottom: calc(166rpx + env(safe-area-inset-bottom));
 	z-index: 60;
-	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-}
-
-.fab-item {
-	display: flex;
-	align-items: center;
-	margin-bottom: 18rpx;
-}
-
-.fab-label {
-	margin-right: 14rpx;
-	padding: 8rpx 18rpx;
-	background: rgba(20, 26, 38, 0.92);
-	border: 1rpx solid rgba(255, 255, 255, 0.08);
-	border-radius: 24rpx;
-	color: #cbd5e0;
-	font-size: 23rpx;
-}
-
-.fab-icon {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 84rpx;
-	height: 84rpx;
-	border-radius: 50%;
-	background: #141a26;
-	border: 1rpx solid rgba(255, 255, 255, 0.1);
-	box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.4);
-}
-
-.fab-main {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -805,84 +855,57 @@ export default {
 	border-radius: 50%;
 	background: linear-gradient(135deg, #2f7ff5, #38bdf8);
 	box-shadow: 0 10rpx 28rpx rgba(56, 189, 248, 0.35);
-	transition: transform 0.24s ease;
 }
 
-.fab-main-hover {
-	opacity: 0.85;
+.fab-hover {
+	opacity: 0.86;
 }
 
-/* + 旋转 45° 就成了 × */
-.fab-main.open {
-	transform: rotate(45deg);
-}
-
-.fab-plus {
+/* 放大镜：圆 + 45° 手柄，纯 CSS（字符图标在部分安卓机缺字会变方块） */
+.fab-mag {
 	position: relative;
-	width: 40rpx;
-	height: 40rpx;
+	width: 46rpx;
+	height: 46rpx;
 }
 
-.fab-plus::before,
-.fab-plus::after {
-	content: '';
+.fab-ring {
 	position: absolute;
-	left: 50%;
-	top: 50%;
-	background: #ffffff;
-	border-radius: 2rpx;
-}
-
-.fab-plus::before {
-	width: 40rpx;
-	height: 4rpx;
-	margin: -2rpx 0 0 -20rpx;
-}
-
-.fab-plus::after {
-	width: 4rpx;
-	height: 40rpx;
-	margin: -20rpx 0 0 -2rpx;
-}
-
-/* 搜索：圆 + 45° 手柄 */
-.fi-search {
-	position: relative;
-	width: 26rpx;
-	height: 26rpx;
-	margin: -4rpx -4rpx 0 0;
-	border: 3rpx solid #cbd5e0;
+	left: 2rpx;
+	top: 2rpx;
+	width: 31rpx;
+	height: 31rpx;
+	border: 5rpx solid #ffffff;
 	border-radius: 50%;
+	box-sizing: border-box;
 }
 
-.fi-search::after {
+.fab-ring::after {
 	content: '';
 	position: absolute;
-	right: -11rpx;
-	bottom: -7rpx;
-	width: 12rpx;
-	height: 3rpx;
-	background: #cbd5e0;
-	border-radius: 2rpx;
+	right: -12rpx;
+	bottom: -10rpx;
+	width: 15rpx;
+	height: 5rpx;
+	background: #ffffff;
+	border-radius: 3rpx;
 	transform: rotate(45deg);
 }
 
-/* 筛选：三条递减横线 */
-.fi-filter {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
+/* 生效条件数角标：不用红点，红点看不出筛了几项 */
+.fab-badge {
+	position: absolute;
+	top: -2rpx;
+	right: -2rpx;
+	min-width: 36rpx;
+	height: 36rpx;
+	padding: 0 8rpx;
+	border-radius: 18rpx;
+	background: #f5c33b;
+	color: #10151f;
+	font-size: 20rpx;
+	font-weight: 600;
+	line-height: 36rpx;
+	text-align: center;
+	box-sizing: border-box;
 }
-
-.fi-line {
-	height: 3rpx;
-	background: #cbd5e0;
-	border-radius: 2rpx;
-	margin: 2rpx 0;
-}
-
-.fi-line-1 { width: 32rpx; }
-.fi-line-2 { width: 22rpx; }
-.fi-line-3 { width: 12rpx; }
 </style>

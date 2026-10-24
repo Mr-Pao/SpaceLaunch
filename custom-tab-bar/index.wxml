@@ -1,4 +1,7 @@
-<view class="ctb-wrap">
+<!-- hidden：抽屉/浮层打开时整条隐藏。
+     自定义 tabBar 渲染在页面之上的独立层，页面里的遮罩盖不住它，
+     只能让它自己消失，否则抽屉底部会和它叠在一起 -->
+<view class="ctb-wrap" wx:if="{{!hidden}}">
 	<!-- 审核模式：整个 tabBar 不渲染，小程序变成单页展示 -->
 	<view class="ctb-bar" wx:if="{{!review}}">
 		<view

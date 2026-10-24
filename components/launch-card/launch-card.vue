@@ -202,6 +202,11 @@ export default {
    比一排小方块干净，也不会因为背景色块把版面切碎 */
 .rocket {
 	display: block;
+	/* .info 是 column flex，这一行不加 align-self 就按内容宽度收缩，
+	   实测只剩 30px —— 末尾的 ellipsis 把「长征八号甲」截成「长…」。
+	   width:100% 在 flex item 上不足以撑开，必须显式 stretch */
+	align-self: stretch;
+	width: 100%;
 	margin-top: 10rpx;
 	color: #7bb8e0;
 	font-size: 23rpx;
