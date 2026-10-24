@@ -133,8 +133,7 @@
 				<text v-if="loadingMore">正在加载后续排期…</text>
 				<text v-else-if="loadError">{{ loadError }}，上拉重试</text>
 				<text v-else-if="hasMore">上拉加载更多</text>
-				<text v-else-if="feed === 'previous' && index && index.total > list.length">已显示全部 {{ list.length }} 条</text>
-				<text v-else>已显示全部 {{ list.length }} 条</text>
+				<text v-else>已显示全部 {{ visible.length }} 条</text>
 			</view>
 			</template>
 			</view>
@@ -454,11 +453,14 @@ export default {
 			if (name === this.feed) return
 			this.fabOpen = false
 			this.sheetVisible = false
-			this.moreDone = false
-			this.resetFilters()
 			this.pickedDate = ''
 			this.dayLaunches = []
+			// moreDone 不重置：切走再切回来时后续排期已经并进 list 了，
+			// 重置会让底部提示一直停在「上拉加载更多」
+			// 顺序要紧：先 switchFeed（它会存下当前 feed 的翻页位置），
+			// 再清筛选。反过来会把旧 feed 的 listNum 提前打回第一页。
 			this.switchFeed(name)
+			this.resetFilters(true)
 		},
 
 		// 日历选中某天：渲染当天任务
@@ -483,11 +485,16 @@ export default {
 			this.resetPaging()
 		},
 
-		resetFilters() {
+		/**
+		 * 清空筛选。
+		 * @param {Boolean} keepPaging 切 feed 时用：筛选没了但列表还停在原来翻到的位置，
+		 *                             不要把分页一起打回第一页
+		 */
+		resetFilters(keepPaging) {
 			const empty = {}
 			for (const k of FILTER_KEYS) empty[k] = ''
 			this.filters = empty
-			this.resetPaging()
+			if (!keepPaging) this.resetPaging()
 		},
 
 		onResetFilters() {

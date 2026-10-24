@@ -120,6 +120,10 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 			/**
 			 * 切换数据集。已加载过的 feed 原样恢复现场（列表、翻页位置、归档进度），
 			 * 没加载过的按需拉一次。首屏由页面自己在 onLoad 里 getData。
+			 *
+			 * 现场的存取是「切走时存、切回时取完即删」：
+			 * 留在 store 里跟踪是不行的 —— applyData / appendMore 都是整体替换数组，
+			 * store 里那份引用会静默过期（用户翻到第 300 条，切回来只剩 100 条）。
 			 */
 			async switchFeed(name) {
 				if (!FEEDS[name] || name === this.feed) return
@@ -144,6 +148,8 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 
 				const s = store[name]
 				if (s) {
+					// 取完就删，避免后续再被当成「还有效的现场」
+					delete store[name]
 					this.list = s.list
 					this.total = s.total
 					this.freshText = s.freshText
