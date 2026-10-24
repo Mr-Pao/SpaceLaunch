@@ -2,12 +2,12 @@
  * 版本记录
  *
  * 新的往数组**末尾**追加；页面渲染时倒序，所以最新版永远在最上面。
- * 版本号从 3.0.0 起逐 1 递增（3.0.0 → 3.0.1 → … → 3.1.0 → 3.1.1 …），
+ * 版本号从 3.0.0 起逐 1 递增（3.0.0 → 3.0.1 → 3.0.2 …），
  * 每个版本对应一块完整的工作；重复性小修不单独记。
  */
 export const CHANGELOG = [
 	{
-		version: '3.1.6',
+		version: '3.0.7',
 		date: '2026-10-24',
 		title: '分享海报与发射工位页',
 		items: [
@@ -18,7 +18,7 @@ export const CHANGELOG = [
 		]
 	},
 	{
-		version: '3.1.5',
+		version: '3.0.6',
 		date: '2026-10-24',
 		title: '全局搜索与日历视图',
 		items: [
@@ -27,7 +27,7 @@ export const CHANGELOG = [
 		]
 	},
 	{
-		version: '3.1.4',
+		version: '3.0.5',
 		date: '2026-10-24',
 		title: '筛选与互跳',
 		items: [
@@ -37,7 +37,7 @@ export const CHANGELOG = [
 		]
 	},
 	{
-		version: '3.1.3',
+		version: '3.0.4',
 		date: '2026-10-24',
 		title: '沉浸式改版',
 		items: [
@@ -46,7 +46,7 @@ export const CHANGELOG = [
 		]
 	},
 	{
-		version: '3.1.2',
+		version: '3.0.3',
 		date: '2026-10-24',
 		title: '缓存与流量优化',
 		items: [
@@ -55,7 +55,7 @@ export const CHANGELOG = [
 		]
 	},
 	{
-		version: '3.1.1',
+		version: '3.0.2',
 		date: '2026-10-24',
 		title: '问题修复',
 		items: [
@@ -66,7 +66,7 @@ export const CHANGELOG = [
 		]
 	},
 	{
-		version: '3.1.0',
+		version: '3.0.1',
 		date: '2026-10-23',
 		title: '收藏、统计与新页面',
 		items: [
