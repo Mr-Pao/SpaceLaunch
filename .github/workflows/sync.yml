@@ -22,6 +22,7 @@ on:
     - cron: '30 3 * * *'     # 统计：每天 UTC 03:30 = 北京 11:30（错开机构，避免抢配额）
     - cron: '0 20 * * *'     # 即将发射后续排期：每天 UTC 20:00 = 北京 04:00（要 4 个请求）
     - cron: '0 21 * * *'     # 火箭型号库：每天 UTC 21:00 = 北京 05:00（要 6 个请求）
+    - cron: '0 22 * * *'     # 发射工位库：每天 UTC 22:00 = 北京 06:00（1 个请求）
   workflow_dispatch:
     inputs:
       dataset:
@@ -36,6 +37,7 @@ on:
           - events
           - agencies
           - launchers
+          - pads
           - stats
           - all
 
@@ -67,6 +69,7 @@ jobs:
               "30 3 * * *")   DS="stats" ;;
               "0 20 * * *")   DS="upcomingMore" ;;
               "0 21 * * *")   DS="launchers" ;;
+              "0 22 * * *")   DS="pads" ;;
               *)              DS="upcoming" ;;
             esac
           fi

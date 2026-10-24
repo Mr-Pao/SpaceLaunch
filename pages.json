@@ -68,6 +68,12 @@
 			}
 		},
 		{
+			"path": "pages/pad/pad",
+			"style": {
+				"navigationBarTitleText": "发射工位"
+			}
+		},
+		{
 			"path": "pages/version/version",
 			"style": {
 				"navigationBarTitleText": "版本记录"

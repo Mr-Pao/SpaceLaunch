@@ -154,12 +154,15 @@
 				<text class="card-desc">{{ failText }}</text>
 			</view>
 
-				<!-- 发射台 -->
+				<!-- 发射台：名称可点进工位详情（地图 + 累计发射数） -->
 				<view class="card" v-if="detail.pad && detail.pad.name">
 					<view class="card-title">发射台</view>
-					<view class="row">
+					<view class="row row-link" @click="goPad">
 						<text class="label">名称</text>
-						<text class="value">{{ detail.pad.name }}</text>
+						<view class="value-wrap">
+							<text class="value value-link">{{ detail.pad.name }}</text>
+							<text class="value-arrow">›</text>
+						</view>
 					</view>
 					<view class="row" v-if="padLocation">
 						<text class="label">位置</text>
@@ -688,6 +691,16 @@ export default {
 			})
 		},
 
+		// 工位名 → pad 详情。pad 库是每天刷的全量快照，
+		// 但新工位可能还没进库，跳过去查不到时页面有自己的空态兜底
+		goPad() {
+			const p = this.detail && this.detail.pad
+			if (!p || !p.name) return
+			uni.navigateTo({
+				url: '/pages/pad/pad?id=' + (p.id || '') + '&name=' + encodeURIComponent(p.name)
+			})
+		},
+
 		goAgency(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/agencies/agencies?id=' + id })
@@ -1108,6 +1121,28 @@ export default {
 	top: 0;
 	width: 600px;
 	height: 960px;
+}
+
+.row-link {
+	cursor: pointer;
+}
+
+.value-wrap {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	min-width: 0;
+}
+
+.value-link {
+	color: #38bdf8;
+}
+
+.value-arrow {
+	color: #4a5568;
+	font-size: 30rpx;
+	margin-left: 8rpx;
 }
 
 .footer-hint {

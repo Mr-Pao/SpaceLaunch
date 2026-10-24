@@ -171,6 +171,38 @@ function slimLaunch(l) {
 	}
 }
 
+/**
+ * 发射工位（pad）—— /pads/ 端点，normal 模式就带全部所需字段
+ * （实测 detailed 无额外字段，别浪费体积）。
+ * pad 详情页用：地图图 + 坐标 + 累计发射数。
+ */
+function slimPad(p) {
+	return {
+		id: p.id ?? null,
+		name: str(p.name),
+		// pad 自身示意图（少部分有）与地图截图（251 张几乎全有）
+		image: imageUrl(p.image),
+		map_image: imageUrl(p.map_image),
+		description: str(p.description),
+		info_url: str(p.info_url),
+		wiki_url: str(p.wiki_url),
+		latitude: num(p.latitude),
+		longitude: num(p.longitude),
+		active: Boolean(p.active),
+		country_code: (Array.isArray(p.country) && p.country.length && p.country[0].alpha_2_code) || '',
+		total_launch_count: num(p.total_launch_count),
+		location: {
+			id: (p.location && p.location.id) ?? null,
+			name: (p.location && p.location.name) || '',
+			total_launch_count: num(p.location && p.location.total_launch_count)
+		},
+		// 只留前两个机构的 id+name，前端可跳机构页
+		agencies: Array.isArray(p.agencies)
+			? p.agencies.slice(0, 2).map((a) => ({ id: (a && a.id) ?? null, name: str(a && a.name) })).filter((a) => a.id)
+			: []
+	}
+}
+
 function slimEvent(e) {
 	return {
 		id: e.id ?? null,
@@ -306,5 +338,6 @@ module.exports = {
 	slimEvent,
 	slimAgency,
 	slimLauncher,
+	slimPad,
 	slimStatLaunch
 }

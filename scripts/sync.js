@@ -21,7 +21,12 @@
 const fs = require('fs')
 const path = require('path')
 const { getJson } = require('./lib/fetch')
-const { slimLaunch, slimEvent, slimAgency, slimStatLaunch, slimLauncher } = require('./lib/slim')
+const { slimLaunch,
+	slimPad,
+	slimEvent,
+	slimAgency,
+	slimStatLaunch,
+	slimLauncher } = require('./lib/slim')
 const { aggregateByYear } = require('./lib/aggregate')
 const { upload } = require('./lib/cos')
 const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies } = require('./lib/localize')
@@ -51,6 +56,21 @@ async function readCosJson(key) {
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 const DATASETS = {
+	/**
+	 * 发射工位（pad）全量：/pads/ 共 251 条，一页拉完。
+	 * 变化极慢，每天刷一次足够；pad 详情页（地图 + 累计发射数）用。
+	 * map_image 全量镜像首轮较慢，之后按 hash 跳过已上传、几乎零成本。
+	 */
+	pads: {
+		file: 'pads.json',
+		cacheControl: 'public, max-age=86400',
+		images: ['image', 'map_image'],
+		async fetch() {
+			const j = await getJson('/pads/?limit=300&mode=normal&format=json')
+			return { count: j.count, list: j.results.map(slimPad) }
+		}
+	},
+
 	upcoming: {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',

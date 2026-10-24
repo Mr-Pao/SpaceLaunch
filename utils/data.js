@@ -51,6 +51,8 @@ const FILES = {
 	agencies: 'agencies.json',
 	// 火箭型号库（532 个型号，含技术参数）
 	launchers: 'launchers.json',
+	// 发射工位库（251 个 pad，含地图图与累计发射数），pad 详情页用
+	pads: 'pads.json',
 	// 统计页数据：CI 侧按年预聚合好的结果，前端只负责展示与年度切换
 	stats: 'stats-years.json'
 }
@@ -74,7 +76,9 @@ const HARD_TTL_DEFAULT = 7 * 24 * 60 * 60 * 1000
 const HARD_TTL = {
 	upcomingMore: 2 * 24 * 60 * 60 * 1000,
 	agencies: 2 * 24 * 60 * 60 * 1000,
-	launchers: 2 * 24 * 60 * 60 * 1000
+	launchers: 2 * 24 * 60 * 60 * 1000,
+	// pads 变化极慢（每天刷一次），但它带 251 张地图图 URL，体积不小
+	pads: 3 * 24 * 60 * 60 * 1000
 }
 
 function hardTtl(name) {
@@ -129,7 +133,7 @@ function readStorage(name) {
 
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
-const EVICT_ORDER = ['launchers', 'agencies', 'upcomingMore', 'stats', 'events', 'previous']
+const EVICT_ORDER = ['pads', 'launchers', 'agencies', 'upcomingMore', 'stats', 'events', 'previous']
 
 function writeStorage(name, data) {
 	try {
