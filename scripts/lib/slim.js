@@ -72,6 +72,46 @@ function imageUrl(image) {
 	return image.image_url || image.thumbnail_url || ''
 }
 
+/**
+ * 缩略图：图片库里一屏要挂十几张，原图动辄 1-3MB 根本渲不出来。
+ * LL2 的每张图都另存了一份 *_thumbnail_ 版本（宽度约 300px，几十 KB），
+ * 优先用它；老数据没有缩略图时回退原图，至少不会空着。
+ */
+function thumbUrl(image) {
+	if (!image || typeof image === 'string') return imageUrl(image)
+	return image.thumbnail_url || image.image_url || ''
+}
+
+/** 图片署名（"CCTV" / "SpaceX" / "Xinhua/Wang Jiangbo"），图片库右下角当水印用 */
+function imageCredit(image) {
+	if (!image || typeof image === 'string') return ''
+	return str(image.credit)
+}
+
+/**
+ * 视频链接。LL2 把 webcast 挂在 mission.vid_urls 里（不是 launch 顶层），
+ * 元素形如 { priority, source, publisher, title, url }。
+ * 实测列表/upcoming 模式下基本都是空数组，只有单条详情才有内容 ——
+ * 这里照实保留，有就展示，没有前端显示空态，不编数据。
+ */
+function vidList(v) {
+	if (!Array.isArray(v)) return []
+	return v
+		.filter((x) => x && (x.url || typeof x === 'string'))
+		.map((x) =>
+			typeof x === 'string'
+				? { url: x, title: '', publisher: '', priority: 99 }
+				: {
+						url: str(x.url),
+						title: str(x.title),
+						publisher: str(x.publisher) || str(x.source),
+						priority: Number(x.priority) || 99
+					}
+		)
+		.sort((a, b) => a.priority - b.priority)
+		.slice(0, 3)
+}
+
 /** 名称数组 → 顿号连接的字符串；本来已经是字符串的原样返回 */
 function joinNames(arr) {
 	// 实测 agency.launchers 是 "A | B" 这样的字符串，不是数组
@@ -92,8 +132,14 @@ function slimLaunch(l) {
 		name: str(l.name),
 		net: str(l.net),
 		image: imageUrl(l.image),
+		// 图片库用的三个附加字段：缩略图省流量、署名当水印、图片名当图注
+		imageThumb: thumbUrl(l.image),
+		imageCredit: imageCredit(l.image),
+		imageName: str(l.image && l.image.name),
 		// 任务信息图（一张竖版长图）。LL2 里是 URL 字符串，也可能为 null
 		infographic: imageUrl(l.infographic),
+		// 视频库数据源（挂在 mission 下，不在 launch 顶层）
+		vid: vidList(l.mission && l.mission.vid_urls),
 
 		status: {
 			name: str(l.status && l.status.name),
@@ -120,6 +166,12 @@ function slimLaunch(l) {
 			name: str(l.pad && l.pad.name),
 			latitude: (l.pad && l.pad.latitude) ?? null,
 			longitude: (l.pad && l.pad.longitude) ?? null,
+			// 工位照片：图片库里「更多火箭照片」的主力来源之一，
+			// 而且很多是 CCTV / Xinhua 这类现场实拍，正好带 credit 署名
+			image: imageUrl(l.pad && l.pad.image),
+			imageThumb: thumbUrl(l.pad && l.pad.image),
+			imageCredit: imageCredit(l.pad && l.pad.image),
+			imageName: str(l.pad && l.pad.image && l.pad.image.name),
 			location: { name: str(l.pad && l.pad.location && l.pad.location.name) }
 		},
 		// pad.map_image 已删：前端从未渲染，却要 CI 每轮下载+压缩+上传

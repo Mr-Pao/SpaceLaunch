@@ -86,6 +86,22 @@
 					</view>
 				</view>
 
+				<!-- 图片库 / 视频库：该系列的现场照片与发射回放，
+				     点进去是独立的瀑布流页面，这里只做一个入口。
+				     放在统计卡后面而不是页面底部 —— 一个系列有五六个构型时，
+				     滚到最下面才看见入口等于没有入口 -->
+				<view class="media-card" v-if="!reviewMode && mediaStats.total">
+					<view class="media-cell" v-if="mediaStats.images" @click="goMedia('image')">
+						<text class="media-num">{{ mediaStats.images }}</text>
+						<text class="media-label">图片库</text>
+					</view>
+					<view class="media-sep" v-if="mediaStats.images && mediaStats.videos"></view>
+					<view class="media-cell" v-if="mediaStats.videos" @click="goMedia('video')">
+						<text class="media-num">{{ mediaStats.videos }}</text>
+						<text class="media-label">视频库</text>
+					</view>
+				</view>
+
 				<!-- 不同构型：同一个系列下的各型号，点了原地切换 -->
 				<view class="section" v-if="variants.length > 1">
 					<view class="section-head">
@@ -232,6 +248,7 @@ import {
 	textUnits
 } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
+import { collectMedia } from '@/utils/media.js'
 import navMixin from '@/utils/nav-mixin.js'
 
 // 同系列构型少于这个数就不当「系列」看：Falcon 家族里只有 Falcon 1 / Falcon Heavy
@@ -446,6 +463,21 @@ export default {
 
 		padsPartial() {
 			return this.records.length >= 100
+		},
+
+		/**
+		 * 图片库 / 视频库的入口数字。
+		 * 和媒体页用的是同一个 collectMedia，两边数字必须一致 ——
+		 * 入口写 39 张、点进去只有 20 张是最容易让人怀疑数据出错的细节。
+		 */
+		mediaStats() {
+			const configs = this.siblings.length ? this.siblings : this.config ? [this.config] : []
+			const m = collectMedia(configs, this.records)
+			return {
+				images: m.images.length,
+				videos: m.videos.length,
+				total: m.images.length + m.videos.length
+			}
 		}
 	},
 
@@ -519,6 +551,14 @@ export default {
 			if (!v || v.current) return
 			uni.redirectTo({
 				url: '/pages/rocket/rocket?id=' + v.id + '&name=' + encodeURIComponent(v.name)
+			})
+		},
+
+		/** 进图片库 / 视频库。tab 只是初始选中项，那边还能自己切 */
+		goMedia(tab) {
+			if (!this.config) return
+			uni.navigateTo({
+				url: '/pages/media/media?id=' + this.config.id + '&tab=' + (tab || 'image')
 			})
 		},
 
@@ -780,8 +820,7 @@ function byNetDesc(a, b) {
 
 .card-head {
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
+	align-items: center;	justify-content: space-between;
 	margin-bottom: 16rpx;
 }
 
@@ -1180,6 +1219,46 @@ function byNetDesc(a, b) {
 .more-text {
 	color: #8a97a8;
 	font-size: 24rpx;
+}
+
+/* ---- 图片库 / 视频库入口 ---- */
+/* 和系列统计一样是「一格里两组数字」的观感，但不抢统计的视觉重量：
+   数字小一号、没有分隔线底色，点上去是高亮反馈 */
+.media-card {
+	display: flex;
+	align-items: center;
+	margin-top: 22rpx;
+	padding: 22rpx 0;
+	background: #141a26;
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+}
+
+.media-cell {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.media-sep {
+	width: 1rpx;
+	height: 52rpx;
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.media-num {
+	color: #ffffff;
+	font-size: 38rpx;
+	font-weight: 600;
+	line-height: 1.1;
+}
+
+.media-label {
+	margin-top: 8rpx;
+	color: #7d8ba0;
+	font-size: 23rpx;
+	line-height: 30rpx;
 }
 
 /* ---- 外部资料 ---- */

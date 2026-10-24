@@ -41,7 +41,7 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v6: 增加 mission.nameZh（任务名中文），标题不再整行英文
 // v7: stats 增加 id / name / site（发射场），支撑年度回顾
 // v8: stats 改为「按年预聚合」输出，不再下发原始数据；数据源换成最新快照 + 历史归档
-const DATA_VERSION = 9
+const DATA_VERSION = 10
 
 /** 读 COS 上已生成的 JSON。桶是公有读，直接走 CDN 地址 */
 async function readCosJson(key) {

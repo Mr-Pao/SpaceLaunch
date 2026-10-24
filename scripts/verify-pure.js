@@ -237,9 +237,73 @@ async function testSearchMatch() {
 	fs.unlinkSync(path.join(dir, 'sl-format-dep.mjs'))
 }
 
+// ---------- media.js（纯函数，不依赖其它模块）----------
+
+async function testMedia() {
+	console.log('[media] 图片库/视频库聚合')
+	const dir = os.tmpdir()
+	fs.copyFileSync(path.join(__dirname, '..', 'utils', 'media.js'), path.join(dir, 'sl-media.mjs'))
+	const m = await import(pathToFileURL(path.join(dir, 'sl-media.mjs')).href)
+
+	const configs = [
+		{ name: 'Falcon 9 Block 5', image: 'c1.jpg', imageThumb: 'c1t.jpg', imageCredit: 'SpaceX' },
+		{ name: 'Falcon 9 B4', image: '', imageThumb: '', imageCredit: '' }
+	]
+	const records = [
+		{
+			name: 'F9 | A',
+			net: '2026-10-20T00:00:00Z',
+			image: 'l1.jpg',
+			imageThumb: 'l1t.jpg',
+			imageCredit: 'SpaceX',
+			imageName: 'Falcon 9 launch A',
+			pad: { name: 'SLC-40', image: 'p1.jpg', imageThumb: 'p1t.jpg', imageCredit: 'CCTV' }
+		},
+		{
+			// 和上面同一张发射图 + 同一张工位图：都必须被去重掉
+			name: 'F9 | B',
+			net: '2026-10-21T00:00:00Z',
+			image: 'l1.jpg',
+			imageThumb: 'l1t.jpg',
+			imageCredit: 'SpaceX',
+			pad: { name: 'SLC-40', image: 'p1.jpg', imageThumb: 'p1t.jpg', imageCredit: 'CCTV' },
+			vid: [{ url: 'https://youtu.be/x', title: 'Webcast B', publisher: 'SpaceX', priority: 1 }]
+		},
+		{
+			// 更早的一次，图不同
+			name: 'F9 | C',
+			net: '2025-01-01T00:00:00Z',
+			image: 'l2.jpg',
+			imageThumb: 'l2t.jpg',
+			infographic: 'ig.jpg'
+		}
+	]
+
+	const r = m.collectMedia(configs, records)
+	eq(r.images.length, 5, '去重后共 5 张（构型 1 + 发射 2 + 工位 1 + 信息图 1）')
+	eq(r.images[0].url, 'c1.jpg', '构型图排最前')
+	eq(r.images[0].kind, 'config', '构型图带 kind=config')
+	eq(r.images[1].url, 'l1.jpg', '发射图按时间倒序，最近的在前')
+	eq(r.images[r.images.length - 1].kind, 'infographic', '信息图排在最后')
+	eq(r.images.filter((x) => x.url === 'l1.jpg').length, 1, '同一张发射图只出现一次')
+	eq(r.images.filter((x) => x.url === 'p1.jpg').length, 1, '同一张工位图只出现一次')
+	eq(r.images.find((x) => x.url === 'l1.jpg').credit, 'SpaceX', '署名透传')
+	eq(r.videos.length, 1, '视频从 vid 展开')
+	eq(r.videos[0].cover, 'l1.jpg', '视频封面借用该次发射的图')
+	eq(r.videos[0].title, 'Webcast B', '视频标题取 vid.title')
+	eq(r.truncated, false, '未达上限不标记截断')
+
+	// 空数据 / 脏数据都不能炸
+	eq(m.collectMedia(null, null).images.length, 0, '入参为空安全返回')
+	eq(m.collectMedia([], []).videos.length, 0, '空数组安全返回')
+
+	fs.unlinkSync(path.join(dir, 'sl-media.mjs'))
+}
+
 ;(async () => {
 	await testFormat()
 	await testSearchMatch()
+	await testMedia()
 })()
 	.catch((e) => {
 		failed++
