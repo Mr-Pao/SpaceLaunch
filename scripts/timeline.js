@@ -20,7 +20,6 @@ const fs = require('fs')
 const path = require('path')
 const { getJson } = require('./lib/fetch')
 const { upload, hasCosConfig } = require('./lib/cos')
-const translate = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 const FILE = 'timelines.json'
@@ -79,8 +78,6 @@ async function runTimelines() {
 	}
 	fs.mkdirSync(OUT_DIR, { recursive: true })
 
-	await translate.loadCache()
-
 	const old = (await readCos(KEY)) || { list: [] }
 	const byId = new Map()
 	for (const x of old.list || []) {
@@ -123,18 +120,13 @@ async function runTimelines() {
 	let added = 0
 	let empty = 0
 	let failed = 0
-	const fresh = []
 
 	for (const c of todo) {
 		try {
 			const items = await fetchOne(c.id)
 			byId.set(c.id, { id: c.id, name: c.name, net: c.net, at: new Date().toISOString(), items })
-			if (items.length) {
-				added++
-				fresh.push(...items.map((x) => x.a), ...items.map((x) => x.d))
-			} else {
-				empty++
-			}
+			if (items.length) added++
+			else empty++
 			await new Promise((r) => setTimeout(r, 800))
 		} catch (e) {
 			// 单条失败不影响整轮；不写入，下轮会重试
@@ -143,27 +135,13 @@ async function runTimelines() {
 		}
 	}
 
-	// 翻译节点名与说明。同一条时间线会反复出现同样的短语（Prop Load / Ignition…），
-	// 按原文哈希缓存，实际只有头几十条会产生新翻译
-	if (fresh.length) {
-		try {
-			await translate.translateTexts(fresh)
-		} catch (e) {
-			console.warn(`  ! 时间线翻译失败，保留英文: ${e.message}`)
-		}
-	}
-
+	// 这里**不翻译**节点名。
+	// 第一版试过走机器翻译，结果 "Prop Load" → 「支柱负载」、"GO for Prop Load" →
+	// 「GO 进行支柱负载」，全是航天术语被通用翻译毁掉的样子。
+	// 节点名就那几十种，交给 utils/timeline.js 的本地表；表外的显示英文原文更诚实。
 	const list = [...byId.values()]
 		.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
 		.slice(0, KEEP)
-
-	// 回填中文：abbrev 走 az、description 走 z，前端优先本地表、其次 az
-	for (const row of list) {
-		for (const it of row.items || []) {
-			if (!it.az) it.az = translate.getZh(it.a) || ''
-			if (!it.z) it.z = translate.getZh(it.d) || ''
-		}
-	}
 
 	const payload = {
 		v: 1,
@@ -180,17 +158,6 @@ async function runTimelines() {
 	console.log(`  → ${FILE}  ${list.length} 条 / ${kb} KB（本轮新增 ${added}、空 ${empty}、失败 ${failed}）`)
 
 	await upload(filePath, KEY, 'public, max-age=1800')
-
-	// 翻译缓存同样要回传，否则下一轮 CI 又是零命中
-	const t = translate.summary()
-	if (t.dirty) {
-		try {
-			const cachePath = translate.saveCache()
-			await upload(cachePath, 'space-data/translation-cache.json', 'public, max-age=3600')
-		} catch (e) {
-			console.warn('  ! 翻译缓存上传失败（不影响数据）: ' + e.message)
-		}
-	}
 
 	return { added, empty, failed, total: list.length }
 }

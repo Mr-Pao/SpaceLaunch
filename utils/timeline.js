@@ -52,6 +52,9 @@ const TL_ZH = {
 	'payload deployment sequence end': '载荷部署结束',
 	'dragon separation': '飞船分离',
 	docking: '对接',
+	// Starlink 专属节点：这批任务占了 LL2 已发射记录的一大半
+	'starlink deployment': '星链部署',
+	'starlink deploy': '星链部署',
 	hold: '暂缓'
 }
 
@@ -69,14 +72,17 @@ export function parseDuration(s) {
 	return sign * sec * 1000
 }
 
-/** 节点显示名：本地表 → 同步翻译 → 英文原文 */
+/**
+ * 节点显示名：只查本地表，查不到保留英文
+ *
+ * 为什么不用同步阶段翻好的 `az`：实测机器翻译把 "Prop Load" 翻成「支柱负载」、
+ * "GO for Prop Load" 翻成「GO 进行支柱负载」—— 这类节点名全是航天术语缩写，
+ * 交给通用翻译只会更糟。表外宁可显示英文，也别显示错的。
+ */
 export function tlLabel(item) {
 	if (!item) return ''
 	const raw = String(item.a || '').trim()
-	const hit = TL_ZH[raw.toLowerCase()]
-	if (hit) return hit
-	if (item.az) return item.az
-	return raw
+	return TL_ZH[raw.toLowerCase()] || raw
 }
 
 /** 相对时间的展示串：T-38 分 / T-0 / T+5 分 / T+2 时 48 分 */

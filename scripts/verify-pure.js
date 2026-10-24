@@ -351,9 +351,9 @@ async function testTimeline() {
 	eq(t.tlRelative(null), '', '相对时间：空值返回空串')
 
 	eq(t.tlLabel({ a: 'Prop Load' }), '推进剂加注', '节点名：本地表命中')
-	eq(t.tlLabel({ a: 'Prop Load', az: '加注推进剂' }), '推进剂加注', '节点名：本地表优先于机器翻译')
-	eq(t.tlLabel({ a: 'Weird Step', az: '怪步骤' }), '怪步骤', '节点名：表外走同步翻译')
-	eq(t.tlLabel({ a: 'Weird Step' }), 'Weird Step', '节点名：都没有则保留英文')
+	eq(t.tlLabel({ a: 'Prop Load', az: '支柱负载' }), '推进剂加注', '节点名：机器翻译的垃圾不参与显示')
+	eq(t.tlLabel({ a: 'Starlink Deployment' }), '星链部署', '节点名：星链专属节点')
+	eq(t.tlLabel({ a: 'Weird Step', az: '怪步骤' }), 'Weird Step', '节点名：表外一律保留英文')
 
 	const items = [
 		{ a: 'A', t: '-PT60M' },
