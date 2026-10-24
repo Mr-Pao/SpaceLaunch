@@ -67,9 +67,15 @@
 
 				<view class="meta-line">
 					<text class="time">{{ netText }}</text>
-					<view class="fav" :class="{ on: isFav }" @click="toggleFav">
-						<text class="fav-icon">{{ isFav ? '★' : '☆' }}</text>
-						<text class="fav-text">{{ isFav ? '已收藏' : '收藏' }}</text>
+					<view class="meta-acts">
+						<button class="share-btn" open-type="share">
+							<text class="share-icon">⤴</text>
+							<text class="share-text">分享</text>
+						</button>
+						<view class="fav" :class="{ on: isFav }" @click="toggleFav">
+							<text class="fav-icon">{{ isFav ? '★' : '☆' }}</text>
+							<text class="fav-text">{{ isFav ? '已收藏' : '收藏' }}</text>
+						</view>
 					</view>
 				</view>
 
@@ -918,6 +924,42 @@ export default {
 .fav.on .fav-icon,
 .fav.on .fav-text {
 	color: #f5c33b;
+}
+
+/* 收藏 + 分享并排 */
+.meta-acts {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+/* 分享按钮：原生 button 重置成与收藏一致的胶囊 */
+.share-btn {
+	display: flex;
+	align-items: center;
+	margin: 0 0 0 20rpx;
+	padding: 8rpx 20rpx;
+	border-radius: 40rpx;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1rpx solid rgba(255, 255, 255, 0.08);
+	line-height: 1;
+	font-size: 24rpx;
+}
+
+/* 小程序 button 自带的边框伪元素必须拿掉，否则重影 */
+.share-btn::after {
+	border: none;
+}
+
+.share-icon {
+	margin-right: 8rpx;
+	color: #6b7891;
+	font-size: 26rpx;
+}
+
+.share-text {
+	color: #6b7891;
+	font-size: 24rpx;
 }
 
 /* 卡片 */
