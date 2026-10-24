@@ -1,5 +1,6 @@
 <template>
 	<view class="page">
+		<star-field />
 		<!-- 审核模式下整页只留空态：活动是资讯感最重的一块，
 		     开关来自 COS 的 app-config.json（utils/config.js），
 		     失败兜底正常展示，不影响普通用户 -->

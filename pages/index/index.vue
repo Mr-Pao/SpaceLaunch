@@ -1,10 +1,7 @@
 <template>
 	<view class="page">
-		<!-- 太空背景：整片星空是「一个元素 + box-shadow 星点」，只有一条动画合成层。
-		     之前 36 个 view 各跑一条 twinkle 动画，低端机上每条都是实打实的合成开销 -->
-		<view class="space-bg">
-			<view class="stars" :style="{ boxShadow: starShadow }"></view>
-		</view>
+		<!-- 全屏星空：组件化后 5 个 tab 页共用同一套星点层 -->
+		<star-field />
 
 		<!-- 沉浸式头部：statusBarH 只负责让出状态栏，内容从状态栏下方开始；
 		     紧凑横排（logo + 标题一行 + 右上搜索），不再占半屏 -->
@@ -142,8 +139,6 @@ export default {
 
 	data() {
 		return {
-			// 整片星空的 box-shadow 字符串（onLoad 一次生成）
-			starShadow: '',
 			// 后续排期（第 100 条之后）只在第一次翻到底时拉一回
 			loadingMore: false,
 			moreDone: false,
@@ -194,18 +189,6 @@ export default {
 	},
 
 	onLoad() {
-		// 整片星空 = 一个元素的 box-shadow 星点（90+ 颗，含少量大星），
-		// 单条动画合成层；位置用 px（box-shadow 里 rpx 要靠编译期，运行时生成只能用 px）
-		const info = uni.getSystemInfoSync()
-		const dots = []
-		for (let i = 0; i < 90; i++) {
-			const x = (Math.random() * info.windowWidth).toFixed(1)
-			const y = (Math.random() * info.windowHeight).toFixed(1)
-			const size = Math.random() > 0.85 ? 1 : 0
-			const alpha = (0.3 + Math.random() * 0.7).toFixed(2)
-			dots.push(x + 'px ' + y + 'px 0 ' + size + 'px rgba(255,255,255,' + alpha + ')')
-		}
-		this.starShadow = dots.join(', ')
 		// 审核态：首页不放内容，直接把入口切到火箭大全（tabBar 已隐藏，
 		// 审核员看到的就是一个纯粹的火箭参数查询工具）；本机切「展示」后也一样
 		getConfig().then((c) => {
@@ -308,34 +291,6 @@ export default {
 	padding-bottom: 200rpx;
 	background: #0a0e17;
 	overflow: hidden;
-}
-
-.space-bg {
-	position: fixed;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	z-index: 0;
-	pointer-events: none;
-}
-
-/* 整片星空是一个元素：星星全部由 box-shadow 画出（onLoad 生成的内联样式），
-   元素本身缩成 1px 透明点藏在原点；整层只跑一条 twinkle，合成开销极低 */
-.stars {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 2rpx;
-	height: 2rpx;
-	background: transparent;
-	border-radius: 50%;
-	animation: twinkle 3.2s infinite ease-in-out;
-}
-
-@keyframes twinkle {
-	0%, 100% { opacity: 0.35; }
-	50% { opacity: 1; }
 }
 
 .header {
@@ -455,8 +410,7 @@ export default {
 	letter-spacing: 2rpx;
 }
 
-/* 错误 / 空态：骨架在 styles/list.scss，这里只补定位 ——
-   背景星空是 position: fixed，不把 z-index 抬起来会被盖住 */
+/* 错误 / 空态 */
 .error,
 .empty {
 	position: relative;

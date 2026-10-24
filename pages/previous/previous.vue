@@ -1,5 +1,6 @@
 <template>
 	<view class="page">
+		<star-field />
 		<block v-if="!reviewMode">
 		<view class="stat" v-if="total" :style="{ paddingTop: statusBarH + 10 + 'px' }">
 			<text class="stat-main">已发射 {{ total }} 次</text>

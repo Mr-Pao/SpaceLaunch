@@ -1,5 +1,6 @@
 <template>
 	<view class="page">
+		<star-field />
 		<view class="header" :style="{ paddingTop: statusBarH + 'px' }">
 			<!-- 连点 5 次呼出展示开关（静默切换）：入口隐藏，普通用户与审核不可见 -->
 			<text class="title" @click="onTitleTap">火箭大全</text>

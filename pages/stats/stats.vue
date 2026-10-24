@@ -1,5 +1,6 @@
 <template>
 	<view class="page" :style="{ paddingTop: statusBarH + 'px' }">
+		<star-field />
 		<block v-if="!reviewMode">
 		<view class="loading" v-if="loading">
 			<text class="hint-text">统计中...</text>
