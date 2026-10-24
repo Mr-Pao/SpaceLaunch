@@ -21,7 +21,8 @@ const PARTIAL = ['Partial']
  *
  * stats 的数据源有两个，字段形态不一样：
  *   - launches-previous.json 用的是 slimLaunch（status 是对象、rocket.configuration、pad.location）
- *   - history/pNN.json       用的是 slimStatLaunch（status 是字符串、rocket 是字符串、site）
+ *   - history/pNN.json       也是 slimLaunch 裁出来的（archive.js 统一用它），
+ *                            只是旧分片历史上混过 slimStatLaunch 的形态（status 字符串、rocket 字符串、site）
  * 必须先把字段拍平成同一种，否则聚合出来全是 `[object Object]`。
  */
 function normalize(x) {

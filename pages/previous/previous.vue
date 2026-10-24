@@ -111,6 +111,9 @@ export default {
 
 	onShow() {
 		syncTabBar(1)
+		// 从详情页收藏/取消收藏返回时，列表的琥珀色标记要跟着变
+		// （首页有同样的处理，这里之前漏了）
+		this.refreshFav()
 	},
 
 	onPullDownRefresh() {

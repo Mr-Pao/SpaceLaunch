@@ -91,7 +91,6 @@ function slimLaunch(l) {
 		id: l.id ?? null,
 		name: str(l.name),
 		net: str(l.net),
-		last_updated: str(l.last_updated),
 		image: imageUrl(l.image),
 		// 任务信息图（一张竖版长图）。LL2 里是 URL 字符串，也可能为 null
 		infographic: imageUrl(l.infographic),
@@ -121,9 +120,10 @@ function slimLaunch(l) {
 			name: str(l.pad && l.pad.name),
 			latitude: (l.pad && l.pad.latitude) ?? null,
 			longitude: (l.pad && l.pad.longitude) ?? null,
-			map_image: imageUrl(l.pad && l.pad.map_image),
 			location: { name: str(l.pad && l.pad.location && l.pad.location.name) }
 		},
+		// pad.map_image 已删：前端从未渲染，却要 CI 每轮下载+压缩+上传
+		// （upcoming 每 15 分钟 100 张、upcomingMore 每天 376 张），纯浪费
 
 		mission: {
 			// 载荷名，比如 "Starlink Group 15-16"。之前整个 mission 只留了描述和类型，
@@ -161,10 +161,9 @@ function slimLaunch(l) {
 		window_end: str(l.window_end),
 
 		// LL2 直接给了各种累计次数，不用自己算，详情页拿来做「发射统计」四格
+		// （location_* 两项前端从未展示，已删）
 		orbital_launch_attempt_count: num(l.orbital_launch_attempt_count),
 		orbital_launch_attempt_count_year: num(l.orbital_launch_attempt_count_year),
-		location_launch_attempt_count: num(l.location_launch_attempt_count),
-		location_launch_attempt_count_year: num(l.location_launch_attempt_count_year),
 		agency_launch_attempt_count: num(l.agency_launch_attempt_count),
 		agency_launch_attempt_count_year: num(l.agency_launch_attempt_count_year),
 

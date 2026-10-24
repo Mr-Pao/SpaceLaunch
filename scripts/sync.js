@@ -55,7 +55,7 @@ const DATASETS = {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',
 		localize: localizeLaunches,
-		images: ['image', 'pad.map_image', { path: 'infographic', preset: 'large' }],
+		images: ['image', { path: 'infographic', preset: 'large' }],
 		async fetch() {
 			// limit=100 仍然是 1 个请求，和原来的 limit=50 同价，首屏条数直接翻倍
 			const j = await getJson('/launches/upcoming/?limit=100&mode=normal&format=json')
@@ -75,7 +75,7 @@ const DATASETS = {
 		cacheControl: 'public, max-age=21600',
 		// 只翻任务名：400 条连描述一起翻会顶破 CI 的 15 分钟上限
 		localize: localizeLaunchNames,
-		images: ['image', 'pad.map_image', { path: 'infographic', preset: 'large' }],
+		images: ['image', { path: 'infographic', preset: 'large' }],
 		async fetch() {
 			const all = []
 			let count = 0
@@ -141,13 +141,6 @@ const DATASETS = {
 		}
 	},
 
-	/**
-	 * 统计页的原料。
-	 *
-	 * 不做年份过滤（`net__gte` 这类过滤参数在 2.3.0 上没实测过，不敢押），
-	 * 改成直接按时间倒序拉最近 400 次发射，前端自己按 net 的年份筛。
-	 * 400 条 × 5 个短字段约 35KB，比在 CI 里把统计结果算死要灵活得多。
-	 */
 	/**
 	 * 火箭型号库
 	 *

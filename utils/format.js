@@ -44,9 +44,11 @@ export function relativeTime(value) {
 	const abs = Math.abs(diff)
 	const future = diff > 0
 
-	const mins = Math.round(abs / 60000)
-	const hours = Math.round(abs / 3600000)
-	const days = Math.round(abs / 86400000)
+	// 一律向下取整：「1 天前」允许少报（1.6 天显示 1 天），
+	// round 会把 1.6 天报成 2 天，明明还差 10 小时才满两天却看着像过了两天
+	const mins = Math.floor(abs / 60000)
+	const hours = Math.floor(abs / 3600000)
+	const days = Math.floor(abs / 86400000)
 
 	if (mins < 1) return '即将发射'
 	if (mins < 60) return future ? `${mins} 分钟后` : `${mins} 分钟前`

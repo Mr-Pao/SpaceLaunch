@@ -152,22 +152,6 @@ export default {
 	font-size: 22rpx;
 }
 
-/* 小号：详情页 */
-.cd-sm .cd-t {
-	margin-top: 6rpx;
-	font-size: 28rpx;
-}
-
-.cd-sm .cd-num {
-	font-size: 36rpx;
-	line-height: 1.2;
-}
-
-.cd-sm .cd-unit {
-	margin-top: 2rpx;
-	font-size: 18rpx;
-}
-
 .cd-over {
 	color: #38bdf8;
 	font-weight: 600;
@@ -175,9 +159,5 @@ export default {
 
 .cd-lg .cd-over {
 	font-size: 44rpx;
-}
-
-.cd-sm .cd-over {
-	font-size: 30rpx;
 }
 </style>
