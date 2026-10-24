@@ -161,10 +161,9 @@ function slimLaunch(l) {
 		window_end: str(l.window_end),
 
 		// LL2 直接给了各种累计次数，不用自己算，详情页拿来做「发射统计」四格
-		// （location_* 两项前端从未展示，已删）
+		// （location_* 与 agency_launch_attempt_count 前端从未展示，已删）
 		orbital_launch_attempt_count: num(l.orbital_launch_attempt_count),
 		orbital_launch_attempt_count_year: num(l.orbital_launch_attempt_count_year),
-		agency_launch_attempt_count: num(l.agency_launch_attempt_count),
 		agency_launch_attempt_count_year: num(l.agency_launch_attempt_count_year),
 
 		pad_launch_attempt_count: num(l.pad_launch_attempt_count),
