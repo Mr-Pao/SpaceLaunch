@@ -310,8 +310,23 @@ async function testMedia() {
 			pad: { name: 'SLC-40', image: 'p1.jpg', imageThumb: 'p1t.jpg', imageCredit: 'CCTV' },
 			// 第一条带自己的封面（YouTube 缩略图），第二条没有 —— 用来测降级
 			vid: [
-				{ url: 'https://youtu.be/x', title: 'Webcast B', publisher: 'SpaceX', priority: 1, cover: 'vc.jpg' },
-				{ url: 'https://youtu.be/y', title: 'Webcast B2', publisher: 'SpaceX', priority: 2 }
+				{
+					url: 'https://youtu.be/x',
+					title: 'Webcast B',
+					publisher: 'SpaceX',
+					priority: 1,
+					tid: 1,
+					kind: 'Official Webcast',
+					cover: 'vc.jpg'
+				},
+				{
+					url: 'https://youtu.be/y',
+					title: 'Webcast B2',
+					publisher: 'SpaceX',
+					priority: 2,
+					tid: 3,
+					kind: 'Unofficial Webcast'
+				}
 			]
 		},
 		{
@@ -338,6 +353,8 @@ async function testMedia() {
 	eq(r.videos[0].thumb, 'vc.jpg', '视频卡片的 thumb 同样指封面')
 	eq(r.videos[1].cover, 'l1t.jpg', '没封面时退回发射缩略图（不能留灰块）')
 	eq(r.videos[0].title, 'Webcast B', '视频标题取 vid.title')
+	eq(r.videos[0].official, true, '官方直播打上 official 标记（type.id=1）')
+	eq(r.videos[1].official, false, '第三方转播不打官方标记')
 	eq(r.truncated, false, '未达上限不标记截断')
 
 	// 空数据 / 脏数据都不能炸
