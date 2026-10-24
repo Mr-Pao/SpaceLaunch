@@ -500,12 +500,14 @@ export default {
 			return out
 		},
 
-		// 发射周期：默认只展示「接下来要发生的」几步，点「查看全部」铺开
+		// 发射周期：默认只展示「接下来要发生的」几步，点「展开全部」铺开。
+		// 排序 + 挑选只算一次，三个展示用的属性都从这里取
+		tlPick() {
+			return pickTimeline(this.timeline, this.detail && this.detail.net, Date.now(), 4)
+		},
 		tlDisplay() {
 			if (!this.timeline.length) return []
-			const src = this.tlOpen
-				? sortedTimeline(this.timeline)
-				: pickTimeline(this.timeline, this.detail && this.detail.net, Date.now(), 4).list
+			const src = this.tlOpen ? sortedTimeline(this.timeline) : this.tlPick.list
 
 			const t0 = this.detail && this.detail.net ? new Date(this.detail.net).getTime() : NaN
 			const now = Date.now()
@@ -521,10 +523,10 @@ export default {
 			})
 		},
 		tlTotal() {
-			return pickTimeline(this.timeline, this.detail && this.detail.net, Date.now(), 4).total
+			return this.tlPick.total
 		},
 		tlMore() {
-			return pickTimeline(this.timeline, this.detail && this.detail.net, Date.now(), 4).more
+			return this.tlPick.more
 		},
 
 		// LL2 直接给了累计次数，六格统计不用自己算
