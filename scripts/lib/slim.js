@@ -172,10 +172,22 @@ function slimLaunch(l) {
 			imageThumb: thumbUrl(l.pad && l.pad.image),
 			imageCredit: imageCredit(l.pad && l.pad.image),
 			imageName: str(l.pad && l.pad.image && l.pad.image.name),
-			location: { name: str(l.pad && l.pad.location && l.pad.location.name) }
+			// 工位地图（卫星示意图）。详情页「发射场地」卡需要它 ——
+			// 之前删掉是因为当时没地方用；现在要用，就只对 upcoming/previous
+			// 这两个真正会展示的集开启镜像（见 sync.js 的 images 配置），
+			// upcomingMore 那 376 条仍然不镜像，避免白烧流量
+			map_image: imageUrl(l.pad && l.pad.map_image),
+			total_launch_count: num(l.pad && l.pad.total_launch_count),
+			location: {
+				name: str(l.pad && l.pad.location && l.pad.location.name),
+				total_launch_count: num(l.pad && l.pad.location && l.pad.location.total_launch_count)
+			}
 		},
-		// pad.map_image 已删：前端从未渲染，却要 CI 每轮下载+压缩+上传
-		// （upcoming 每 15 分钟 100 张、upcomingMore 每天 376 张），纯浪费
+
+		// 火箭技术参数（起飞推力 / 长度 / LEO / GTO / 造价…）不在这次的响应里：
+		// normal 模式的 configuration 只给名字。同步阶段用 lib/enrich.js
+		// 拿 launchers.json 按 config id 回填，前端因此零额外请求
+		rocketBrief: null,
 
 		mission: {
 			// 载荷名，比如 "Starlink Group 15-16"。之前整个 mission 只留了描述和类型，
@@ -212,12 +224,12 @@ function slimLaunch(l) {
 		window_start: str(l.window_start),
 		window_end: str(l.window_end),
 
-		// LL2 直接给了各种累计次数，不用自己算，详情页拿来做「发射统计」四格
-		// （location_* 与 agency_launch_attempt_count 前端从未展示，已删）
+		// LL2 直接给了各种累计次数，不用自己算。
+		// 详情页底部「统计概览」用 6 格：全球 / 本机构 / 本工位 的累计与本年
 		orbital_launch_attempt_count: num(l.orbital_launch_attempt_count),
 		orbital_launch_attempt_count_year: num(l.orbital_launch_attempt_count_year),
+		agency_launch_attempt_count: num(l.agency_launch_attempt_count),
 		agency_launch_attempt_count_year: num(l.agency_launch_attempt_count_year),
-
 		pad_launch_attempt_count: num(l.pad_launch_attempt_count),
 		pad_launch_attempt_count_year: num(l.pad_launch_attempt_count_year)
 	}

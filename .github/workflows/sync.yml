@@ -23,6 +23,7 @@ on:
     - cron: '0 20 * * *'     # 即将发射后续排期：每天 UTC 20:00 = 北京 04:00（要 4 个请求）
     - cron: '0 21 * * *'     # 火箭型号库：每天 UTC 21:00 = 北京 05:00（要 6 个请求）
     - cron: '0 22 * * *'     # 发射工位库：每天 UTC 22:00 = 北京 06:00（1 个请求）
+    - cron: '20 */3 * * *'   # 发射时间线：每 3 小时（每次 8 条单条详情）
   # 手动触发（含本机无 API 访问时）：改 scripts/sync-request.json 里的 dataset 再 push 即可。
   # GitHub App / 手机上也能改这个文件，是最省事的"跑一次某数据集"入口。
   push:
@@ -44,6 +45,7 @@ on:
           - launchers
           - pads
           - stats
+          - timeline
           - all
 
 permissions:
@@ -83,6 +85,7 @@ jobs:
               "0 20 * * *")   DS="upcomingMore" ;;
               "0 21 * * *")   DS="launchers" ;;
               "0 22 * * *")   DS="pads" ;;
+              "20 */3 * * *") DS="timeline" ;;
               *)              DS="upcoming" ;;
             esac
           fi
@@ -113,6 +116,9 @@ jobs:
           # 描述中文化：CI 在海外节点，Google 免费端点可直连且不限量，
           # auto 表示 Google 挂了自动降级到 MyMemory，两条都挂就保留英文
           TRANSLATE_PROVIDER: auto
+          # 时间线每轮抓多少条：sync 自身约用 6 次/小时，这里留 8 条，
+          # 合计仍在未认证限额 15 次/小时之内
+          TIMELINE_PER_RUN: '8'
         run: node sync.js --dataset=${{ steps.pick.outputs.dataset }}
 
       # GitHub 规定：公开仓库连续 60 天无提交，定时任务会被自动停用。

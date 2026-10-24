@@ -34,7 +34,10 @@ const PREFIX = 'space-img'
  */
 const PRESETS = {
 	thumb: { maxWidth: 480, maxBytes: 30 * 1024, qualities: [72, 64, 56, 48, 40], fallbackWidth: 320, fallbackQuality: 55 },
-	large: { maxWidth: 1080, maxBytes: 300 * 1024, qualities: [85, 78, 70, 60, 50], fallbackWidth: 720, fallbackQuality: 60 }
+	large: { maxWidth: 1080, maxBytes: 300 * 1024, qualities: [85, 78, 70, 60, 50], fallbackWidth: 720, fallbackQuality: 60 },
+	// 工位地图：要用来看清跑道、塔架和周边地形，480px 糊成一片；
+	// 但也不值得按 1080px 传 —— 750px 正好是 375pt 屏的 2 倍图
+	map: { maxWidth: 750, maxBytes: 120 * 1024, qualities: [78, 70, 62, 54], fallbackWidth: 600, fallbackQuality: 55 }
 }
 
 const MAX_WIDTH = PRESETS.thumb.maxWidth

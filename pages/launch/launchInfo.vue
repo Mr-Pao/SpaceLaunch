@@ -50,6 +50,9 @@
 				<view v-else class="hero-img hero-placeholder"></view>
 
 				<view class="hero-mask"></view>
+
+				<!-- 图片计数角标：多图轮播时才有意义，单图显示「1/1」纯噪音 -->
+				<view class="hero-count" v-if="heroImages.length > 1">1/{{ heroImages.length }}</view>
 			</view>
 
 			<view class="body">
@@ -61,38 +64,95 @@
 				</view>
 
 				<!-- 倒计时：发射前最有用的一行 -->
-				<view class="cd-row">
+				<view class="cd-row" v-if="isUpcoming">
 					<countdown :net="detail.net" size="lg" />
 				</view>
 
-				<view class="meta-line">
-					<text class="time">{{ netText }}</text>
-					<view class="meta-acts">
-						<button class="share-btn" open-type="share" @tap="onShareTap">
-							<text class="share-icon">⤴</text>
-							<text class="share-text">分享</text>
-						</button>
-						<view class="fav" :class="{ on: isFav }" @click="toggleFav">
-							<text class="fav-icon">{{ isFav ? '★' : '☆' }}</text>
-							<text class="fav-text">{{ isFav ? '已收藏' : '收藏' }}</text>
+				<!-- 发射周期：LL2 单条详情才有 timeline，没抓到的任务整块不显示。
+				     默认只给「接下来要发生的」几步，避免一屏全是已经做完的流程 -->
+				<view class="tl" v-if="tlDisplay.length">
+					<view class="tl-head">
+						<text class="tl-title">发射周期</text>
+						<text class="tl-more" v-if="tlOpen" @click="tlOpen = false">收起</text>
+						<text class="tl-more" v-else-if="tlMore > 0" @click="tlOpen = true">
+							展开全部 {{ tlTotal }} 步
+						</text>
+					</view>
+					<view class="tl-list">
+						<view class="tl-row" v-for="(it, i) in tlDisplay" :key="i" :class="{ past: it.past }">
+							<view class="tl-dot"></view>
+							<text class="tl-name">{{ it.label }}</text>
+							<text class="tl-rel">{{ it.relText }}</text>
 						</view>
 					</view>
 				</view>
 
-				<!-- 任务信息 -->
+				<!-- 发射时刻：本地时间的大字，比「2026-10-27 12:45（3 小时后）」好扫 -->
+				<view class="when">
+					<view class="when-top">
+						<view class="when-cap-wrap">
+							<text class="when-cap">发射时间</text>
+							<text class="when-tz">北京时间</text>
+						</view>
+						<view class="meta-acts">
+							<button class="share-btn" open-type="share" @tap="onShareTap">
+								<text class="share-icon">⤴</text>
+								<text class="share-text">分享</text>
+							</button>
+							<view class="fav" :class="{ on: isFav }" @click="toggleFav">
+								<text class="fav-icon">{{ isFav ? '★' : '☆' }}</text>
+								<text class="fav-text">{{ isFav ? '已收藏' : '收藏' }}</text>
+							</view>
+						</view>
+					</view>
+					<text class="when-clock">{{ clockText }}</text>
+					<view class="when-bottom">
+						<text class="when-date">{{ dateText }}</text>
+						<text class="when-rel" v-if="relText">{{ relText }}</text>
+					</view>
+				</view>
+
+				<!-- 计划发射窗口：两端的时刻 + 一条带节点的轴，
+				     告诉用户这次发射有几分钟到几小时的余量 -->
+				<view class="win" v-if="winEnd">
+					<view class="win-head">
+						<text class="win-title">计划发射窗口</text>
+						<text class="win-span">{{ winSpan }}</text>
+					</view>
+					<view class="win-track">
+						<view class="win-node"></view>
+						<view class="win-line"></view>
+						<view class="win-node"></view>
+					</view>
+					<view class="win-ends">
+						<view class="win-end">
+							<text class="win-time">{{ winStartClock }}</text>
+							<text class="win-cap">开始</text>
+						</view>
+						<view class="win-end is-right">
+							<text class="win-time">{{ winEndClock }}</text>
+							<text class="win-cap">结束</text>
+						</view>
+					</view>
+				</view>
+
+				<!-- 任务详情 -->
 				<view class="card" v-if="hasMission">
-					<view class="card-title">任务信息</view>
+					<view class="card-title">任务详情</view>
 					<view class="row" v-if="missionName">
 						<text class="label">任务名</text>
 						<text class="value">{{ missionName }}</text>
 					</view>
 					<view class="row" v-if="missionType">
-						<text class="label">类型</text>
+						<text class="label">任务类型</text>
 						<text class="value">{{ missionType }}</text>
 					</view>
-					<view class="row" v-if="orbitText">
-						<text class="label">目标轨道</text>
-						<text class="value">{{ orbitText }}</text>
+					<!-- 轨道做成标签：缩写（LEO / GTO）+ 全称并排，
+					     比「目标轨道：Low Earth Orbit」一行更好扫 -->
+					<view class="chips" v-if="orbitChips.length">
+						<text class="chip" :class="{ 'chip-strong': c.abbrev }" v-for="(c, i) in orbitChips" :key="i">
+							{{ c.text }}
+						</text>
 					</view>
 					<!-- 任务描述动辄几百上千字，默认只给 4 行 + 展开/收起。
 					     详情页的功能定位是「查参数」，长文折叠后才不像科普文章
@@ -117,23 +177,59 @@
 					></image>
 				</view>
 
-				<!-- 火箭：可点进型号页看该型号的全部发射记录 -->
-				<view class="card card-link" v-if="rocketName" @click="goRocket">
+				<!-- 火箭介绍：技术参数由同步阶段从型号库 join 进来（rocketBrief），
+				     点卡片进型号页看该型号的全部构型与发射记录 -->
+				<view class="card rcard" v-if="rocketName" @click="goRocket">
 					<view class="card-title">
-						运载火箭
+						火箭介绍
 						<text class="arrow">›</text>
 					</view>
-					<view class="row">
-						<text class="label">型号</text>
-						<text class="value">{{ rocketName }}</text>
+
+					<view class="rhead">
+						<image
+							class="rimg"
+							v-if="rocketImage"
+							:src="rocketImage"
+							mode="aspectFill"
+							lazy-load
+						></image>
+						<view class="rmain">
+							<view class="rname-row">
+								<text class="rname">{{ rocketName }}</text>
+								<text class="rtag" :class="rocketActive ? 'rtag-on' : 'rtag-off'">
+									{{ rocketActive ? '现役' : '已退役' }}
+								</text>
+							</view>
+							<text class="rsub" v-if="rocketSub">{{ rocketSub }}</text>
+							<view class="rtag-row" v-if="rocketFlags.length">
+								<text class="rtag" v-for="(f, i) in rocketFlags" :key="i">{{ f }}</text>
+							</view>
+						</view>
 					</view>
-					<view class="row" v-if="showConfig">
-						<text class="label">配置</text>
-						<text class="value">{{ detail.rocket.configuration.name }}</text>
+
+					<text class="rdesc" v-if="rocketDesc">{{ rocketDesc }}</text>
+
+					<view class="rspec" v-if="rocketSpecs.length">
+						<view class="rspec-cell" v-for="(p, i) in rocketSpecs" :key="i">
+							<text class="rspec-v">{{ p.v }}</text>
+							<text class="rspec-k">{{ p.k }}</text>
+						</view>
 					</view>
-					<view class="row" v-if="rocketFamily">
-						<text class="label">系列</text>
-						<text class="value">{{ rocketFamily }}</text>
+
+					<view class="rmeta" v-if="rocketMeta.length">
+						<text class="rmeta-item" v-for="(m, i) in rocketMeta" :key="i">{{ m }}</text>
+					</view>
+
+					<!-- 发射机构：单独一行，点了进机构页（.stop 阻止冒泡到火箭页） -->
+					<view class="ragency" v-if="agency" @click.stop="goAgency(agency.id)">
+						<image
+							v-if="agency.logo_url"
+							class="ragency-logo"
+							:src="agency.logo_url"
+							mode="aspectFit"
+						></image>
+						<text class="ragency-name">{{ agencyLabel(agency.name) }}</text>
+						<text class="arrow">›</text>
 					</view>
 				</view>
 
@@ -154,70 +250,37 @@
 				<text class="card-desc">{{ failText }}</text>
 			</view>
 
-				<!-- 发射台：名称可点进工位详情（地图 + 累计发射数） -->
+				<!-- 发射场地：地图 + 名称可点进工位详情 -->
 				<view class="card" v-if="detail.pad && detail.pad.name">
-					<view class="card-title">发射台</view>
-					<view class="row row-link" @click="goPad">
-						<text class="label">名称</text>
-						<view class="value-wrap">
-							<text class="value value-link">{{ detail.pad.name }}</text>
-							<text class="value-arrow">›</text>
+					<view class="card-title">发射场地</view>
+					<image
+						class="padmap"
+						v-if="padMapImage && !reviewMode"
+						:src="padMapImage"
+						mode="widthFix"
+						lazy-load
+						@click="preview(padMapImage)"
+					></image>
+					<view class="padrow" @click="goPad">
+						<view class="padrow-main">
+							<text class="padrow-name">{{ detail.pad.name }}</text>
+							<text class="padrow-loc" v-if="padLocation">{{ padLocation }}</text>
 						</view>
+						<text class="arrow">›</text>
 					</view>
-					<view class="row" v-if="padLocation">
-						<text class="label">位置</text>
-						<text class="value">{{ padLocation }}</text>
+					<view class="row" v-if="detail.pad.total_launch_count">
+						<text class="label">该工位累计</text>
+						<text class="value">{{ detail.pad.total_launch_count }} 次发射</text>
 					</view>
 					<view class="row" v-if="padCoord">
 						<text class="label">经纬度</text>
 						<text class="value">{{ padCoord }}</text>
 					</view>
-					<view class="row" v-if="detail.pad_launch_attempt_count">
-						<text class="label">该台累计</text>
-						<text class="value">{{ detail.pad_launch_attempt_count }} 次发射</text>
-					</view>
 				</view>
 
-				<!-- 发射窗口：只给 net 一个点会让用户以为窗口就是那一秒 -->
-				<view class="card" v-if="windowEnd">
-					<view class="card-title">发射窗口</view>
-					<view class="row">
-						<text class="label">开始</text>
-						<text class="value">{{ windowStart }}</text>
-					</view>
-					<view class="row">
-						<text class="label">结束</text>
-						<text class="value">{{ windowEnd }}</text>
-					</view>
-					<view class="row" v-if="windowSpan">
-						<text class="label">窗口长度</text>
-						<text class="value">{{ windowSpan }}</text>
-					</view>
-				</view>
-
-				<!-- 发射机构：可点进机构详情 -->
-				<view class="card card-link" v-if="agency" @click="goAgency(agency.id)">
-					<view class="card-title">
-						发射机构
-						<text class="arrow">›</text>
-					</view>
-					<view class="agency">
-						<image v-if="agency.logo_url" class="agency-logo" :src="agency.logo_url" mode="aspectFit"></image>
-						<text class="agency-name">{{ agency.name }}</text>
-					</view>
-					<view class="row" v-if="agency.country_code">
-						<text class="label">国家/地区</text>
-						<text class="value">{{ agency.country_code }}</text>
-					</view>
-					<view class="row" v-if="agency.founding_year">
-						<text class="label">成立年份</text>
-						<text class="value">{{ agency.founding_year }} 年</text>
-					</view>
-				</view>
-
-				<!-- 发射统计：LL2 直接给了累计数，不用自己算 -->
+				<!-- 统计概览：LL2 直接给了累计数，不用自己算 -->
 				<view class="card" v-if="countCells.length">
-					<view class="card-title">发射统计</view>
+					<view class="card-title">统计概览</view>
 					<view class="stat-grid">
 						<view class="stat-cell" v-for="c in countCells" :key="c.label">
 							<text class="stat-num">{{ c.value }}</text>
@@ -248,7 +311,23 @@
 <script>
 import spaceData from '@/utils/data.js'
 import { findById as findByIdInArchive } from '@/utils/history.js'
-import { formatDateTime, relativeTime, launchTitle, rocketName as rocketNameOf, zhValue } from '@/utils/format.js'
+import {
+	formatDateTime,
+	relativeTime,
+	launchTitle,
+	rocketName as rocketNameOf,
+	orbitName,
+	missionTypeName,
+	agencyLabel,
+	clock,
+	longDate,
+	spanText,
+	massText,
+	costText,
+	isStillUpcoming,
+	textUnits
+} from '@/utils/format.js'
+import { pickTimeline, sortedTimeline, parseDuration, tlLabel, tlRelative } from '@/utils/timeline.js'
 import * as fav from '@/utils/favorites.js'
 import { getConfig } from '@/utils/config.js'
 
@@ -265,6 +344,10 @@ export default {
 			navSolid: false,
 			// 任务描述折叠态：默认收起，点击「展开全文」才铺开
 			descExpanded: false,
+			// 发射时间线（T- 序列）原始节点，来自 timelines.json，可能为空
+			timeline: [],
+			// 时间线是展开全部还是只给接下来几步
+			tlOpen: false,
 			// 审核模式：隐藏任务描述 / 天气顾虑 / 失败原因等长文，只留参数
 			reviewMode: false
 		}
@@ -294,7 +377,7 @@ export default {
 		},
 		missionType() {
 			const m = this.detail && this.detail.mission
-			return m ? zhValue(m.type) : ''
+			return m ? missionTypeName(m.type) : ''
 		},
 		missionDesc() {
 			const m = this.detail && this.detail.mission
@@ -316,53 +399,134 @@ export default {
 		orbitText() {
 			const o = this.detail && this.detail.mission && this.detail.mission.orbit
 			if (!o) return ''
-			return zhValue(o.abbrev) || zhValue(o.name) || ''
+			return orbitName(o.abbrev) || orbitName(o.name) || ''
 		},
 		rocketName() {
 			return rocketNameOf(this.detail && this.detail.rocket && this.detail.rocket.configuration)
 		},
-		// full_name 和 name 往往一模一样（"Long March 4B"），这时不重复摆一行
-		showConfig() {
-			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
-			if (!c || !c.name) return false
-			return c.name !== (c.full_name || c.name)
-		},
-		// 火箭所属系列 + 型号代号，比如「长征四号 · B」
-		// families 从大到小返回（Long March、Long March 4），只取最后一个更具体
-		rocketFamily() {
-			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
-			if (!c) return ''
 
-			const fams = c.families || []
-			const last = fams.length ? fams[fams.length - 1] : ''
-			const variant = c.variant || ''
-
-			if (last && variant) return last + ' · ' + variant
-			return last || variant
+		// 型号简介、图片、参数都来自同步阶段 join 进来的 rocketBrief
+		// （launchers.json 太大，前端不为一张卡去拉 568KB）
+		rocketBrief() {
+			return (this.detail && this.detail.rocketBrief) || null
 		},
-		windowStart() {
+		rocketImage() {
+			return (this.rocketBrief && this.rocketBrief.image) || ''
+		},
+		rocketActive() {
+			return Boolean(this.rocketBrief && this.rocketBrief.active)
+		},
+		// 副标题给英文原名：中文型号名有时是意译（猎鹰九号 / Falcon 9），
+		// 两行并排一看就对得上英文资料
+		rocketSub() {
+			const b = this.rocketBrief
+			if (!b || !b.name) return ''
+			const zh = this.rocketName
+			return b.name === zh ? '' : b.name
+		},
+		rocketFlags() {
+			const b = this.rocketBrief
+			if (!b) return []
+			const out = []
+			if (b.reusable) out.push('可复用')
+			if (b.max_stage) out.push(b.max_stage + ' 级')
+			return out
+		},
+		rocketDesc() {
+			return (this.rocketBrief && this.rocketBrief.desc) || ''
+		},
+		// 参数六格：和参考图一致，两列三行
+		rocketSpecs() {
+			const b = this.rocketBrief
+			if (!b) return []
+			const cells = []
+			const push = (k, v) => {
+				if (v !== undefined && v !== null && v !== '' && v !== 0) cells.push({ k, v })
+			}
+			push('起飞推力', b.to_thrust ? b.to_thrust + ' 千牛' : '')
+			push('长度', b.length ? b.length + ' 米' : '')
+			push('直径', b.diameter ? b.diameter + ' 米' : '')
+			push('级数', b.max_stage ? b.max_stage + ' 级' : '')
+			push('LEO 运力', b.leo_capacity ? massText(b.leo_capacity) : '')
+			push('GTO 运力', b.gto_capacity ? massText(b.gto_capacity) : '')
+			return cells
+		},
+		// 参数格放不下的两项，用一行小字带过
+		rocketMeta() {
+			const b = this.rocketBrief
+			if (!b) return []
+			const out = []
+			if (b.launch_mass) out.push('起飞质量 ' + b.launch_mass + ' 吨')
+			if (b.launch_cost) out.push('单次造价 ' + costText(b.launch_cost))
+			if (b.maiden_flight) out.push('首飞 ' + b.maiden_flight)
+			return out
+		},
+
+		// 发射时刻一行大字 + 日期
+		clockText() {
+			return clock(this.detail && this.detail.net) || '待定'
+		},
+		dateText() {
+			return longDate(this.detail && this.detail.net)
+		},
+		relText() {
+			if (!this.detail) return ''
+			return relativeTime(this.detail.net)
+		},
+		// 窗口两端的时刻与长度。LL2 里窗口长度从 0 分钟到几小时都有
+		winEnd() {
+			return (this.detail && this.detail.window_end) || ''
+		},
+		winStartClock() {
+			return clock(this.detail && this.detail.window_start)
+		},
+		winEndClock() {
+			return clock(this.detail && this.detail.window_end)
+		},
+		winSpan() {
 			const d = this.detail
-			return d && d.window_start ? formatDateTime(d.window_start) : ''
+			if (!d) return ''
+			return spanText(d.window_start, d.window_end)
 		},
-		windowEnd() {
-			const d = this.detail
-			return d && d.window_end ? formatDateTime(d.window_end) : ''
+
+		// 轨道标签：缩写加粗 + 全称并排
+		orbitChips() {
+			const o = this.detail && this.detail.mission && this.detail.mission.orbit
+			if (!o) return []
+			const out = []
+			if (o.abbrev) out.push({ text: orbitName(o.abbrev), abbrev: true })
+			if (o.name && o.name !== o.abbrev) out.push({ text: orbitName(o.name), abbrev: false })
+			return out
 		},
-		windowSpan() {
-			const d = this.detail
-			if (!d || !d.window_start || !d.window_end) return ''
 
-			const ms = new Date(d.window_end).getTime() - new Date(d.window_start).getTime()
-			if (!(ms > 0)) return ''
+		// 发射周期：默认只展示「接下来要发生的」几步，点「查看全部」铺开
+		tlDisplay() {
+			if (!this.timeline.length) return []
+			const src = this.tlOpen
+				? sortedTimeline(this.timeline)
+				: pickTimeline(this.timeline, this.detail && this.detail.net, Date.now(), 4).list
 
-			const min = Math.round(ms / 60000)
-			if (min < 60) return min + ' 分钟'
+			const t0 = this.detail && this.detail.net ? new Date(this.detail.net).getTime() : NaN
+			const now = Date.now()
 
-			const h = Math.floor(min / 60)
-			const m = min % 60
-			return m ? h + ' 小时 ' + m + ' 分钟' : h + ' 小时'
+			return src.map((it) => {
+				const ms = parseDuration(it && it.t)
+				const abs = isNaN(t0) || ms === null ? null : t0 + ms
+				return {
+					label: tlLabel(it),
+					relText: tlRelative(ms),
+					past: abs !== null && abs < now
+				}
+			})
 		},
-		// LL2 直接给了累计次数，四格统计不用自己算
+		tlTotal() {
+			return pickTimeline(this.timeline, this.detail && this.detail.net, Date.now(), 4).total
+		},
+		tlMore() {
+			return pickTimeline(this.timeline, this.detail && this.detail.net, Date.now(), 4).more
+		},
+
+		// LL2 直接给了累计次数，六格统计不用自己算
 		countCells() {
 			const d = this.detail
 			if (!d) return []
@@ -373,8 +537,10 @@ export default {
 			}
 			push(d.orbital_launch_attempt_count, '全球累计')
 			push(d.orbital_launch_attempt_count_year, '本年全球')
-			push(d.agency_launch_attempt_count_year, '本年本机构')
-			push(d.pad_launch_attempt_count_year, '本年本工位')
+			push(d.agency_launch_attempt_count, '机构累计')
+			push(d.agency_launch_attempt_count_year, '本年机构')
+			push(d.pad_launch_attempt_count, '工位累计')
+			push(d.pad_launch_attempt_count_year, '本年工位')
 			return cells
 		},
 		probabilityText() {
@@ -399,6 +565,14 @@ export default {
 			const p = this.detail && this.detail.pad
 			if (!p || p.latitude == null || p.longitude == null) return ''
 			return p.latitude.toFixed(2) + ', ' + p.longitude.toFixed(2)
+		},
+		// 工位卫星图：同步阶段按 750px 镜像到 COS，点开可全屏看
+		padMapImage() {
+			return (this.detail && this.detail.pad && this.detail.pad.map_image) || ''
+		},
+		// 还没发射（含推迟但状态未更新的）才显示倒计时
+		isUpcoming() {
+			return isStillUpcoming(this.detail)
 		},
 		statusClass() {
 			const s = this.detail && this.detail.status
@@ -485,12 +659,33 @@ export default {
 		this.detail = d
 		this.loading = false
 
+		// 时间线不阻塞首屏：页面先画出来，抓到的时间线到了再补一块
+		this.loadTimeline(id)
+
 		const providerId = d && d.launch_service_provider && d.launch_service_provider.id
 		if (providerId) {
 			this.agency = await spaceData.getAgencyById(providerId)
 		}
 	},
 	methods: {
+		/**
+		 * 读发射时间线
+		 *
+		 * LL2 的列表端点 timeline 恒为空，只有单条详情才有，
+		 * 配额又只够 CI 分批抓，所以大多数任务拿不到 —— 拿不到就整块不显示，
+		 * 不能编造也不能拿别的任务的时间线顶上。
+		 */
+		async loadTimeline(id) {
+			try {
+				const d = await spaceData.load('timelines')
+				const row = ((d && d.list) || []).find((x) => String(x.id) === String(id))
+				this.timeline = (row && row.items) || []
+			} catch (e) {
+				// COS 上还没生成 timelines.json，或网络失败：静默降级
+				this.timeline = []
+			}
+		},
+
 		/** 分享路径里的 net 参数：知道大致时间才能在归档里直达目标分片 */
 		_netQuery(noLeading) {
 			const net = this.detail && this.detail.net
@@ -926,6 +1121,20 @@ export default {
 	background: linear-gradient(to bottom, rgba(10, 14, 23, 0) 0%, #0a0e17 100%);
 }
 
+/* 图片计数角标：右上角压在图上，给一层半透明底保证在亮天空上也读得清 */
+.hero-count {
+	position: absolute;
+	right: 24rpx;
+	bottom: 24rpx;
+	padding: 4rpx 16rpx;
+	border-radius: 24rpx;
+	background: rgba(0, 0, 0, 0.42);
+	color: rgba(255, 255, 255, 0.92);
+	font-size: 22rpx;
+	line-height: 32rpx;
+	letter-spacing: 1rpx;
+}
+
 .body {
 	padding: 0 32rpx;
 	margin-top: -40rpx;
@@ -990,6 +1199,415 @@ export default {
 
 .cd-row {
 	margin-top: 26rpx;
+}
+
+/* ---- 发射周期（T- 序列） ---- */
+.tl {
+	margin-top: 24rpx;
+	padding: 26rpx 28rpx 12rpx;
+	background: #141a26;
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+}
+
+.tl-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8rpx;
+}
+
+.tl-title {
+	color: #e2e8f0;
+	font-size: 30rpx;
+	font-weight: 600;
+}
+
+.tl-more {
+	color: #38bdf8;
+	font-size: 24rpx;
+}
+
+.tl-row {
+	display: flex;
+	align-items: center;
+	padding: 11rpx 0;
+}
+
+.tl-dot {
+	width: 10rpx;
+	height: 10rpx;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: #38bdf8;
+	box-shadow: 0 0 0 4rpx rgba(56, 189, 248, 0.14);
+}
+
+.tl-name {
+	flex: 1;
+	min-width: 0;
+	margin-left: 18rpx;
+	color: #cbd5e0;
+	font-size: 27rpx;
+	line-height: 36rpx;
+}
+
+.tl-rel {
+	flex-shrink: 0;
+	margin-left: 16rpx;
+	color: #7d8ba0;
+	font-size: 24rpx;
+	line-height: 36rpx;
+	font-variant-numeric: tabular-nums;
+}
+
+/* 已经发生的节点压暗：一眼看出流程走到哪一步了 */
+.tl-row.past .tl-name,
+.tl-row.past .tl-rel {
+	color: #5a6478;
+}
+
+.tl-row.past .tl-dot {
+	background: #3b4658;
+	box-shadow: none;
+}
+
+/* ---- 发射时刻 ---- */
+.when {
+	margin-top: 20rpx;
+	padding: 26rpx 30rpx 24rpx;
+	background: linear-gradient(135deg, #17243a 0%, #141a26 100%);
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(56, 189, 248, 0.12);
+}
+
+.when-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.when-cap-wrap {
+	display: flex;
+	align-items: baseline;
+}
+
+.when-cap {
+	color: #cbd5e0;
+	font-size: 26rpx;
+}
+
+.when-tz {
+	margin-left: 12rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+/* 时刻是这张卡的主角：76rpx 大字，tabular-nums 让分钟跳动时不抖 */
+.when-clock {
+	display: block;
+	margin-top: 4rpx;
+	color: #ffffff;
+	font-size: 76rpx;
+	font-weight: 700;
+	line-height: 1.12;
+	letter-spacing: 2rpx;
+	font-variant-numeric: tabular-nums;
+}
+
+.when-bottom {
+	display: flex;
+	align-items: center;
+	margin-top: 4rpx;
+}
+
+.when-date {
+	color: #a0aec0;
+	font-size: 26rpx;
+}
+
+.when-rel {
+	margin-left: 16rpx;
+	color: #38bdf8;
+	font-size: 24rpx;
+}
+
+/* ---- 计划发射窗口 ---- */
+.win {
+	margin-top: 20rpx;
+	padding: 24rpx 30rpx 22rpx;
+	background: #141a26;
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+}
+
+.win-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.win-title {
+	color: #cbd5e0;
+	font-size: 26rpx;
+}
+
+.win-span {
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.win-track {
+	display: flex;
+	align-items: center;
+	margin-top: 22rpx;
+}
+
+.win-node {
+	width: 12rpx;
+	height: 12rpx;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: #38bdf8;
+}
+
+.win-line {
+	flex: 1;
+	height: 2rpx;
+	margin: 0 6rpx;
+	background: rgba(56, 189, 248, 0.45);
+}
+
+.win-ends {
+	display: flex;
+	justify-content: space-between;
+	margin-top: 10rpx;
+}
+
+.win-end {
+	display: flex;
+	flex-direction: column;
+}
+
+.win-end.is-right {
+	align-items: flex-end;
+}
+
+.win-time {
+	color: #e2e8f0;
+	font-size: 34rpx;
+	font-weight: 600;
+	line-height: 1.2;
+	font-variant-numeric: tabular-nums;
+}
+
+.win-cap {
+	margin-top: 2rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+/* ---- 轨道标签 ---- */
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: 16rpx;
+}
+
+.chip {
+	margin: 0 12rpx 12rpx 0;
+	padding: 6rpx 18rpx;
+	border-radius: 8rpx;
+	background: rgba(56, 189, 248, 0.1);
+	color: #7dd3fc;
+	font-size: 23rpx;
+}
+
+.chip-strong {
+	background: rgba(56, 189, 248, 0.18);
+	color: #38bdf8;
+	font-weight: 600;
+}
+
+/* ---- 火箭介绍 ---- */
+.rhead {
+	display: flex;
+}
+
+.rimg {
+	width: 180rpx;
+	height: 180rpx;
+	flex-shrink: 0;
+	border-radius: 14rpx;
+	background: #0f1621;
+}
+
+.rmain {
+	flex: 1;
+	min-width: 0;
+	margin-left: 20rpx;
+	display: flex;
+	flex-direction: column;
+}
+
+.rname-row {
+	display: flex;
+	align-items: center;
+}
+
+.rname {
+	flex: 1;
+	min-width: 0;
+	color: #ffffff;
+	font-size: 32rpx;
+	font-weight: 600;
+	line-height: 1.35;
+}
+
+.rsub {
+	margin-top: 4rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.rtag {
+	margin-left: 10rpx;
+	padding: 2rpx 12rpx;
+	border-radius: 6rpx;
+	background: rgba(255, 255, 255, 0.07);
+	color: #8b98ad;
+	font-size: 20rpx;
+	line-height: 30rpx;
+	white-space: nowrap;
+}
+
+.rtag-on {
+	margin-left: 0;
+	background: rgba(52, 199, 89, 0.14);
+	color: #34c759;
+}
+
+.rtag-off {
+	margin-left: 0;
+	background: rgba(255, 255, 255, 0.06);
+	color: #7d8ba0;
+}
+
+.rtag-row {
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: 10rpx;
+}
+
+.rdesc {
+	display: -webkit-box;
+	margin-top: 18rpx;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 4;
+	overflow: hidden;
+	color: #a9b6c8;
+	font-size: 26rpx;
+	line-height: 1.7;
+}
+
+/* 六格参数：两列三行，和参考图一致 */
+.rspec {
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: 18rpx;
+	padding-top: 10rpx;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.rspec-cell {
+	width: 50%;
+	padding: 12rpx 0 0;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+}
+
+.rspec-v {
+	color: #e2e8f0;
+	font-size: 30rpx;
+	font-weight: 600;
+	line-height: 1.25;
+}
+
+.rspec-k {
+	margin-top: 2rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.rmeta {
+	display: flex;
+	flex-wrap: wrap;
+	margin-top: 16rpx;
+}
+
+.rmeta-item {
+	margin-right: 20rpx;
+	color: #7d8ba0;
+	font-size: 22rpx;
+}
+
+/* 发射机构：贴在火箭卡底部，点了进机构页 */
+.ragency {
+	display: flex;
+	align-items: center;
+	margin-top: 20rpx;
+	padding-top: 20rpx;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.ragency-logo {
+	width: 40rpx;
+	height: 40rpx;
+	flex-shrink: 0;
+	margin-right: 14rpx;
+	border-radius: 6rpx;
+}
+
+.ragency-name {
+	flex: 1;
+	min-width: 0;
+	color: #cbd5e0;
+	font-size: 25rpx;
+}
+
+/* ---- 发射场地 ---- */
+.padmap {
+	display: block;
+	width: 100%;
+	margin-bottom: 18rpx;
+	border-radius: 12rpx;
+	background: #0f1621;
+}
+
+.padrow {
+	display: flex;
+	align-items: center;
+}
+
+.padrow-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.padrow-name {
+	display: block;
+	color: #e2e8f0;
+	font-size: 28rpx;
+	font-weight: 600;
+	line-height: 1.4;
+}
+
+.padrow-loc {
+	display: block;
+	margin-top: 4rpx;
+	color: #6b7891;
+	font-size: 23rpx;
 }
 
 /* 四格统计 */

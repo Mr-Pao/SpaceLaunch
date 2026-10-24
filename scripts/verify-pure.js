@@ -177,6 +177,34 @@ async function testFormat() {
 	eq(f.textUnits('猎鹰 9 号'), 9, '视觉宽度：中英混排各按各的算')
 	eq(f.textUnits(null), 0, '视觉宽度：null 安全返回 0')
 
+	// 详情页的发射时刻 / 日期 / 窗口跨度。
+	// 用本地时间构造再 toISOString()，断言就不受跑测试的机器时区影响
+	const at = new Date(2026, 9, 27, 12, 45, 0)
+	eq(f.clock(at.toISOString()), '12:45', '时刻：只取时分')
+	eq(f.longDate(at.toISOString()), '2026年10月27日 星期二', '长日期：带星期')
+	eq(f.clock(''), '', '时刻：空值返回空串')
+	eq(f.spanText(at.toISOString(), new Date(2026, 9, 27, 16, 45).toISOString()), '4 小时', '窗口跨度：整小时不出现「0 分钟」')
+	eq(f.spanText(at.toISOString(), new Date(2026, 9, 27, 13, 15).toISOString()), '30 分钟', '窗口跨度：不足一小时按分钟')
+	eq(f.spanText(at.toISOString(), at.toISOString()), '', '窗口跨度：零长度返回空串')
+
+	// 火箭参数格式化：LL2 给的是 kg 与美元整数
+	eq(f.massText(22800), '22.8 吨', '运力：吨级保留一位小数')
+	eq(f.massText(4200), '4.2 吨', '运力：四千二百公斤')
+	eq(f.massText(500), '500 kg', '运力：小运力用 kg')
+	eq(f.massText(0), '', '运力：0 不显示')
+	eq(f.costText(50000000), '5000 万美元', '造价：五千万')
+	eq(f.costText(150000000), '1.5 亿美元', '造价：亿级')
+	eq(f.costText(null), '', '造价：空值不显示')
+
+	// 轨道与任务类型：都是固定枚举，本地查表，不能交给机器翻译
+	eq(f.orbitName('LEO'), 'LEO', '轨道：缩写保持缩写')
+	eq(f.orbitName('Low Earth Orbit'), '近地轨道', '轨道：全称中文化')
+	eq(f.orbitName('Geostationary Transfer Orbit'), '地球同步转移轨道', '轨道：GTO 全称')
+	eq(f.orbitName('Some New Orbit'), 'Some New Orbit', '轨道：未收录保留原文')
+	eq(f.missionTypeName('Communications'), '通信', '任务类型：通信')
+	eq(f.missionTypeName('Government/Top Secret'), '政府/保密', '任务类型：带斜杠的也能命中')
+	eq(f.missionTypeName('Weird Type'), 'Weird Type', '任务类型：未收录保留原文')
+
 	fs.unlinkSync(tmp)
 }
 
@@ -300,10 +328,71 @@ async function testMedia() {
 	fs.unlinkSync(path.join(dir, 'sl-media.mjs'))
 }
 
+// ---------- timeline.js（发射时间线纯函数）----------
+
+async function testTimeline() {
+	console.log('[timeline] 发射时间线解析与展示挑选')
+	const dir = os.tmpdir()
+	const tmp = path.join(dir, 'sl-timeline-check.mjs')
+	fs.copyFileSync(path.join(__dirname, '..', 'utils', 'timeline.js'), tmp)
+	const t = await import(pathToFileURL(tmp).href)
+
+	// LL2 的 relative_time 是 ISO 8601 时长，不是常见的 "-00:38:00"
+	eq(t.parseDuration('-PT38M'), -38 * 60000, '时长：T-38 分钟')
+	eq(t.parseDuration('PT2H48M28S'), (2 * 3600 + 48 * 60 + 28) * 1000, '时长：2 小时 48 分 28 秒')
+	eq(t.parseDuration('P0D'), 0, '时长：P0D 就是 T-0')
+	eq(t.parseDuration('P1DT2H'), 26 * 3600 * 1000, '时长：带天的写法')
+	eq(t.parseDuration('garbage'), null, '时长：解析不出来返回 null，不能当 0')
+	eq(t.parseDuration(null), null, '时长：空值返回 null')
+
+	eq(t.tlRelative(-38 * 60000), 'T-38 分', '相对时间：分钟')
+	eq(t.tlRelative(0), 'T+0 秒', '相对时间：T-0')
+	eq(t.tlRelative(2 * 3600 * 1000), 'T+2 时 0 分', '相对时间：小时')
+	eq(t.tlRelative(null), '', '相对时间：空值返回空串')
+
+	eq(t.tlLabel({ a: 'Prop Load' }), '推进剂加注', '节点名：本地表命中')
+	eq(t.tlLabel({ a: 'Prop Load', az: '加注推进剂' }), '推进剂加注', '节点名：本地表优先于机器翻译')
+	eq(t.tlLabel({ a: 'Weird Step', az: '怪步骤' }), '怪步骤', '节点名：表外走同步翻译')
+	eq(t.tlLabel({ a: 'Weird Step' }), 'Weird Step', '节点名：都没有则保留英文')
+
+	const items = [
+		{ a: 'A', t: '-PT60M' },
+		{ a: 'B', t: '-PT30M' },
+		{ a: 'C', t: '-PT10M' },
+		{ a: 'D', t: 'P0D' },
+		{ a: 'E', t: 'PT10M' }
+	]
+	const net = new Date(2026, 9, 27, 12, 0).toISOString()
+	const before = new Date(2026, 9, 27, 11, 35).getTime() // T-25 分钟
+
+	const p1 = t.pickTimeline(items, net, before, 2)
+	eq(p1.list.map((x) => x.a), ['C', 'D'], '挑选：只给还没发生的节点')
+	eq(p1.more, 1, '挑选：剩余条数')
+	eq(p1.total, 5, '挑选：总条数')
+
+	const p2 = t.pickTimeline(items, net, new Date(2026, 9, 27, 12, 30).getTime(), 4)
+	eq(p2.list.map((x) => x.a), ['B', 'C', 'D', 'E'], '挑选：全部已过时退回最后几条')
+
+	const p3 = t.pickTimeline([], net, before, 4)
+	eq(p3.list, [], '挑选：空时间线返回空数组')
+	eq(p3.total, 0, '挑选：空时间线总数为 0')
+
+	// 解析失败的节点必须跳过：否则会被当成 T-0 排到最前面
+	const p4 = t.pickTimeline([{ a: 'X', t: 'bad' }, { a: 'Y', t: 'P0D' }], net, before, 4)
+	eq(p4.list.map((x) => x.a), ['Y'], '挑选：解析失败的节点被跳过')
+
+	const sorted = t.sortedTimeline(items)
+	eq(sorted.map((x) => x.a), ['A', 'B', 'C', 'D', 'E'], '排序：按相对时间正序')
+	eq(sorted[0].rel, -60 * 60000, '排序：带出毫秒偏移，页面据此判断「已发生」')
+
+	fs.unlinkSync(tmp)
+}
+
 ;(async () => {
 	await testFormat()
 	await testSearchMatch()
 	await testMedia()
+	await testTimeline()
 })()
 	.catch((e) => {
 		failed++

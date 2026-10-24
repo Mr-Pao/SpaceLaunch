@@ -39,7 +39,7 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 // v6: 增加任务名中文 mission.nameZh
 // v7: stats 增加任务 id / 名称 / 发射场
 // v8: stats 改为按年预聚合输出
-const DATA_VERSION = 10
+const DATA_VERSION = 11
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {
@@ -54,7 +54,10 @@ const FILES = {
 	// 发射工位库（251 个 pad，含地图图与累计发射数），pad 详情页用
 	pads: 'pads.json',
 	// 统计页数据：CI 侧按年预聚合好的结果，前端只负责展示与年度切换
-	stats: 'stats-years.json'
+	stats: 'stats-years.json',
+	// 发射时间线（T- 序列）。LL2 只有单条详情才有，CI 每 3 小时抓 8 条，
+	// 覆盖率靠时间累积；没抓到的任务详情页整块不显示
+	timelines: 'timelines.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"
@@ -63,7 +66,9 @@ const SOFT_TTL = {
 	upcoming: 15 * 60 * 1000,
 	previous: 60 * 60 * 1000,
 	events: 30 * 60 * 1000,
-	agencies: 24 * 60 * 60 * 1000
+	agencies: 24 * 60 * 60 * 1000,
+	// 时间线每 3 小时才补几条，TTL 给宽一点，别为了几条新记录反复拉
+	timelines: 3 * 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。

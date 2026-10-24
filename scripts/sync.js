@@ -31,6 +31,10 @@ const { aggregateByYear } = require('./lib/aggregate')
 const { upload } = require('./lib/cos')
 const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
+// 发射快照本身不带火箭技术参数（normal 模式的 configuration 只有名字），
+// 同步时用型号库按 config id 内联进去，前端就不用为一张卡多拉 568KB
+const { enrichRockets } = require('./lib/enrich')
+const { runTimelines } = require('./timeline')
 const translate = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
@@ -41,7 +45,10 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v6: 增加 mission.nameZh（任务名中文），标题不再整行英文
 // v7: stats 增加 id / name / site（发射场），支撑年度回顾
 // v8: stats 改为「按年预聚合」输出，不再下发原始数据；数据源换成最新快照 + 历史归档
-const DATA_VERSION = 10
+// v9: launcher 简介中文化（descriptionZh），型号图片全量镜像
+// v10: launch 增加 imageThumb / imageCredit / pad.image* / vid
+// v11: launch 增加 rocketBrief（火箭技术参数内联）、pad.map_image、机构累计发射数
+const DATA_VERSION = 11
 
 /** 读 COS 上已生成的 JSON。桶是公有读，直接走 CDN 地址 */
 async function readCosJson(key) {
@@ -91,7 +98,9 @@ const DATASETS = {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',
 		localize: localizeLaunches,
-		images: ['image', { path: 'infographic', preset: 'large' }],
+		// pad.map_image 是详情页「发射场地」卡的地图，按 750px 单独一档压
+		images: ['image', { path: 'infographic', preset: 'large' }, { path: 'pad.map_image', preset: 'map' }],
+		enrich: true,
 		async fetch() {
 			// limit=100 仍然是 1 个请求，和原来的 limit=50 同价，首屏条数直接翻倍
 			const j = await getJson('/launches/upcoming/?limit=100&mode=normal&format=json')
@@ -133,7 +142,8 @@ const DATASETS = {
 		file: 'launches-previous.json',
 		cacheControl: 'public, max-age=3600',
 		localize: localizeLaunches,
-		images: ['image', { path: 'infographic', preset: 'large' }],
+		images: ['image', { path: 'infographic', preset: 'large' }, { path: 'pad.map_image', preset: 'map' }],
+		enrich: true,
 		async fetch() {
 			// limit=100 仍是 1 个请求，和 limit=50 同价：已发射页首屏翻倍，
 			// stats 的数据源也随之变大（stats 会读这个文件）
@@ -322,6 +332,16 @@ async function runDataset(name) {
 		}
 	}
 
+	// 火箭技术参数：launchers.json 是每天一刷的低频快照，发射快照却是高频的，
+	// 在这里 join 一次，前端拿到的每条发射就自带参数，详情页零额外请求
+	if (ds.enrich) {
+		try {
+			await enrichRockets(list, readCosJson)
+		} catch (e) {
+			console.warn(`  ! 火箭参数回填失败（详情页退化为只有型号名）: ${e.message}`)
+		}
+	}
+
 	// 图片统一换成 COS 上的缩略图地址：原域名没备案，真机加载不出来；
 	// 而且原图太大，直接走 COS 流量会把预算吃穿
 	if (ds.images) {
@@ -354,17 +374,29 @@ async function runDataset(name) {
 
 (async () => {
 	const { dataset, base } = parseArgs(process.argv)
-	const targets = dataset === 'all' ? Object.keys(DATASETS) : [dataset]
-
-	if (targets.some((t) => !DATASETS[t])) {
-		console.error(`未知数据集: ${dataset}，可选 ${Object.keys(DATASETS).join(' / ')} / all`)
-		process.exit(2)
-	}
 
 	// 切到开发端点：本地反复调试不消耗正式配额（15 次/小时按 IP 计，很容易烧光）
 	if (base === 'dev') {
 		process.env.LL2_BASE = 'dev'
 		console.log('\n⚠️  使用开发端点 lldev（不限速，但数据可能陈旧），仅用于联调')
+	}
+
+	// 时间线是「逐条抓单条详情」的独立流程，产物也不是 list 而是按 id 索引的 map，
+	// 塞不进 DATASETS 的通用管线，单独走一条分支
+	if (dataset === 'timeline') {
+		fs.mkdirSync(OUT_DIR, { recursive: true })
+		console.log('\n=== 同步 timeline ===')
+		const r = await runTimelines()
+		console.log('\n=== 汇总 ===')
+		console.log(`  timelines.json  新增 ${r.added} 条 / 空 ${r.empty} / 失败 ${r.failed} / 累计 ${r.total} 条`)
+		return
+	}
+
+	const targets = dataset === 'all' ? Object.keys(DATASETS) : [dataset]
+
+	if (targets.some((t) => !DATASETS[t])) {
+		console.error(`未知数据集: ${dataset}，可选 ${Object.keys(DATASETS).join(' / ')} / timeline / all`)
+		process.exit(2)
 	}
 
 	fs.mkdirSync(OUT_DIR, { recursive: true })

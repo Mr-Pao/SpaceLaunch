@@ -290,6 +290,82 @@ export function zhValue(value) {
 }
 
 /**
+ * 目标轨道的中文名
+ *
+ * LL2 的 orbit 是固定枚举（约 15 个），本地查表最稳：
+ * 走翻译接口反而会把 LEO 翻成乱七八糟的东西。
+ * 查不到就原样返回，别瞎编。
+ */
+const ORBIT_ZH = {
+	'low earth orbit': '近地轨道',
+	'medium earth orbit': '中地球轨道',
+	'geostationary orbit': '地球同步轨道',
+	'geostationary transfer orbit': '地球同步转移轨道',
+	'geosynchronous orbit': '地球同步轨道',
+	'geosynchronous transfer orbit': '地球同步转移轨道',
+	'highly elliptical orbit': '高椭圆轨道',
+	'elliptical orbit': '椭圆轨道',
+	'polar orbit': '极地轨道',
+	'sun-synchronous orbit': '太阳同步轨道',
+	'solar synchronous orbit': '太阳同步轨道',
+	'lunar orbit': '月球轨道',
+	'heliocentric orbit': '日心轨道',
+	'suborbital': '亚轨道',
+	'suborbital trajectory': '亚轨道',
+	'unknown': '未知',
+	'retrograde orbit': '逆行轨道',
+	'equatorial orbit': '赤道轨道'
+}
+
+export function orbitName(value) {
+	const s = zhValue(value)
+	if (!s) return ''
+	return ORBIT_ZH[s.toLowerCase()] || s
+}
+
+/**
+ * 任务类型的中文名
+ *
+ * LL2 的 mission.type 是英文枚举（"Communications" / "Government/Top Secret"…），
+ * 同步阶段没翻它（只翻了任务名和描述），本地表兜住常见的，
+ * 表外的保留英文 —— 总比翻错了强。
+ */
+const MISSION_TYPE_ZH = {
+	communications: '通信',
+	'earth observation': '对地观测',
+	'navigation': '导航',
+	'science': '科学',
+	'astrophysics': '天体物理',
+	'planetary science': '行星科学',
+	'human exploration': '载人探索',
+	'lunar exploration': '月球探索',
+	'robotic exploration': '机器人探索',
+	'solar physics': '太阳物理',
+	'government/top secret': '政府/保密',
+	'government': '政府',
+	'military': '军事',
+	'test flight': '试飞',
+	'test': '试验',
+	'resupply': '货运补给',
+	'crew': '载人',
+	'dedicated rideshare': '专享拼车',
+	'rideshare': '拼车',
+	'technology': '技术验证',
+	'materials science': '材料科学',
+	'biology': '生物',
+	'education': '教育',
+	'engineering': '工程',
+	'demonstration': '演示验证',
+	'other': '其他'
+}
+
+export function missionTypeName(value) {
+	const s = zhValue(value)
+	if (!s) return ''
+	return MISSION_TYPE_ZH[s.toLowerCase()] || s
+}
+
+/**
  * 发射所在国家/地区的中文名。
  *
  * 快照里的国家信息只有一个来源：`pad.location.name`，形如
@@ -441,4 +517,67 @@ export function isStillUpcoming(item) {
 
 	const a = (item.status && item.status.abbrev) || ''
 	return FINAL_STATUS.indexOf(a) === -1
+}
+
+/**
+ * 只取时刻：12:45
+ * 详情页把发射时刻做成一行大字，和「2026-10-27 12:45」那种混排比，
+ * 一眼就能看到几点发。
+ */
+export function clock(value) {
+	const d = toDate(value)
+	if (!d) return ''
+	return pad(d.getHours()) + ':' + pad(d.getMinutes())
+}
+
+const WEEK_ZH = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+
+/** 长日期：2026年10月27日 星期二 */
+export function longDate(value) {
+	const d = toDate(value)
+	if (!d) return ''
+	return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + WEEK_ZH[d.getDay()]
+}
+
+/** 两个时间的时间跨度，用「X 小时 Y 分钟」表示；非法或非正返回空串 */
+export function spanText(from, to) {
+	const a = toDate(from)
+	const b = toDate(to)
+	if (!a || !b) return ''
+	const ms = b.getTime() - a.getTime()
+	if (!(ms > 0)) return ''
+	const min = Math.round(ms / 60000)
+	if (min < 60) return min + ' 分钟'
+	const h = Math.floor(min / 60)
+	const m = min % 60
+	return m ? h + ' 小时 ' + m + ' 分钟' : h + ' 小时'
+}
+
+/** 千分位，火箭参数动辄上万，不加逗号读不出来 */
+function thousands(v) {
+	return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+/**
+ * 运力 / 质量：大于 1 吨用吨，小运力保留 kg 更直观
+ * （和火箭详情页 mass() 同口径，那边暂时还留着自己的副本，收敛时再合并）
+ */
+export function massText(kg) {
+	const v = Number(kg)
+	if (!isFinite(v) || v <= 0) return ''
+	if (v >= 1000) {
+		const t = v / 1000
+		return thousands(t >= 100 ? Math.round(t) : Math.round(t * 10) / 10) + ' 吨'
+	}
+	return Math.round(v) + ' kg'
+}
+
+/** 造价：LL2 给的是美元整数，按中文习惯折成亿 / 万 */
+export function costText(usd) {
+	const v = Number(usd)
+	if (!isFinite(v) || v <= 0) return ''
+	// 折成亿 / 万之后数值都不大，再加千分位反而像排版错误
+	if (v >= 1e8) return Math.round((v / 1e8) * 10) / 10 + ' 亿美元'
+	if (v >= 1e4) return Math.round(v / 1e4) + ' 万美元'
+	return Math.round(v) + ' 美元'
 }
