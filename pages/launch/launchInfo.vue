@@ -418,6 +418,15 @@ export default {
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
+	onShow() {
+		// 页面实例可能被复用（navigateBack 回来而不是重新 onLoad），
+		// 开关状态跟手刷新，避免切「正常」后长文仍处于隐藏态。
+		// getConfig 有内存缓存，这里零开销。
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
+	},
+
 	async onLoad(query) {
 		const id = query && query.id
 		this.launchId = id || ''

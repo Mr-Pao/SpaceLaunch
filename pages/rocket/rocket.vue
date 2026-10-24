@@ -223,6 +223,15 @@ export default {
 	},
 
 	// 滚过首图后导航栏切成实色
+	onShow() {
+		// 页面实例可能被复用（navigateBack 回来而不是重新 onLoad），
+		// 开关状态必须跟手刷新，否则切「正常」后外部资料/近期发射仍是隐藏的。
+		// getConfig 有内存缓存，这里零开销。
+		getConfig().then((c) => {
+			this.reviewMode = Boolean(c && c.review)
+		})
+	},
+
 	onPageScroll(e) {
 		const solid = e.scrollTop > 180
 		if (solid !== this.navSolid) this.navSolid = solid

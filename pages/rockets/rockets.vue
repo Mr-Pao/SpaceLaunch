@@ -289,17 +289,25 @@ export default {
 		},
 
 		// 只有两项，静默切换：切完直接跳到对应首页，
-		// 「展示」后的界面与审核员看到的一致（火箭大全，无 tabBar）
+		// 「展示」后的界面与审核员看到的一致（火箭大全，无 tabBar）。
+		// reLaunch 失败时页面栈不会被清空，旧实例（尤其详情页）会卡在旧状态，
+		// 所以失败必须给出提示，不能静默。
 		showPanel() {
+			const relaunch = (url) =>
+				uni.reLaunch({
+					url,
+					fail: () => uni.showToast({ title: '切换失败，请重试', icon: 'none' })
+				})
+
 			uni.showActionSheet({
 				itemList: ['展示', '正常'],
 				success: (res) => {
 					if (res.tapIndex === 0) {
 						setOverride(true)
-						uni.reLaunch({ url: '/pages/rockets/rockets' })
+						relaunch('/pages/rockets/rockets')
 					} else if (res.tapIndex === 1) {
 						setOverride(false)
-						uni.reLaunch({ url: '/pages/index/index' })
+						relaunch('/pages/index/index')
 					}
 				}
 			})
