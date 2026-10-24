@@ -55,6 +55,7 @@
 							<view class="vcover">
 								<image class="vcover-img" :src="v.thumb" mode="aspectFill" lazy-load></image>
 								<view class="vplay"></view>
+								<text class="vtag" v-if="v.official">官方</text>
 							</view>
 							<text class="vtitle">{{ v.title }}</text>
 							<text class="vmeta" v-if="v.publisher">@{{ v.publisher }}</text>
@@ -65,6 +66,7 @@
 							<view class="vcover">
 								<image class="vcover-img" :src="v.thumb" mode="aspectFill" lazy-load></image>
 								<view class="vplay"></view>
+								<text class="vtag" v-if="v.official">官方</text>
 							</view>
 							<text class="vtitle">{{ v.title }}</text>
 							<text class="vmeta" v-if="v.publisher">@{{ v.publisher }}</text>
@@ -73,7 +75,7 @@
 				</block>
 				<view class="empty-box" v-else>
 					<text class="empty-text">该型号暂时没有视频</text>
-					<text class="empty-sub">数据源目前只提供发射任务的部分回放链接</text>
+					<text class="empty-sub">数据源只收录部分任务的直播回放</text>
 				</view>
 			</view>
 
@@ -159,15 +161,30 @@ export default {
 					ids[String(x.id)] = 1
 				})
 
-				const [prev, up] = await Promise.all([
+				const [prev, up, vd] = await Promise.all([
 					spaceData.load('previous').catch(() => null),
-					spaceData.load('upcoming').catch(() => null)
+					spaceData.load('upcoming').catch(() => null),
+					spaceData.load('videos').catch(() => null)
 				])
+
+				// 视频单独存在 videos.json 里（列表端点不返回 vid_urls），
+				// 按 id 索引，这里合并回记录上再交给 collectMedia。
+				// 没抓到的记录就是没视频，不做占位
+				const vmap = {}
+				for (const row of (vd && vd.list) || []) {
+					if (row && row.id && (row.vids || []).length) vmap[String(row.id)] = row.vids
+				}
+
 				const all = [...((prev && prev.list) || []), ...((up && up.list) || [])]
-				const records = all.filter((x) => {
-					const c = x.rocket && x.rocket.configuration
-					return c && ids[String(c.id)]
-				})
+				const records = all
+					.filter((x) => {
+						const c = x.rocket && x.rocket.configuration
+						return c && ids[String(c.id)]
+					})
+					.map((x) => {
+						const vids = vmap[String(x.id)]
+						return vids ? Object.assign({}, x, { vid: vids }) : x
+					})
 
 				const media = collectMedia(this.series, records)
 				this.images = media.images
@@ -328,6 +345,20 @@ export default {
 	border-left: 20rpx solid rgba(255, 255, 255, 0.95);
 	border-top: 12rpx solid transparent;
 	border-bottom: 12rpx solid transparent;
+}
+
+/* 「官方」角标压在封面左上角。和播放键一样用半透明黑底，
+   不抢画面，但一眼能分出哪个是火箭公司的官方源 */
+.vtag {
+	position: absolute;
+	left: 10rpx;
+	top: 10rpx;
+	padding: 2rpx 10rpx;
+	border-radius: 4rpx;
+	background: rgba(0, 0, 0, 0.55);
+	color: #ffffff;
+	font-size: 18rpx;
+	line-height: 26rpx;
 }
 
 .vtitle {

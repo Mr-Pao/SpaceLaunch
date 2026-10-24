@@ -90,20 +90,29 @@ export function collectMedia(configs, records) {
 	const all = uniqByUrl([...configImages, ...launchImages, ...padImages, ...infographics])
 	const images = all.slice(0, MAX_IMAGES)
 
-	// 视频：LL2 把 webcast 挂在 mission.vid_urls 下，列表模式里绝大多数是空的。
-	// 有就展示，没有就空态，不编数据。封面借这次发射的图，不然列表全是灰块。
+	// 视频：vid 有两个来源。列表端点**不返回** vid_urls（normal 模式连这个键都没有），
+	// 所以绝大多数记录这里是空的；真正的视频由 CI 用 detailed 抓进 videos.json，
+	// 由媒体页合并到记录上再传进来。有就展示，没有就空态，不编数据。
 	const videos = []
 	for (const r of sorted) {
 		const list = Array.isArray(r.vid) ? r.vid : []
 		for (const v of list) {
 			if (!v || !v.url) continue
+			// 封面优先用视频自己的缩略图（就是这场发射的画面）；
+			// 早期版本借发射照片，结果整列全是同款火箭照
+			const cover = v.cover || r.imageThumb || r.image || ''
 			videos.push({
 				url: v.url,
 				title: v.title || r.name || '',
 				publisher: v.publisher || '',
-				cover: r.image || r.imageThumb || '',
-				thumb: r.imageThumb || r.image || '',
-				net: r.net || ''
+				kind: v.kind || '',
+				// 官方直播（type.id=1）给个角标，否则满屏分不清哪个是火箭公司的
+				// 官方源、哪个是网友转播
+				official: v.tid === 1 || v.kind === 'Official Webcast',
+				cover,
+				thumb: cover,
+				net: r.net || '',
+				mins: v.mins || 0
 			})
 		}
 	}

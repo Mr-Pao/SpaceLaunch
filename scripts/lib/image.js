@@ -177,16 +177,31 @@ async function mirrorOne(url, preset = PRESETS.thumb) {
 	}
 }
 
-/** 支持 'pad.map_image' 这种点路径 */
-function getPath(obj, path) {
-	return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj)
-}
-
-function setPath(obj, path, value) {
-	const keys = path.split('.')
-	const last = keys.pop()
-	const target = keys.reduce((o, k) => (o == null ? undefined : o[k]), obj)
-	if (target && typeof target === 'object') target[last] = value
+/**
+ * 按路径取出所有可写槽位，路径里的 `*` 代表数组的每个元素。
+ *
+ * 原来只支持 'pad.map_image' 这种点路径，拿不到「数组里的每一项」——
+ * 而视频的封面正好长在 `vids[].cover` 上。普通路径（如 `craft.image`）
+ * 在这里退化成单个槽位，行为和之前的 getPath/setPath 完全一致。
+ */
+function slotsOf(obj, path) {
+	const segs = path.split('.')
+	const out = []
+	const walk = (node, i) => {
+		if (node == null || i >= segs.length) return
+		if (segs[i] === '*') {
+			if (Array.isArray(node)) for (const el of node) walk(el, i + 1)
+			return
+		}
+		if (typeof node !== 'object' || Array.isArray(node)) return
+		if (i === segs.length - 1) {
+			out.push({ obj: node, key: segs[i] })
+			return
+		}
+		walk(node[segs[i]], i + 1)
+	}
+	walk(obj, 0)
+	return out
 }
 
 /**
@@ -215,8 +230,10 @@ async function mirrorImages(list, fields) {
 	const urls = new Map()
 	for (const item of list) {
 		for (const s of specs) {
-			const v = getPath(item, s.path)
-			if (typeof v === 'string' && /^https?:\/\//.test(v)) urls.set(v, s.preset)
+			for (const sl of slotsOf(item, s.path)) {
+				const v = sl.obj[sl.key]
+				if (typeof v === 'string' && /^https?:\/\//.test(v)) urls.set(v, s.preset)
+			}
 		}
 	}
 
@@ -238,12 +255,14 @@ async function mirrorImages(list, fields) {
 	let replaced = 0
 	for (const item of list) {
 		for (const s of specs) {
-			const v = getPath(item, s.path)
-			if (typeof v !== 'string' || !v) continue
-			const mapped = memo.get(v + '|' + s.preset.maxWidth)
-			if (mapped && mapped !== v) {
-				setPath(item, s.path, mapped)
-				replaced++
+			for (const sl of slotsOf(item, s.path)) {
+				const v = sl.obj[sl.key]
+				if (typeof v !== 'string' || !v) continue
+				const mapped = memo.get(v + '|' + s.preset.maxWidth)
+				if (mapped && mapped !== v) {
+					sl.obj[sl.key] = mapped
+					replaced++
+				}
 			}
 		}
 	}
@@ -257,4 +276,4 @@ function summary() {
 	return { ...stats }
 }
 
-module.exports = { mirrorImages }
+module.exports = { mirrorImages, slotsOf }

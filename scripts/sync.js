@@ -35,6 +35,7 @@ const { mirrorImages } = require('./lib/image')
 // 同步时用型号库按 config id 内联进去，前端就不用为一张卡多拉 568KB
 const { enrichRockets } = require('./lib/enrich')
 const { runTimelines } = require('./timeline')
+const { runVideos } = require('./videos')
 const translate = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
@@ -392,10 +393,21 @@ async function runDataset(name) {
 		return
 	}
 
+	// 视频同理，而且更麻烦：只有 mode=detailed 才返回 vid_urls，
+	// 体积大、响应慢，必须单独按页抓，不能混进普通同步
+	if (dataset === 'video') {
+		fs.mkdirSync(OUT_DIR, { recursive: true })
+		console.log('\n=== 同步 video ===')
+		const r = await runVideos()
+		console.log('\n=== 汇总 ===')
+		console.log(`  videos.json  本轮 ${r.got} 条 / 其中有视频 ${r.withVid} / 失败 ${r.failed} / 累计 ${r.total} 条`)
+		return
+	}
+
 	const targets = dataset === 'all' ? Object.keys(DATASETS) : [dataset]
 
 	if (targets.some((t) => !DATASETS[t])) {
-		console.error(`未知数据集: ${dataset}，可选 ${Object.keys(DATASETS).join(' / ')} / timeline / all`)
+		console.error(`未知数据集: ${dataset}，可选 ${Object.keys(DATASETS).join(' / ')} / timeline / video / all`)
 		process.exit(2)
 	}
 

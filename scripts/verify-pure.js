@@ -308,7 +308,11 @@ async function testMedia() {
 			imageThumb: 'l1t.jpg',
 			imageCredit: 'SpaceX',
 			pad: { name: 'SLC-40', image: 'p1.jpg', imageThumb: 'p1t.jpg', imageCredit: 'CCTV' },
-			vid: [{ url: 'https://youtu.be/x', title: 'Webcast B', publisher: 'SpaceX', priority: 1 }]
+			// 第一条带自己的封面（YouTube 缩略图），第二条没有 —— 用来测降级
+			vid: [
+				{ url: 'https://youtu.be/x', title: 'Webcast B', publisher: 'SpaceX', priority: 1, cover: 'vc.jpg' },
+				{ url: 'https://youtu.be/y', title: 'Webcast B2', publisher: 'SpaceX', priority: 2 }
+			]
 		},
 		{
 			// 更早的一次，图不同
@@ -329,8 +333,10 @@ async function testMedia() {
 	eq(r.images.filter((x) => x.url === 'l1.jpg').length, 1, '同一张发射图只出现一次')
 	eq(r.images.filter((x) => x.url === 'p1.jpg').length, 1, '同一张工位图只出现一次')
 	eq(r.images.find((x) => x.url === 'l1.jpg').credit, 'SpaceX', '署名透传')
-	eq(r.videos.length, 1, '视频从 vid 展开')
-	eq(r.videos[0].cover, 'l1.jpg', '视频封面借用该次发射的图')
+	eq(r.videos.length, 2, '视频从 vid 展开')
+	eq(r.videos[0].cover, 'vc.jpg', '视频封面优先用视频自己的缩略图')
+	eq(r.videos[0].thumb, 'vc.jpg', '视频卡片的 thumb 同样指封面')
+	eq(r.videos[1].cover, 'l1t.jpg', '没封面时退回发射缩略图（不能留灰块）')
 	eq(r.videos[0].title, 'Webcast B', '视频标题取 vid.title')
 	eq(r.truncated, false, '未达上限不标记截断')
 
@@ -458,12 +464,87 @@ async function testCraft() {
 	eq(long.desc.length, 221, '航天器：长描述截断到 220 字（含省略号 221）')
 }
 
+// ---------- 视频裁剪 + 镜像路径通配 ----------
+
+/**
+ * 样本取自真实响应（launches/previous/?mode=detailed 的**顶层** vid_urls）。
+ *
+ * 两个必须钉住的点：
+ *   1. priority 与「官方优先」是反的 —— 官方那条 priority=10 最大，
+ *      按它降序排会把第三方转播顶到第一个，所以按 type.id 排。
+ *   2. vid_urls 在顶层，mission.vid_urls 恒空。早期版本读后者，
+ *      于是视频库一条都没有。
+ */
+function testVideo() {
+	console.log('[video] 视频裁剪与镜像路径通配')
+	const { slimVids } = require('./videos')
+	const { slotsOf } = require('./lib/image')
+
+	const raw = [
+		{
+			url: 'https://www.youtube.com/watch?v=cyJtopOtMZA',
+			title: 'SpaceX Starlink Group 15-15',
+			publisher: 'The Space Devs',
+			source: 'youtube.com',
+			priority: 8,
+			type: { id: 4, name: 'Unofficial Re-stream' },
+			feature_image: 'https://i.ytimg.com/vi/a/hqdefault.jpg',
+			start_time: '2026-10-23T23:06:42Z',
+			end_time: '2026-10-23T23:27:15Z',
+			live: false
+		},
+		{
+			url: 'https://x.com/i/broadcasts/1qKDzWkEraoJV',
+			title: 'Starlink Mission',
+			publisher: 'SpaceX',
+			source: 'x.com',
+			priority: 10,
+			type: { id: 1, name: 'Official Webcast' },
+			feature_image: 'https://pbs.twimg.com/media/x.jpg',
+			start_time: '2026-10-23T22:37:56Z',
+			end_time: '2026-10-23T22:58:30Z',
+			live: false
+		}
+	]
+
+	const v = slimVids(raw)
+	eq(v.length, 2, '视频：两条都保留')
+	eq(v[0].publisher, 'SpaceX', '视频：官方直播排最前（不能按 priority 排，它是反的）')
+	eq(v[0].kind, 'Official Webcast', '视频：类型枚举原样存，翻译在前端')
+	eq(v[0].mins, 21, '视频：时长按起止时间算')
+	eq(v[1].mins, 21, '视频：转播时长同样算')
+	eq(v[0].cover, 'https://pbs.twimg.com/media/x.jpg', '视频：封面取 feature_image（X 的图也要镜像）')
+	eq(v[0].title, 'Starlink Mission', '视频：标题保留')
+
+	eq(slimVids(null).length, 0, '视频：null 安全返回空')
+	eq(slimVids([]).length, 0, '视频：空数组返回空')
+	eq(slimVids([{ title: '没有 url' }]).length, 0, '视频：缺 url 的丢掉（点了没反应）')
+	eq(slimVids([{ url: 'u', type: { id: 1, name: 'Official Webcast' } }])[0].title, 'Official Webcast', '视频：没有标题时退回类型名')
+	eq(slimVids([{ url: 'u', start_time: '2026-01-01T00:00:00Z' }])[0].mins, 0, '视频：只有开始时间时时长记 0，不瞎算')
+	eq(slimVids([{ url: 'https://a'.repeat(200) }])[0].title, '', '视频：超长输入不炸')
+
+	// 镜像路径：mirrorImages 原来只认点路径，拿不到 vids[].cover
+	const row = { vids: [{ cover: 'a.jpg' }, { cover: 'b.jpg' }] }
+	eq(slotsOf(row, 'vids.*.cover').length, 2, '镜像路径：* 展开数组每一项')
+	eq(
+		slotsOf(row, 'vids.*.cover').map((s) => s.obj[s.key]),
+		['a.jpg', 'b.jpg'],
+		'镜像路径：取到每一张封面'
+	)
+	eq(slotsOf({ craft: { image: 'x' } }, 'craft.image').length, 1, '镜像路径：普通点路径行为不变')
+	eq(slotsOf(row, 'vids.nope').length, 0, '镜像路径：不存在的字段返回空，不炸')
+	eq(slotsOf(null, 'a.b').length, 0, '镜像路径：null 安全')
+	eq(slotsOf([{ cover: 'a' }], '*.cover').length, 1, '镜像路径：顶层就是数组时也能展开')
+	eq(slotsOf({ vids: 'not-an-array' }, 'vids.*.cover').length, 0, '镜像路径：该是数组却是字符串，跳过')
+}
+
 ;(async () => {
 	await testFormat()
 	await testSearchMatch()
 	await testMedia()
 	await testTimeline()
 	await testCraft()
+	testVideo()
 })()
 	.catch((e) => {
 		failed++

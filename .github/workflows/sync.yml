@@ -5,11 +5,13 @@ name: sync-space-data
 # 用 分钟%15 会算成"该更新事件"）。改用 github.event.schedule 精确对应本次是哪个 cron 触发的。
 #
 # 请求预算（LL2 未认证限额 15 次/小时）：
-#   upcoming  4 次/小时
-#   events    2 次/小时
-#   previous  1 次/小时
-#   合计      7 次/小时，留 2 倍余量
-#   agencies  每天 1 轮 4 个请求（唯一需要真翻页的数据集）
+#   upcoming    4 次/小时
+#   events      1 次/小时
+#   previous    1 次/小时
+#   timeline    约 2.7 次/小时（每 3 小时 8 条单条详情）
+#   video       2 次/小时（每轮 10 条发射，detailed 一页 5 条）
+#   合计        约 11 次/小时，仍在 15 次以内
+#   agencies    每天 1 轮 4 个请求（唯一需要真翻页的数据集）
 #
 # 注意：cron 用的是 UTC。北京时间 = UTC+8
 
@@ -24,6 +26,9 @@ on:
     - cron: '0 21 * * *'     # 火箭型号库：每天 UTC 21:00 = 北京 05:00（要 6 个请求）
     - cron: '0 22 * * *'     # 发射工位库：每天 UTC 22:00 = 北京 06:00（1 个请求）
     - cron: '20 */3 * * *'   # 发射时间线：每 3 小时（每次 8 条单条详情）
+    # 发射视频：每小时。只有 mode=detailed 才返回 vid_urls，一页 5 条约 12 秒，
+    # 每轮 10 条 = 2 个请求。定在 40 分，避开其它任务的 0 / 15 / 20 / 30 分
+    - cron: '40 * * * *'
   # 手动触发（含本机无 API 访问时）：改 scripts/sync-request.json 里的 dataset 再 push 即可。
   # GitHub App / 手机上也能改这个文件，是最省事的"跑一次某数据集"入口。
   push:
@@ -46,6 +51,7 @@ on:
           - pads
           - stats
           - timeline
+          - video
           - all
 
 permissions:
@@ -86,6 +92,7 @@ jobs:
               "0 21 * * *")   DS="launchers" ;;
               "0 22 * * *")   DS="pads" ;;
               "20 */3 * * *") DS="timeline" ;;
+              "40 * * * *")   DS="video" ;;
               *)              DS="upcoming" ;;
             esac
           fi
@@ -119,6 +126,8 @@ jobs:
           # 时间线每轮抓多少条：sync 自身约用 6 次/小时，这里留 8 条，
           # 合计仍在未认证限额 15 次/小时之内
           TIMELINE_PER_RUN: '8'
+          # 视频每轮抓多少条发射：detailed 一页 5 条，10 条 = 2 个请求
+          VIDEO_PER_RUN: '10'
         run: node sync.js --dataset=${{ steps.pick.outputs.dataset }}
 
       # GitHub 规定：公开仓库连续 60 天无提交，定时任务会被自动停用。

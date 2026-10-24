@@ -23,7 +23,7 @@
 const fs = require('fs')
 const path = require('path')
 const { getJson } = require('./lib/fetch')
-const { upload, hasCosConfig } = require('./lib/cos')
+const { upload, hasCosConfig, readCosJson } = require('./lib/cos')
 const { mirrorImages } = require('./lib/image')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
@@ -57,25 +57,8 @@ const cut = (s, n) => {
 	return t.length > n ? t.slice(0, n) + '…' : t
 }
 
-/** 读 COS 上的 JSON；文件不存在或没配桶都返回 null。
- *  注意只要求 COS_BUCKET / COS_REGION —— 桶是公有读，读取不需要密钥，
- *  本地想干跑时给这两个环境变量就够，不必暴露写权限 */
-async function readCos(key) {
-	const { COS_BUCKET, COS_REGION } = process.env
-	if (!COS_BUCKET || !COS_REGION) return null
-	const url = `https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${key}`
-	try {
-		const res = await fetch(url, { signal: AbortSignal.timeout(30000) })
-		if (!res.ok) return null
-		return await res.json()
-	} catch (e) {
-		console.warn(`  · 读取 ${key} 失败（按空处理）: ${e.message}`)
-		return null
-	}
-}
-
 async function loadSnapshot(file) {
-	const d = await readCos('space-data/' + file)
+	const d = await readCosJson('space-data/' + file)
 	return (d && d.list) || []
 }
 
@@ -141,7 +124,7 @@ async function runTimelines() {
 	}
 	fs.mkdirSync(OUT_DIR, { recursive: true })
 
-	const old = (await readCos(KEY)) || { list: [] }
+	const old = (await readCosJson(KEY)) || { list: [] }
 	const byId = new Map()
 	for (const x of old.list || []) {
 		if (x && x.id) byId.set(x.id, x)

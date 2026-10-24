@@ -57,7 +57,10 @@ const FILES = {
 	stats: 'stats-years.json',
 	// 发射时间线（T- 序列）。LL2 只有单条详情才有，CI 每 3 小时抓 8 条，
 	// 覆盖率靠时间累积；没抓到的任务详情页整块不显示
-	timelines: 'timelines.json'
+	timelines: 'timelines.json',
+	// 发射视频（官方直播 / 回放 / 第三方转播）。只有 mode=detailed 才返回
+	// vid_urls，CI 每小时抓 10 条发射，按 id 索引；媒体页拿它补记录上的 vid
+	videos: 'videos.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"
@@ -68,7 +71,9 @@ const SOFT_TTL = {
 	events: 30 * 60 * 1000,
 	agencies: 24 * 60 * 60 * 1000,
 	// 时间线每 3 小时才补几条，TTL 给宽一点，别为了几条新记录反复拉
-	timelines: 3 * 60 * 60 * 1000
+	timelines: 3 * 60 * 60 * 1000,
+	// 视频每小时补 10 条，历史发射的 webcast 基本不会变，同样给宽
+	videos: 6 * 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。

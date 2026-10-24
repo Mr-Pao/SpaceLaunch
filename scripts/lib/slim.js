@@ -89,10 +89,18 @@ function imageCredit(image) {
 }
 
 /**
- * 视频链接。LL2 把 webcast 挂在 mission.vid_urls 里（不是 launch 顶层），
- * 元素形如 { priority, source, publisher, title, url }。
- * 实测列表/upcoming 模式下基本都是空数组，只有单条详情才有内容 ——
- * 这里照实保留，有就展示，没有前端显示空态，不编数据。
+ * 视频链接
+ *
+ * 字段在 launch **顶层** 的 `vid_urls`，元素形如
+ * { priority, source, publisher, title, url, feature_image,
+ *   type:{id,name}, start_time, end_time, live }。
+ * 早期版本读的是 `mission.vid_urls` —— 那个在任何模式下都是空数组，
+ * 这就是「视频库一条都没有」的真正原因，不是数据源不提供。
+ *
+ * 另一条实测结论：`mode=normal` **连 vid_urls 这个键都不返回**，
+ * 只有 `mode=detailed` 才给。所以视频没法跟着普通同步顺路带回来，
+ * 由 scripts/videos.js 专门用 detailed 分页抓，产物是 videos.json。
+ * 这里仍然保留映射：launch 对象若是 detailed 来的，就不会把视频丢掉。
  */
 function vidList(v) {
 	if (!Array.isArray(v)) return []
@@ -108,6 +116,8 @@ function vidList(v) {
 						priority: Number(x.priority) || 99
 					}
 		)
+		// priority 与「官方优先」是反的（官方那条数值最大），
+		// 但前端不靠这个排序，交给 videos.js 按 type.id 排，这里只定个稳定次序
 		.sort((a, b) => a.priority - b.priority)
 		.slice(0, 3)
 }
@@ -139,7 +149,7 @@ function slimLaunch(l) {
 		// 任务信息图（一张竖版长图）。LL2 里是 URL 字符串，也可能为 null
 		infographic: imageUrl(l.infographic),
 		// 视频库数据源（挂在 mission 下，不在 launch 顶层）
-		vid: vidList(l.mission && l.mission.vid_urls),
+		vid: vidList(l.vid_urls || (l.mission && l.mission.vid_urls)),
 
 		status: {
 			name: str(l.status && l.status.name),

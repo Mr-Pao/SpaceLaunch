@@ -102,4 +102,25 @@ async function upload(localPath, key, cacheControl, contentType) {
 	return true
 }
 
-module.exports = { upload, hasCosConfig, getClient, headObject, putBuffer }
+/**
+ * 读 COS 上的 JSON。
+ *
+ * 桶是公有读，所以**不需要密钥**——只要桶名和地域。
+ * 这一点很关键：本地干跑增量脚本时没有 secret，也能读到线上已有数据，
+ * 从而算出「哪些还没抓过」，不必每次都从零开始。
+ */
+async function readCosJson(key) {
+	const { COS_BUCKET, COS_REGION } = process.env
+	if (!COS_BUCKET || !COS_REGION) return null
+	const url = `https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${key}`
+	try {
+		const res = await fetch(url, { signal: AbortSignal.timeout(30000) })
+		if (!res.ok) return null
+		return await res.json()
+	} catch (e) {
+		console.warn(`  · 读取 ${key} 失败（按空处理）: ${e.message}`)
+		return null
+	}
+}
+
+module.exports = { upload, hasCosConfig, getClient, headObject, putBuffer, readCosJson }
