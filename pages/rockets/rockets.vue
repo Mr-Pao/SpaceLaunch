@@ -425,7 +425,8 @@ function leoOf(kg) {
 
 
 .header-sub {
-	padding: 0 24rpx 12rpx;
+	/* 横向留白由 .page 统一给（24rpx），这里再叠就双重缩进了 */
+	padding: 0 0 12rpx;
 }
 
 .subtitle {
