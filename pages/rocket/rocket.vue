@@ -54,9 +54,13 @@
 				<!-- 核心参数 -->
 				<view class="card" v-if="specs.length">
 					<view class="card-title">核心参数</view>
-					<view class="row" v-for="s in specs" :key="s.label">
+					<view class="row" v-for="s in specs" :key="s.label" @click="s.jump && goAgency(s.value)">
 						<text class="label">{{ s.label }}</text>
-						<text class="value">{{ s.value }}</text>
+						<view class="value-wrap" v-if="s.jump">
+							<text class="value value-link">{{ s.value }}</text>
+							<text class="value-arrow">›</text>
+						</view>
+						<text class="value" v-else>{{ s.value }}</text>
 					</view>
 				</view>
 
@@ -195,7 +199,8 @@ export default {
 			push('GTO 运力', c.gto_capacity ? mass(c.gto_capacity) : '')
 			push('首飞', c.maiden_flight || '')
 			push('状态', c.active ? '现役' : '已退役')
-			push('制造方', c.manufacturer || '')
+			// 制造方一行可点：带 jump 标记，点了去机构页
+			if (c.manufacturer) out.push({ label: '制造方', value: c.manufacturer, jump: true })
 			push('研制成本', c.launch_cost ? cost(c.launch_cost) : '')
 			return out
 		},
@@ -256,6 +261,30 @@ export default {
 	},
 
 	methods: {
+		/**
+		 * 制造方 → 机构页。slimLauncher 的 manufacturer 只有名字没有 id，
+		 * 拿名字去 agencies 数据集里对（全等 → 包含 → 缩写），
+		 * 机构数据集有 Storage 缓存，通常零网络开销。
+		 */
+		async goAgency(name) {
+			if (!name) return
+			try {
+				const d = await spaceData.load('agencies')
+				const list = (d && d.list) || []
+				const found =
+					list.find((a) => a.name === name) ||
+					list.find((a) => a.name && (a.name.indexOf(name) !== -1 || name.indexOf(a.name) !== -1)) ||
+					list.find((a) => a.abbrev && a.abbrev === name)
+				if (found && found.id) {
+					uni.navigateTo({ url: '/pages/agencies/agencies?id=' + found.id })
+				} else {
+					uni.showToast({ title: '机构库中暂无该制造方', icon: 'none' })
+				}
+			} catch (e) {
+				console.warn('[rocket] 查找机构失败', e)
+			}
+		},
+
 		async loadConfig() {
 			try {
 				const d = await spaceData.load('launchers')
@@ -519,6 +548,24 @@ function cost(usd) {
 	font-size: 28rpx;
 	line-height: 1.5;
 	word-break: break-all;
+}
+
+/* 制造方一行可点：右侧小箭头 + 高亮 */
+.value-wrap {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.value-link {
+	color: #38bdf8;
+}
+
+.value-arrow {
+	color: #4a5568;
+	font-size: 30rpx;
+	margin-left: 8rpx;
 }
 
 .c-blue {
