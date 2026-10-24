@@ -1,0 +1,52 @@
+name: upload-app-config
+
+# 只做一件事：把仓库里的 scripts/app-config.json 推到 COS。
+#
+# 用途：手机上（GitHub App / 手机浏览器）改这一个文件就能远程切展示开关，
+# 不用开电脑、不用登 COS 控制台：
+#   仓库 → scripts/app-config.json → 铅笔编辑 → Commit
+#   → 本 workflow 自动上传 → 小程序 5 分钟内生效
+#
+# 不请求 LL2 API、不消耗任何配额，也不碰其它数据文件。
+
+on:
+  push:
+    paths:
+      - 'scripts/app-config.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upload-app-config
+  cancel-in-progress: true
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: 上传 app-config.json
+        working-directory: scripts
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: spacelaunch-1258113633
+          COS_REGION: ap-chengdu
+          COS_ACL: public-read
+        run: node upload.js --only=app-config.json
+
+      - name: 回读验证
+        run: curl -sS -w '\nHTTP %{http_code}\n' https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-data/app-config.json
