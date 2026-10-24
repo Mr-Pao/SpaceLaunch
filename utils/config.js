@@ -1,13 +1,20 @@
 /**
  * 远程展示开关（审核模式）
  *
- * COS 上放一份 app-config.json：{ "review": false }
- * - 提审前把 review 改成 true，小程序自动切「工具态」：
- *   隐藏活动 tab 与活动列表、收起详情页长文、列表卡片去大图
- * - 过审后改回 false，已打开的用户最迟 5 分钟恢复完整展示
+ * COS 上放一份 app-config.json：
+ *   { "review": false, "reviewVersions": [] }
+ *
+ * 两种生效方式（reviewVersions 优先）：
+ * - reviewVersions 非空：**只有列在里面的版本**进工具态，其它线上版本照常完整展示。
+ *   提审流程：把要提审的版本号（= manifest 的 versionName，如 "3.0.10"）加进去 →
+ *   审核员与该版用户看到工具态，老版本用户完全不受影响 →
+ *   过审发布后把这条删掉，该版用户即恢复完整展示（不用重新提审）。
+ * - reviewVersions 为空：退回全局布尔 review（老行为），一提审所有用户都变工具态。
+ *
+ * 工具态内容：隐藏活动 tab 与活动列表、收起详情页长文、列表卡片去大图。
  *
  * 设计约束：
- * - 请求失败一律按 review:false 兜底，绝不影响正常使用
+ * - 请求失败一律按完整态兜底，绝不影响正常使用
  * - 审核环境是全新安装（无本地缓存），首次打开必然拉一次远程，
  *   所以开关在审核场景一定生效
  * - COS 直连域名无 CDN 缓存层，控制台改完即生效
@@ -39,6 +46,59 @@ function isReleaseBuild() {
 // 会话内存缓存：tabBar、首页、详情页多处调用共享一次请求
 let mem = null
 let inflight = null
+
+/**
+ * 当前运行的小程序版本号（= 上传时填的 versionName，如 "3.0.10"）。
+ * 开发版/体验版返回空串，正式版返回线上版本号。
+ */
+function runtimeVersion() {
+	// #ifdef MP-WEIXIN
+	try {
+		const info = wx.getAccountInfoSync()
+		return String((info && info.miniProgram && info.miniProgram.version) || '').trim()
+	} catch (e) {
+		// API 不存在或取不到：当没有版本号处理
+	}
+	// #endif
+	return ''
+}
+
+/**
+ * 按远程配置算出这台设备该不该进工具态。
+ *
+ * 判定顺序：
+ *   1. 非正式版 → 永远完整态（开发/体验不受远程开关影响）
+ *   2. 配了 reviewVersions 且当前版本在其中 → 工具态
+ *   3. 配了 reviewVersions 但拿不到版本号 → 工具态
+ *      （正式版一定有版本号，拿不到只可能是无版本号的审核环境，宁可保审核）
+ *   4. 其它 → 全局布尔 review
+ *
+ * 注意第 3 条的代价：启用白名单后，若某天正式版异常拿不到版本号，
+ * 用户会看到工具态。但这是「审核不过」与「体验降级」之间选，
+ * 审核不过影响发版且要重走流程，体验降级可通过改配置立刻恢复，故选保审核。
+ */
+function applyVersionRule(raw) {
+	const cfg = raw || {}
+	// 除 review 外的字段原样透传，以后配置加新开关不用改这里
+	const out = Object.assign({}, cfg)
+
+	if (!isReleaseBuild()) {
+		out.review = false
+		return out
+	}
+
+	const list = Array.isArray(cfg.reviewVersions) ? cfg.reviewVersions.map(String) : []
+
+	if (list.length) {
+		const v = runtimeVersion()
+		// 拿不到版本号：无版本号的审核环境，保审核
+		out.review = v ? list.indexOf(v) !== -1 : true
+		return out
+	}
+
+	out.review = Boolean(cfg.review)
+	return out
+}
 
 function request() {
 	return new Promise((resolve) => {
@@ -135,7 +195,7 @@ export function getConfig() {
 	// 审核态只在正式版生效：开发版/体验版永远完整态，不读 COS
 	if (!isReleaseBuild()) return Promise.resolve({ review: false })
 
-	if (mem && Date.now() - mem.ts < TTL) return Promise.resolve(mem.data)
+	if (mem && Date.now() - mem.ts < TTL) return Promise.resolve(applyVersionRule(mem.data))
 	if (inflight) return inflight
 
 	inflight = (async () => {
@@ -143,16 +203,18 @@ export function getConfig() {
 		if (local) {
 			mem = { data: local, ts: Date.now() }
 			inflight = null
-			return local
+			return applyVersionRule(local)
 		}
 
 		const remote = await fetchOnce()
-		const data = remote || { review: false }
+		// 缓存里存原始配置（含 reviewVersions），判定结果每次现算，
+		// 这样同一份缓存能被不同版本号的设备正确解释
+		const data = remote || {}
 		mem = { data, ts: Date.now() }
 		// 远程拉取成功才落缓存；失败结果不缓存，下次进页面再试
 		if (remote) writeLocal(data)
 		inflight = null
-		return data
+		return applyVersionRule(data)
 	})()
 
 	return inflight
