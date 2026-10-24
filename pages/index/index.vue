@@ -396,7 +396,7 @@ export default {
 
 	// 从详情页收藏回来时把收藏项顶上去（不重新请求数据）
 	onShow() {
-		syncTabBar(1)
+		syncTabBar(0)
 		this.reorder()
 	},
 

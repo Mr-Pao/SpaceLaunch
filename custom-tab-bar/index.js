@@ -62,17 +62,17 @@ Component({
 		selected: 1,
 		list: [
 			{
-				pagePath: 'pages/rockets/rockets',
-				text: '火箭',
-				icon: '/static/image/tabbar/rocket1.png',
-				iconActive: '/static/image/tabbar/rocket2.png'
-			},
-			{
-				// 「待发射 / 已发射」合并成一页，入口沿用原来的火箭图标
+				// 「待发射 / 已发射」合并成一页，放第一个：它是打开小程序就落地的页面
 				pagePath: 'pages/index/index',
 				text: '发射',
 				icon: '/static/image/tabbar/huojian1.png',
 				iconActive: '/static/image/tabbar/huojian2.png'
+			},
+			{
+				pagePath: 'pages/rockets/rockets',
+				text: '火箭',
+				icon: '/static/image/tabbar/rocket1.png',
+				iconActive: '/static/image/tabbar/rocket2.png'
 			},
 			{
 				pagePath: 'pages/event/event',

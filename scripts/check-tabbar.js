@@ -62,6 +62,29 @@ for (let i = 0; i < n; i++) {
 	}
 }
 
+/**
+ * 第三个错位来源：各 tab 页 onShow 里的 syncTabBar(N)。
+ * 它决定底部高亮哪一项，调完顺序最容易漏改 —— 配置一致、高亮错位，
+ * 从 pages.json 和 custom-tab-bar 两边都看不出来。
+ */
+const pagesDir = path.join(ROOT, 'pages')
+let checked = 0
+for (const dir of fs.readdirSync(pagesDir)) {
+	const file = path.join(pagesDir, dir, dir + '.vue')
+	if (!fs.existsSync(file)) continue
+
+	const m = /syncTabBar\((\d+)\)/.exec(fs.readFileSync(file, 'utf8'))
+	if (!m) continue
+
+	const idx = truth.findIndex((it) => it.pagePath === `pages/${dir}/${dir}`)
+	if (idx < 0) continue
+
+	checked++
+	if (Number(m[1]) !== idx) {
+		errors.push(`${dir}.vue 的 syncTabBar(${m[1]}) 与该页在 tabBar 里的位置（第 ${idx + 1} 项）不一致`)
+	}
+}
+
 if (errors.length) {
 	console.error('✗ tabBar 配置不一致：')
 	errors.forEach((e) => console.error('  - ' + e))
@@ -69,4 +92,4 @@ if (errors.length) {
 	process.exit(1)
 }
 
-console.log(`✓ tabBar 一致：${truth.length} 项，顺序与文案均匹配`)
+console.log(`✓ tabBar 一致：${truth.length} 项，顺序、文案与各页选中索引均匹配（校验 ${checked} 个页面）`)
