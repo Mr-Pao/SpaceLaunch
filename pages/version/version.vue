@@ -1,5 +1,7 @@
 <template>
 	<view class="page">
+		<nav-bar title="版本记录" solid placeholder />
+
 		<view class="head">
 			<text class="title">版本记录</text>
 			<text class="sub">当前版本 {{ current }}</text>

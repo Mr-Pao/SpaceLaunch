@@ -1,5 +1,7 @@
 <template>
 	<view class="page">
+		<nav-bar title="机构信息" solid placeholder />
+
 		<view class="loading" v-if="loading">
 			<text class="hint-text">加载中...</text>
 		</view>

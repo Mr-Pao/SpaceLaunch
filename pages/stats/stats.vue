@@ -1,5 +1,5 @@
 <template>
-	<view class="page">
+	<view class="page" :style="{ paddingTop: statusBarH + 'px' }">
 		<block v-if="!reviewMode">
 		<view class="loading" v-if="loading">
 			<text class="hint-text">统计中...</text>
@@ -163,6 +163,7 @@ import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
+import navMixin from '@/utils/nav-mixin.js'
 
 const MONTH_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -188,6 +189,8 @@ const COUNTRY_RULES = [
 ]
 
 export default {
+	mixins: [navMixin],
+
 	data() {
 		return {
 			loading: true,

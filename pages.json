@@ -46,21 +46,25 @@
 		{
 			"path": "pages/launch/launchInfo",
 			"style": {
-				"navigationBarTitleText": "发射任务详情",
-				"navigationStyle": "custom"
+				"navigationBarTitleText": "发射任务详情"
 			}
 		},
 		{
 			"path": "pages/rocket/rocket",
 			"style": {
-				"navigationBarTitleText": "运载火箭",
-				"navigationStyle": "custom"
+				"navigationBarTitleText": "运载火箭"
 			}
 		},
 		{
 			"path": "pages/agencies/agencies",
 			"style": {
 				"navigationBarTitleText": "机构信息"
+			}
+		},
+		{
+			"path": "pages/search/search",
+			"style": {
+				"navigationBarTitleText": "搜索"
 			}
 		},
 		{
@@ -112,6 +116,7 @@
 	"globalStyle": {
 		"backgroundColor": "#0a0e17",
 		"backgroundTextStyle": "light",
+		"navigationStyle": "custom",
 		"navigationBarBackgroundColor": "#0a0e17",
 		"navigationBarTitleText": "太空发射任务",
 		"navigationBarTextStyle": "white"

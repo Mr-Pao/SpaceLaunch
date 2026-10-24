@@ -6,33 +6,48 @@
 			<view class="stars" :style="{ boxShadow: starShadow }"></view>
 		</view>
 
-		<view class="header">
-			<image
-				class="logo"
-				src="/static/logo.png"
-				mode="aspectFill"
-				@click="goVersion"
-			></image>
-			<text class="title">太空发射任务</text>
-			<!-- 副标题写成功能描述而不是宣传语：
-			     审核按「内容型小程序」判定类目，文案越像口号越容易被归到资讯 -->
-			<text class="subtitle">实时排期 · 发射倒计时</text>
+		<!-- 沉浸式头部：statusBarH 只负责让出状态栏，内容从状态栏下方开始；
+		     紧凑横排（logo + 标题一行 + 右上搜索），不再占半屏 -->
+		<view class="header" :style="{ paddingTop: statusBarH + 'px' }">
+			<view class="header-row">
+				<image
+					class="logo"
+					src="/static/logo.png"
+					mode="aspectFill"
+					@click="goVersion"
+				></image>
+				<view class="header-text">
+					<text class="title">太空发射任务</text>
+					<!-- 副标题写成功能描述而不是宣传语：
+					     审核按「内容型小程序」判定类目，文案越像口号越容易被归到资讯 -->
+					<text class="subtitle">实时排期 · 发射倒计时</text>
+				</view>
+				<!-- 全局搜索入口：右上角一枚图标，点了进搜索页 -->
+				<view class="search-entry" @click="goSearch">
+					<text class="search-entry-icon">🔍</text>
+				</view>
+			</view>
 		</view>
 
 		<!-- 审核模式下整页换成静态展示卡：无列表、无动态数据、无 tab 入口，
 		     观感是「工具介绍页」，与「工具-信息查询」类目一致 -->
 		<block v-if="!reviewMode">
-			<!-- 只有完全没有缓存时才整屏转圈，有缓存时下面直接出内容 -->
+			<!-- 只有完全没有缓存时才整屏转圈，有缓存时下面直接出内容。
+			     火箭小动画 + 骨架卡：骨架给「内容长什么样」的预期，
+			     火箭给品牌感，纯转圈什么都不给 -->
 			<view class="loading" v-if="loading && list.length === 0">
 				<view class="rocket-loading">
-				<image
-					class="rocket"
-					src="/static/rocket.png"
-					mode="aspectFit"
-				></image>
+					<image
+						class="rocket"
+						src="/static/rocket.png"
+						mode="aspectFit"
+					></image>
 					<view class="flame"></view>
 				</view>
 				<text class="loading-text">准备发射...</text>
+				<view class="sk-list">
+					<skeleton-card v-for="i in 3" :key="i" />
+				</view>
 			</view>
 
 			<view class="error" v-else-if="error && list.length === 0">
@@ -87,11 +102,15 @@ import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { isStillUpcoming } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
+import navMixin from '@/utils/nav-mixin.js'
 import spaceData from '@/utils/data.js'
 
 export default {
 	// filter 用来剔掉 LL2 还挂在 upcoming 里的「已发射成功」任务
-	mixins: [createListMixin({ dataset: 'upcoming', pageSize: 12, favorite: true, filter: isStillUpcoming })],
+	mixins: [
+		navMixin,
+		createListMixin({ dataset: 'upcoming', pageSize: 12, favorite: true, filter: isStillUpcoming })
+	],
 
 	data() {
 		return {
@@ -205,6 +224,11 @@ export default {
 			uni.navigateTo({ url: '/pages/version/version' })
 		},
 
+		// 右上角搜索入口
+		goSearch() {
+			uni.navigateTo({ url: '/pages/search/search' })
+		},
+
 		/**
 		 * 加载第 100 条之后的排期。
 		 * 这份数据每天更新一次（不是每 15 分钟），所以拉一次就够了，
@@ -276,23 +300,33 @@ export default {
 .header {
 	position: relative;
 	z-index: 1;
-	text-align: center;
-	padding: 50rpx 40rpx 30rpx;
+	/* 左右留白与列表对齐；paddingTop 由 statusBarH 动态给 */
+	padding: 10rpx 24rpx 20rpx;
+}
+
+.header-row {
+	display: flex;
+	align-items: center;
 }
 
 .logo {
-	display: block;
-	width: 150rpx;
-	height: 150rpx;
-	margin: 0 auto 24rpx;
+	width: 76rpx;
+	height: 76rpx;
 	border-radius: 50%;
-	box-shadow: 0 0 40rpx rgba(56, 189, 248, 0.3);
+	box-shadow: 0 0 30rpx rgba(56, 189, 248, 0.3);
+	flex-shrink: 0;
+}
+
+.header-text {
+	flex: 1;
+	min-width: 0;
+	margin-left: 20rpx;
 }
 
 .title {
 	display: block;
 	color: #ffffff;
-	font-size: 44rpx;
+	font-size: 36rpx;
 	font-weight: 600;
 	letter-spacing: 2rpx;
 	text-shadow: 0 0 24rpx rgba(56, 189, 248, 0.35);
@@ -300,17 +334,38 @@ export default {
 
 .subtitle {
 	display: block;
-	margin-top: 10rpx;
+	margin-top: 4rpx;
 	color: #6b7891;
-	font-size: 24rpx;
-	letter-spacing: 4rpx;
+	font-size: 22rpx;
+	letter-spacing: 3rpx;
 }
 
-/* 加载 */
+/* 右上角搜索入口 */
+.search-entry {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 68rpx;
+	height: 68rpx;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1rpx solid rgba(255, 255, 255, 0.08);
+	flex-shrink: 0;
+}
+
+.search-entry-icon {
+	font-size: 30rpx;
+}
+
+/* 加载：火箭小动画 + 骨架卡（sk-list 里是 skeleton-card 组件） */
 .loading {
 	position: relative;
 	z-index: 1;
-	padding: 120rpx 40rpx;
+	padding: 40rpx 24rpx;
+}
+
+.sk-list {
+	margin-top: 20rpx;
 }
 
 .rocket-loading {

@@ -1,12 +1,12 @@
 <template>
 	<view class="page">
 		<block v-if="!reviewMode">
-		<view class="stat" v-if="total">
+		<view class="stat" v-if="total" :style="{ paddingTop: statusBarH + 10 + 'px' }">
 			<text class="stat-main">已发射 {{ total }} 次</text>
 			<text class="stat-sub">{{ progressText }}</text>
 		</view>
 
-		<view class="list">
+		<view class="list" v-if="visible.length">
 			<launch-card
 				v-for="item in visible"
 				:key="item.id"
@@ -17,7 +17,7 @@
 		</view>
 
 		<view class="loading" v-if="loading && visible.length === 0">
-			<text class="hint-text">加载中...</text>
+			<skeleton-card v-for="i in 4" :key="i" />
 		</view>
 
 		<view class="empty" v-else-if="!loading && visible.length === 0">
@@ -45,13 +45,17 @@
 import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { getConfig } from '@/utils/config.js'
+import navMixin from '@/utils/nav-mixin.js'
 
 const STEP = 12
 
 export default {
 	// 数据获取 / 本地分页 / 收藏标记 / 归档分片全部来自 mixin；
 	// favorite 用 'mark'：历史页只标记不置顶，置顶会打乱时间序（首页才置顶）
-	mixins: [createListMixin({ dataset: 'previous', pageSize: STEP, favorite: 'mark', archive: true })],
+	mixins: [
+		navMixin,
+		createListMixin({ dataset: 'previous', pageSize: STEP, favorite: 'mark', archive: true })
+	],
 
 	data() {
 		return {
@@ -119,7 +123,8 @@ export default {
 
 .page {
 	min-height: 100vh;
-	padding: 20rpx 24rpx 200rpx;
+	/* 顶部留白由 .stat 的 statusBarH 动态给 */
+	padding: 0 24rpx 200rpx;
 	background: #0a0e17;
 	box-sizing: border-box;
 }

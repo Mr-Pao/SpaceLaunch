@@ -1,6 +1,6 @@
 <template>
 	<view class="page">
-		<view class="header">
+		<view class="header" :style="{ paddingTop: statusBarH + 'px' }">
 			<!-- 连点 5 次呼出展示开关（静默切换）：入口隐藏，普通用户与审核不可见 -->
 			<text class="title" @click="onTitleTap">火箭大全</text>
 			<text class="subtitle">主流现役与历史型号，按发射次数排序</text>
@@ -73,7 +73,7 @@
 		</view>
 
 		<view class="loading" v-if="loading && !all.length">
-			<text class="hint-text">加载中...</text>
+			<skeleton-card v-for="i in 4" :key="i" />
 		</view>
 
 		<view class="empty" v-else-if="!all.length">
@@ -127,6 +127,7 @@ import spaceData from '@/utils/data.js'
 import { rocketName } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { setOverride } from '@/utils/config.js'
+import navMixin from '@/utils/nav-mixin.js'
 
 const STEP = 14
 // 系列太多（66 个），只把最活跃的放进筛选条，其余靠搜索
@@ -154,6 +155,8 @@ const CN_FAMILIES = [
 ]
 
 export default {
+	mixins: [navMixin],
+
 	data() {
 		return {
 			all: [],
@@ -408,7 +411,8 @@ function leoOf(kg) {
 }
 
 .header {
-	padding: 36rpx 8rpx 24rpx;
+	/* paddingTop 由 statusBarH 动态给（沉浸式），这里只管内容间距 */
+	padding: 10rpx 8rpx 24rpx;
 }
 
 .title {

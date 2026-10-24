@@ -4,12 +4,24 @@
 		     开关来自 COS 的 app-config.json（utils/config.js），
 		     失败兜底正常展示，不影响普通用户 -->
 		<block v-if="!reviewMode">
-			<view class="stat" v-if="list.length">
+			<view class="stat" v-if="list.length" :style="{ paddingTop: statusBarH + 10 + 'px' }">
 				<text class="stat-main">近期活动 {{ list.length }} 项</text>
 				<text class="stat-sub">{{ freshText }}</text>
 			</view>
 
 			<view class="list">
+				<!-- 骨架卡：形状对齐活动卡（整宽图 + 文字块），加载期占位 -->
+				<template v-if="loading && !visible.length">
+					<view class="sk-event" v-for="i in 2" :key="'sk' + i">
+						<view class="cover sk-block"></view>
+						<view class="body">
+							<view class="sk-line sk-block" style="width: 40%"></view>
+							<view class="sk-line sk-block" style="width: 85%"></view>
+							<view class="sk-line sk-block" style="width: 60%"></view>
+						</view>
+					</view>
+				</template>
+
 				<view class="card" v-for="item in visible" :key="item.id">
 					<image
 						v-if="item.feature_image"
@@ -63,9 +75,10 @@ import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort, truncate } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
+import navMixin from '@/utils/nav-mixin.js'
 
 export default {
-	mixins: [createListMixin({ dataset: 'events', pageSize: 8 })],
+	mixins: [navMixin, createListMixin({ dataset: 'events', pageSize: 8 })],
 
 	data() {
 		return {
@@ -117,9 +130,35 @@ export default {
 
 .page {
 	min-height: 100vh;
-	padding: 20rpx 24rpx 200rpx;
+	/* 顶部留白由 .stat 的 statusBarH 动态给 */
+	padding: 0 24rpx 200rpx;
 	background: #0a0e17;
 	box-sizing: border-box;
+}
+
+/* 骨架块：与卡片同底色，靠呼吸动画区分 */
+.sk-event {
+	margin-bottom: 24rpx;
+	background: #141a26;
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	overflow: hidden;
+	animation: sk-breathe 1.4s ease-in-out infinite;
+}
+
+.sk-block {
+	background: #1a2231;
+}
+
+.sk-line {
+	height: 26rpx;
+	border-radius: 8rpx;
+	margin-bottom: 14rpx;
+}
+
+@keyframes sk-breathe {
+	0%, 100% { opacity: 0.45; }
+	50% { opacity: 1; }
 }
 
 /* 卡片占满宽度。原先是写死 550rpx，小屏显窄、大屏显小 */

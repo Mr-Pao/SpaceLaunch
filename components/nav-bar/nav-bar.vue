@@ -1,12 +1,16 @@
 <template>
-	<view class="nav" :class="{ solid: solid }" :style="{ paddingTop: statusBar + 'px' }">
-		<view class="nav-inner">
-			<view class="nav-back" @click="back">
-				<text class="nav-arrow">‹</text>
-			</view>
+	<view>
+		<view class="nav" :class="{ solid: solid }" :style="{ paddingTop: statusBar + 'px' }">
+			<view class="nav-inner">
+				<view class="nav-back" @click="back">
+					<text class="nav-arrow">‹</text>
+				</view>
 
-			<text class="nav-title" v-if="title && solid">{{ title }}</text>
+				<text class="nav-title" v-if="title && solid">{{ title }}</text>
+			</view>
 		</view>
+		<!-- fixed 导航不占文档流：需要占位的页面（内容从头开始的普通页）打开此项 -->
+		<view v-if="placeholder" class="nav-placeholder" :style="{ height: statusBar + 44 + 'px' }"></view>
 	</view>
 </template>
 
@@ -26,7 +30,9 @@ export default {
 	props: {
 		title: { type: String, default: '' },
 		// 页面向下滚动后切成实色，避免图片上的文字看不清
-		solid: { type: Boolean, default: false }
+		solid: { type: Boolean, default: false },
+		// 渲染一段等高占位，内容页不用再自己算 padding
+		placeholder: { type: Boolean, default: false }
 	},
 
 	data() {
@@ -78,8 +84,13 @@ export default {
 	position: relative;
 	display: flex;
 	align-items: center;
-	height: 88rpx;
+	/* 固定 px 而不是 88rpx：占位高度按 44px 算，宽屏上两者必须一致 */
+	height: 44px;
 	padding: 0 20rpx;
+}
+
+.nav-placeholder {
+	width: 100%;
 }
 
 .nav-back {
