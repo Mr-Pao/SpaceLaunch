@@ -120,7 +120,7 @@ export default {
 	left: 120rpx;
 	right: 120rpx;
 	color: #ffffff;
-	font-size: 42rpx;
+	font-size: 46rpx;
 	font-weight: 600;
 	text-align: center;
 	white-space: nowrap;

@@ -398,8 +398,13 @@ function countryOf(agency) {
 	box-sizing: border-box;
 }
 
+/* 本页 .page 无横向留白，导航行单独补上，与内容区 24rpx 对齐 */
+.nav-row {
+	padding: 0 24rpx;
+}
+
 .head {
-	padding: 40rpx 32rpx 24rpx;
+	padding: 40rpx 24rpx 24rpx;
 }
 
 .year {
@@ -422,7 +427,7 @@ function countryOf(agency) {
 .year-picker {
 	display: flex;
 	flex-wrap: wrap;
-	padding: 4rpx 32rpx 22rpx;
+	padding: 4rpx 24rpx 22rpx;
 	/* 折叠态只露一行（chip 高约 52rpx），其余裁掉；shownYears 同时把节点数限到 12 */
 	max-height: 56rpx;
 	overflow: hidden;
@@ -452,7 +457,7 @@ function countryOf(agency) {
 
 /* 年份折叠开关 */
 .year-more {
-	margin: 0 32rpx 18rpx;
+	margin: 0 24rpx 18rpx;
 	text-align: center;
 	color: #5d6a7d;
 	font-size: 24rpx;
@@ -779,7 +784,7 @@ function countryOf(agency) {
 
 .footer-hint {
 	margin-top: 30rpx;
-	padding: 0 32rpx;
+	padding: 0 24rpx;
 	text-align: center;
 	color: #3d4a5c;
 	font-size: 22rpx;

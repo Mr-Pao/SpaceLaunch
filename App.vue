@@ -113,7 +113,9 @@ export default {
 	}
 
 	/* 统一导航行：标题靠左，与右上角微信胶囊同排，右侧永远留白给胶囊。
-	   paddingTop 由各页用 statusBarH 内联给出，这里固定 44px 与胶囊排等高 */
+	   paddingTop 由各页用 statusBarH 内联给出，这里固定 44px 与胶囊排等高。
+	   左右留白由 nav-row 或各页根容器负责（统一 24rpx，与内容区对齐），
+	   标题自身不再叠加横向 padding —— 之前标题比内容多缩 32rpx 就是这里来的 */
 	.nav-row {
 		display: flex;
 		align-items: center;
@@ -123,10 +125,10 @@ export default {
 
 	.nav-title {
 		color: #ffffff;
-		font-size: 42rpx;
+		font-size: 46rpx;
 		font-weight: 600;
 		letter-spacing: 2rpx;
-		/* 左侧留白不贴屏幕边；右侧让位给微信胶囊 */
-		padding: 0 200rpx 0 32rpx;
+		/* 右侧让位给微信胶囊；左侧对齐交给容器 */
+		padding-right: 200rpx;
 	}
 </style>
