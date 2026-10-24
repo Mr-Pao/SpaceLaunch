@@ -22,9 +22,9 @@
 			</view>
 
 			<!-- 年度切换。可选年份直接来自 CI 预聚合好的结果。
-			     归档补齐后覆盖 1957 年起 70 个年份，默认只展开最近 12 个，
+			     归档补齐后覆盖 1957 年起 70 个年份，默认只显示一行，
 			     更早的收进「更多年份」，免得整屏灰胶囊 -->
-			<view class="year-picker" v-if="availableYears.length > 1">
+			<view class="year-picker" :class="{ open: yearExpanded }" v-if="availableYears.length > 1">
 				<view
 					class="year-chip"
 					v-for="y in shownYears"
@@ -37,7 +37,7 @@
 			</view>
 			<view
 				class="year-more"
-				v-if="availableYears.length > 12"
+				v-if="availableYears.length > 6"
 				@click="yearExpanded = !yearExpanded"
 			>
 				{{ yearExpanded ? '收起年份 ▴' : '更多年份 ▾' }}
@@ -423,6 +423,14 @@ function countryOf(agency) {
 	display: flex;
 	flex-wrap: wrap;
 	padding: 4rpx 32rpx 22rpx;
+	/* 折叠态只露一行（chip 高约 52rpx），其余裁掉；shownYears 同时把节点数限到 12 */
+	max-height: 56rpx;
+	overflow: hidden;
+}
+
+.year-picker.open {
+	max-height: none;
+	overflow: visible;
 }
 
 .year-chip {

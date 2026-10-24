@@ -126,5 +126,7 @@ export default {
 		font-size: 42rpx;
 		font-weight: 600;
 		letter-spacing: 2rpx;
+		/* 左侧留白不贴屏幕边；右侧让位给微信胶囊 */
+		padding: 0 200rpx 0 32rpx;
 	}
 </style>
