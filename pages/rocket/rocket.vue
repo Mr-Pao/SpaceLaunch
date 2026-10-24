@@ -45,12 +45,32 @@
 					<text class="hero-name">{{ seriesTitle }}</text>
 					<text class="hero-sub" v-if="subName">{{ subName }}</text>
 
-					<view class="hero-tags">
-						<text class="tag" :class="config.active ? 'tag-on' : 'tag-off'">
-							{{ config.active ? '现役' : '已退役' }}
-						</text>
-						<text class="tag" v-if="config.reusable">可复用</text>
-						<text class="tag" v-if="config.max_stage">{{ config.max_stage }} 级</text>
+					<!-- 状态标签靠左、图片库入口靠右，共用一行：
+					     入口放这里比放页面中部更早看到，也不再占一整张卡 -->
+					<view class="hero-foot">
+						<view class="hero-tags">
+							<text class="tag" :class="config.active ? 'tag-on' : 'tag-off'">
+								{{ config.active ? '现役' : '已退役' }}
+							</text>
+							<text class="tag" v-if="config.reusable">可复用</text>
+							<text class="tag" v-if="config.max_stage">{{ config.max_stage }} 级</text>
+						</view>
+
+						<view
+							class="hero-media"
+							v-if="!reviewMode && mediaStats.images"
+							hover-class="hero-media-hover"
+							@click="goMedia('image')"
+						>
+							<view class="hm-icon">
+								<view class="hm-dot"></view>
+								<view class="hm-dot"></view>
+								<view class="hm-dot"></view>
+								<view class="hm-dot"></view>
+							</view>
+							<text class="hm-text">图片库</text>
+							<text class="hm-count">{{ mediaStats.images }}</text>
+						</view>
 					</view>
 				</view>
 			</view>
@@ -83,22 +103,6 @@
 							</view>
 							<text class="stat-num" :class="'num-' + s.tone">{{ s.value }}</text>
 						</view>
-					</view>
-				</view>
-
-				<!-- 图片库 / 视频库：该系列的现场照片与发射回放，
-				     点进去是独立的瀑布流页面，这里只做一个入口。
-				     放在统计卡后面而不是页面底部 —— 一个系列有五六个构型时，
-				     滚到最下面才看见入口等于没有入口 -->
-				<view class="media-card" v-if="!reviewMode && mediaStats.total">
-					<view class="media-cell" v-if="mediaStats.images" @click="goMedia('image')">
-						<text class="media-num">{{ mediaStats.images }}</text>
-						<text class="media-label">图片库</text>
-					</view>
-					<view class="media-sep" v-if="mediaStats.images && mediaStats.videos"></view>
-					<view class="media-cell" v-if="mediaStats.videos" @click="goMedia('video')">
-						<text class="media-num">{{ mediaStats.videos }}</text>
-						<text class="media-label">视频库</text>
 					</view>
 				</view>
 
@@ -779,10 +783,68 @@ function byNetDesc(a, b) {
 	font-size: 26rpx;
 }
 
+/* 状态标签与图片库入口同一行：左边标签自动占满剩余宽度，按钮靠右不压缩 */
+.hero-foot {
+	display: flex;
+	align-items: center;
+	margin-top: 18rpx;
+}
+
 .hero-tags {
+	flex: 1;
+	min-width: 0;
 	display: flex;
 	flex-wrap: wrap;
-	margin-top: 18rpx;
+}
+
+/* 图片库按钮：磨砂胶囊，和首页搜索钮同一套语言（半透明白 + 细亮边） */
+.hero-media {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	margin-left: 16rpx;
+	padding: 7rpx 18rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.14);
+	-webkit-backdrop-filter: blur(20rpx) saturate(150%);
+	backdrop-filter: blur(20rpx) saturate(150%);
+	border: 1rpx solid rgba(255, 255, 255, 0.22);
+	box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.18);
+}
+
+.hero-media-hover {
+	background: rgba(255, 255, 255, 0.24);
+}
+
+/* 2×2 小方格当图标，纯 CSS，比图片省一次请求。
+   容器宽 = 2×(点 + 右间距)，少 1rpx 都换不了行、会竖成一列 */
+.hm-icon {
+	display: flex;
+	flex-wrap: wrap;
+	width: 18rpx;
+	height: 18rpx;
+	margin-right: 10rpx;
+}
+
+.hm-dot {
+	width: 6rpx;
+	height: 6rpx;
+	margin: 0 3rpx 3rpx 0;
+	border-radius: 1.5rpx;
+	background: rgba(255, 255, 255, 0.9);
+}
+
+.hm-text {
+	color: #ffffff;
+	font-size: 22rpx;
+	line-height: 1.2;
+}
+
+.hm-count {
+	margin-left: 8rpx;
+	color: rgba(255, 255, 255, 0.6);
+	font-size: 22rpx;
+	line-height: 1.2;
 }
 
 .tag {
@@ -1219,46 +1281,6 @@ function byNetDesc(a, b) {
 .more-text {
 	color: #8a97a8;
 	font-size: 24rpx;
-}
-
-/* ---- 图片库 / 视频库入口 ---- */
-/* 和系列统计一样是「一格里两组数字」的观感，但不抢统计的视觉重量：
-   数字小一号、没有分隔线底色，点上去是高亮反馈 */
-.media-card {
-	display: flex;
-	align-items: center;
-	margin-top: 22rpx;
-	padding: 22rpx 0;
-	background: #141a26;
-	border-radius: 20rpx;
-	border: 1rpx solid rgba(255, 255, 255, 0.05);
-}
-
-.media-cell {
-	flex: 1;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-}
-
-.media-sep {
-	width: 1rpx;
-	height: 52rpx;
-	background: rgba(255, 255, 255, 0.07);
-}
-
-.media-num {
-	color: #ffffff;
-	font-size: 38rpx;
-	font-weight: 600;
-	line-height: 1.1;
-}
-
-.media-label {
-	margin-top: 8rpx;
-	color: #7d8ba0;
-	font-size: 23rpx;
-	line-height: 30rpx;
 }
 
 /* ---- 外部资料 ---- */
