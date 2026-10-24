@@ -58,9 +58,6 @@ Component({
 			const KEY = 'appReviewConfig'
 			const OVERRIDE_KEY = 'appReviewConfigOverride'
 			const TTL = 5 * 60 * 1000
-			// 开发期保护：与 utils/config.js 的 DEV_FORCE_NORMAL 是同一个开关，
-			// ⚠️ 提审前两处必须一起改成 false！
-			const DEV_FORCE_NORMAL = true
 
 			// 1) 本机覆盖（暗门切的）最高优先
 			try {
@@ -71,10 +68,12 @@ Component({
 				}
 			} catch (e) {}
 
-			// 1.5) 开发期保护：没有覆盖就强制正常态，不读远程。
-			//      与 utils/config.js 的 DEV_FORCE_NORMAL 是同一个开关，
-			//      ⚠️ 提审前两处必须一起改成 false！
-			if (DEV_FORCE_NORMAL) return
+			// 1.5) 开发版（HBuilderX 运行/预览）永远正常态，不读远程；
+			//      审核员与线上用户是正式版，不受影响。
+			//      与 utils/config.js 的 isDevBuild() 同一逻辑
+			try {
+				if (wx.getAccountInfoSync().miniProgram.envVersion === 'develop') return
+			} catch (e) {}
 
 			// 2) 远程开关的 5 分钟内缓存
 			try {

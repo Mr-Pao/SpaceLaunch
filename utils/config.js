@@ -18,14 +18,22 @@ const CONFIG_URL =
 const KEY = 'appReviewConfig'
 const TTL = 5 * 60 * 1000
 
-// 开发期保护开关：为 true 时，本机没有暗门覆盖（override）就一律按正常态处理，
-// 无视 COS 上的 review 值 —— 等审核期间 COS 停着 review:true，本机照样开发调试。
-// 暗门「展示/正常」不受影响（有覆盖时优先覆盖，两种态都能预览）。
-//
-// ⚠️⚠️ 提审前必须改回 false！⚠️⚠️
-// 审核员设备没有 override，这个开关若还是 true，审核员会看到完整版，
-// COS 开关等于失效。（custom-tab-bar/index.js 里有一份同样的开关，两处一起改！）
-const DEV_FORCE_NORMAL = true
+/**
+ * 是否开发版（HBuilderX 真机运行 / 预览 / 开发者工具编译预览）。
+ * 开发版永远按正常态展示、不读 COS —— 等审核期间 COS 停着 review:true
+ * 也不影响本机开发。审核员拿到的是提审的正式版（release），必走 COS。
+ * 基础库不支持该 API 时按非开发版处理（正式设备走 COS，行为不变）。
+ */
+function isDevBuild() {
+	// #ifdef MP-WEIXIN
+	try {
+		return wx.getAccountInfoSync().miniProgram.envVersion === 'develop'
+	} catch (e) {
+		// API 不存在或取不到：当正式版处理
+	}
+	// #endif
+	return false
+}
 
 // 会话内存缓存：tabBar、首页、详情页多处调用共享一次请求
 let mem = null
@@ -117,15 +125,15 @@ async function fetchOnce() {
 
 /**
  * 取展示开关，永远 resolve 一个对象（任何失败都兜底 review:false）。
- * 优先级：本机覆盖 > 开发期强制正常 > 内存缓存 > 本地缓存 > 远程。
+ * 优先级：本机覆盖 > 开发版完整态 > 内存缓存 > 本地缓存 > 远程。
  */
 export function getConfig() {
 	const ov = readOverride()
 	if (ov) return Promise.resolve(ov)
 
-	// 开发期：没有覆盖就强制正常态，不读任何远程/缓存，
-	// COS 上停着 review:true 也不影响本机调试完整版
-	if (DEV_FORCE_NORMAL) return Promise.resolve({ review: false })
+	// 开发版（HBuilderX 运行/预览）永远完整态，不读 COS；
+	// 审核员与线上用户走的是正式版，不受影响
+	if (isDevBuild()) return Promise.resolve({ review: false })
 
 	if (mem && Date.now() - mem.ts < TTL) return Promise.resolve(mem.data)
 	if (inflight) return inflight
