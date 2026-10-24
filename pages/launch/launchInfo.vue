@@ -68,7 +68,7 @@
 				<view class="meta-line">
 					<text class="time">{{ netText }}</text>
 					<view class="meta-acts">
-						<button class="share-btn" open-type="share">
+						<button class="share-btn" open-type="share" @tap="onShareTap">
 							<text class="share-icon">⤴</text>
 							<text class="share-text">分享</text>
 						</button>
@@ -557,6 +557,7 @@ export default {
 
 		/** 卡片内容：顶部任务图 → 标题 → 时间/状态 → 关键信息 → 底部品牌 */
 		_drawPoster(canvas, ctx, W, H, imgPath) {
+			const d = this.detail || {}
 			return new Promise((resolve) => {
 				const IMG_H = 320
 				// 背景
@@ -699,6 +700,21 @@ export default {
 				url: '/pages/rocket/rocket?id=' + c.id + '&name=' + encodeURIComponent(name)
 			})
 		},
+		/**
+		 * 分享按钮 tap：转发面板由 open-type=share 接管，正常情况点它就弹面板。
+		 * 微信没有「认证状态」的运行时 API，这里只能做能力检测兜底：
+		 * 转发不可用的环境（基础库过老 / 被限制的场景）面板不弹、按钮像坏了，
+		 * 此时 tap 仍会触发 —— 直接转去生成海报，保证按钮永远有响应。
+		 */
+		onShareTap() {
+			const supported =
+				typeof wx !== 'undefined' && wx.canIUse && wx.canIUse('button.open-type.share')
+			if (!supported) {
+				uni.showToast({ title: '当前环境不支持转发，试试海报', icon: 'none' })
+				this.makePoster()
+			}
+		},
+
 		toggleFav() {
 			if (!this.launchId) return
 			this.isFav = fav.toggle(this.launchId)
