@@ -115,10 +115,16 @@ export default {
 	margin-left: -2rpx;
 }
 
+/* 绝对定位的 text 不会吃 flex 的 align-items，
+   不显式给高度就会从容器顶部往下排，视觉上「歪」在中间偏下。
+   top + height + line-height 三者对齐 44px 才是真垂直居中。 */
 .nav-title {
 	position: absolute;
 	left: 120rpx;
 	right: 120rpx;
+	top: 0;
+	height: 44px;
+	line-height: 44px;
 	color: #ffffff;
 	font-size: 46rpx;
 	font-weight: 600;

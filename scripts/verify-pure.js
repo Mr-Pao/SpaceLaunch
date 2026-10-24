@@ -118,6 +118,17 @@ async function testFormat() {
 		'过去 + 状态未定（多半是推迟了 LL2 没更新）→ 保留'
 	)
 
+	// rocketName：长征系列走规则推导（44 个变体不逐个查表），其余保留原文
+	eq(f.rocketName({ name: 'Long March 2C' }), '长征二号丙', '长征规则：2C → 二号丙')
+	eq(f.rocketName({ name: 'Long March 3B/E' }), '长征三号乙/E', '长征规则：3B/E 保留构型后缀')
+	eq(f.rocketName({ name: 'Long March 2F/G' }), '长征二号F/G', '长征规则：F 保留原字母不转「己」')
+	eq(f.rocketName({ name: 'Long March 5B' }), '长征五号B', '长征五号B 是构型不是「乙」，查表钉死')
+	eq(f.rocketName({ name: 'Long March 12A' }), '长征十二号甲', '长征规则：两位数字 + 甲')
+	eq(f.rocketName({ name: 'Long March 8 (Core Only)' }), '长征八号（仅芯级）', '长征规则：仅芯级补注')
+	eq(f.rocketName({ name: 'Long March' }), '长征', '长征规则：无编号不产生「长征号」')
+	eq(f.rocketName({ name: 'Falcon 9 Block 5' }), 'Falcon 9 Block 5', '非中国型号保留英文原文')
+	eq(f.rocketName({ full_name: 'Long March 5', name: 'Long March' }), '长征五号', 'full_name 优先于 name')
+
 	fs.unlinkSync(tmp)
 }
 

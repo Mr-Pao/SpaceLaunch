@@ -93,34 +93,19 @@ export function statusInfo(status) {
 /**
  * 中国运载火箭的中文名。
  *
- * 只收「确定无疑」的型号：长征系列、朱雀、谷神星、快舟。
+ * 只收「确定无疑」的型号：朱雀、谷神星、快舟。
  * Kinetica / Pallas / Gravity 这类英文译名在不同资料里对不上具体中文名，
  * 与其猜错不如保留英文原文 —— 译错了比不译更糟。
  *
+ * 长征系列不写在这里：型号库里有 44 个 Long March 变体（含上面级组合），
+ * 一条条列既列不全又容易漏改，改成下面的规则推导。
  * 型号名属于固定枚举，走本地查表，不占翻译额度。
  */
 const ROCKET_ZH = {
-	'Long March 2C': '长征二号丙',
-	'Long March 2D': '长征二号丁',
-	'Long March 2F': '长征二号F',
-	'Long March 2F/G': '长征二号F/G',
-	'Long March 3B/E': '长征三号乙',
-	'Long March 3B': '长征三号乙',
-	'Long March 3C': '长征三号丙',
-	'Long March 4B': '长征四号乙',
-	'Long March 4C': '长征四号丙',
-	'Long March 5': '长征五号',
+	// 长征五号B 的 B 是构型而不是「乙」，官方写法就是 5B，规则推导会推错，单独钉住
 	'Long March 5B': '长征五号B',
-	'Long March 6': '长征六号',
-	'Long March 6A': '长征六号甲',
-	'Long March 6C': '长征六号丙',
-	'Long March 7': '长征七号',
-	'Long March 7A': '长征七号甲',
-	'Long March 8': '长征八号',
-	'Long March 8A': '长征八号甲',
-	'Long March 11': '长征十一号',
-	'Long March 12': '长征十二号',
-	'Long March 12A': '长征十二号甲',
+	'Long March 5B/YZ-2': '长征五号B/YZ-2',
+
 	'Zhuque-2': '朱雀二号',
 	'Zhuque-2E': '朱雀二号E',
 	'Zhuque-2E Block 2': '朱雀二号E',
@@ -131,11 +116,58 @@ const ROCKET_ZH = {
 	'Kuaizhou 11': '快舟十一号'
 }
 
+const CN_NUM = {
+	1: '一',
+	2: '二',
+	3: '三',
+	4: '四',
+	5: '五',
+	6: '六',
+	7: '七',
+	8: '八',
+	9: '九',
+	10: '十',
+	11: '十一',
+	12: '十二'
+}
+
+/* 型号后缀字母：A=甲 B=乙 C=丙 D=丁 E=戊。
+   F 是载人专型（长征二号F），G 只出现在 2F/G，两者都保留原字母。 */
+const CN_TAIL = { A: '甲', B: '乙', C: '丙', D: '丁', E: '戊' }
+
+/**
+ * 长征系列规则推导：
+ *   Long March 5            → 长征五号
+ *   Long March 3B/E         → 长征三号乙/E     （斜杠后是构型/上面级，保留原文）
+ *   Long March 2F/G         → 长征二号F/G
+ *   Long March 2C/YZ-1S     → 长征二号丙/YZ-1S
+ *   Long March 8 (Core Only)→ 长征八号（仅芯级）
+ * 对不上格式就返回空串，调用方回退英文原文。
+ */
+function zhLongMarch(raw) {
+	const m = /^Long March(?:\s+(\d+)([A-Z])?)?(\s*\/\s*[A-Za-z0-9][\w\-]*)?(\s*\(Core Only\))?$/i.exec(
+		String(raw).trim()
+	)
+	if (!m) return ''
+
+	const num = m[1] ? CN_NUM[m[1]] : ''
+	// 型号库里有一条光秃秃的 "Long March"（没有编号）
+	if (!m[1]) return '长征'
+	if (!num) return ''
+
+	const tail = m[2] ? CN_TAIL[m[2].toUpperCase()] || m[2] : ''
+	const extra = m[3] ? m[3].replace(/\s+/g, '').toUpperCase() : ''
+	const core = m[4] ? '（仅芯级）' : ''
+
+	return '长征' + num + '号' + tail + extra + core
+}
+
 /** 火箭型号名，中国型号换成中文，其余保留原文 */
 export function rocketName(config) {
 	if (!config) return ''
 	const raw = config.full_name || config.name || ''
-	return ROCKET_ZH[raw] || raw
+	if (!raw) return ''
+	return ROCKET_ZH[raw] || zhLongMarch(raw) || raw
 }
 
 /**
