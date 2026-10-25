@@ -10,7 +10,7 @@
 		<block v-if="!reviewMode">
 			<!-- 1 每日一图。按「日序号」取模挑图，同一天反复进来看到的是同一张，
 			     跨天才换 —— 用随机数的话每次进页都换，就没有「今天这张」的意思了 -->
-			<view class="daily" v-if="daily" hover-class="daily-hover" @click="previewDaily">
+			<view class="daily" v-if="daily" hover-class="daily-hover" @click="openPhoto(daily)">
 				<image class="daily-img" :src="dailySrc" mode="aspectFill" @error="imgBroken = true"></image>
 				<view class="daily-shade"></view>
 
@@ -19,7 +19,7 @@
 				</view>
 
 				<view class="daily-body">
-					<text class="daily-name">{{ daily.name }}</text>
+					<text class="daily-name">{{ dailyTitle }}</text>
 					<text class="daily-meta" v-if="dailyMeta">{{ dailyMeta }}</text>
 					<text class="daily-credit" v-if="daily.credit">@{{ daily.credit }}</text>
 				</view>
@@ -31,22 +31,37 @@
 					<text class="sec-title">此刻在天上</text>
 					<text class="sec-sub">{{ inSpace.length }} 人</text>
 				</view>
-				<scroll-view class="inspace-scroll" scroll-x>
-					<view class="inspace-row">
-						<view
-							class="acard"
-							v-for="a in inSpace"
-							:key="a.id"
-							hover-class="acard-hover"
-							@click="goAstronaut(a.id)"
-						>
-							<image v-if="a.img" class="acard-img" :src="a.img" mode="aspectFill" lazy-load></image>
-							<view v-else class="acard-img acard-ph"><text>🧑‍🚀</text></view>
-							<text class="acard-name">{{ a.name }}</text>
-							<text class="acard-days">在轨 {{ a.days }} 天</text>
+
+				<view class="inspace-wrap">
+					<scroll-view
+						class="inspace-scroll"
+						scroll-x
+						:scroll-left="astroLeft"
+						scroll-with-animation
+						@scroll="onAstroScroll"
+					>
+						<view class="inspace-row">
+							<view
+								class="acard"
+								v-for="a in inSpace"
+								:key="a.id"
+								hover-class="acard-hover"
+								@click="goAstronaut(a.id)"
+							>
+								<image v-if="a.img" class="acard-img" :src="a.img" mode="aspectFill" lazy-load></image>
+								<view v-else class="acard-img acard-ph"><text>🧑‍🚀</text></view>
+								<text class="acard-name">{{ astroName(a) }}</text>
+								<text class="acard-days">在轨 {{ a.days }} 天</text>
+							</view>
 						</view>
+					</scroll-view>
+
+					<!-- 右边还有内容，但横滑列表不给任何暗示，一屏外的卡片等于不存在。
+					     一块渐隐 + 一个半透明箭头，既有提示也能点着让它自己滑一段 -->
+					<view class="inspace-fade" v-if="!astroMoved">
+						<view class="inspace-nudge" hover-class="inspace-nudge-hover" @click="slideAstro">›</view>
 					</view>
-				</scroll-view>
+				</view>
 			</view>
 
 			<!-- 3 下次发射：直接用发射页那张卡（next-launch 组件），
@@ -61,7 +76,7 @@
 				<!-- 今日页只放一条，想看全部去发射页 -->
 				<view class="more-row" hover-class="more-hover" @click="goFeed">
 					<text class="more-text">更多发射</text>
-					<text class="more-arrow">»</text>
+					<text class="more-arrow">›</text>
 				</view>
 			</view>
 
@@ -70,26 +85,17 @@
 				<view class="sec-head">
 					<text class="sec-title">往年今日</text>
 					<text class="sec-sub">{{ otd.length }} 次发射</text>
-
-					<!-- 默认只露三条：这是「顺手看一眼」的内容，不是要坐这儿读的。
-					     想多看再展开，页面才不至于一进来就要滑很久 -->
-					<view
-						class="sec-more"
-						v-if="otd.length > OTD_FOLD"
-						hover-class="sec-more-hover"
-						@click="toggleOtdOpen"
-					>
-						<text class="sec-more-text">{{ otdOpen ? '收起' : '更多 ' + (otd.length - OTD_FOLD) + ' 条' }}</text>
-						<text class="sec-more-arrow" :class="{ 'is-open': otdOpen }">›</text>
-					</view>
 				</view>
 
+				<!-- 点进去是发射详情页。归档里的历史任务不在「已发射」快照内，
+				     但详情页会拿 net 直接定位到归档分片（见 launchInfo 的 netHint），
+				     所以这里带 net 能省掉一片片翻找 -->
 				<view
 					class="otd-item"
 					v-for="x in otdShown"
 					:key="x.id || x.net"
 					hover-class="otd-hover"
-					@click="toggleOtd(x.id)"
+					@click="goLaunch(x.id, x.net)"
 				>
 					<image v-if="x.img" class="otd-img" :src="x.img" mode="aspectFill" lazy-load></image>
 					<view v-else class="otd-img otd-ph"><text>🚀</text></view>
@@ -98,11 +104,19 @@
 						<text class="otd-year">{{ x.yearsAgo }} 年前的今天</text>
 						<text class="otd-name">{{ x.title }}</text>
 						<text class="otd-meta" v-if="x.meta">{{ x.meta }}</text>
-						<!-- 点开补一句现场信息。不做跳转：这些任务在「已发射」快照里早已滚出去，
-						     跳详情页只会拿到「未找到」 -->
-						<text class="otd-more" v-if="expanded === x.id">{{ x.more }}</text>
-						<text class="otd-hint" v-else>展开详情 ›</text>
 					</view>
+				</view>
+
+				<!-- 默认只露三条：这是「顺手看一眼」的内容，不是要坐这儿读的。
+				     折叠入口与「更多发射」同一套靠右样式，位置也一致（列表下方） -->
+				<view
+					class="more-row"
+					v-if="otd.length > OTD_FOLD"
+					hover-class="more-hover"
+					@click="toggleOtdOpen"
+				>
+					<text class="more-text">{{ otdOpen ? '收起' : '更多 ' + (otd.length - OTD_FOLD) + ' 条' }}</text>
+					<text class="more-arrow" :class="{ 'is-up': otdOpen }">›</text>
 				</view>
 			</view>
 
@@ -113,6 +127,15 @@
 				<view class="btn" v-if="!loading" @click="reload">重新加载</view>
 			</view>
 		</block>
+
+		<!-- 大图弹层：点每日一图打开。放在 block 外，审核态没有数据也就不会触发 -->
+		<photo-view
+			:visible="photoVisible"
+			:item="photoItem"
+			:rocket-id="photoRocketId"
+			:status-bar-h="statusBarH"
+			@close="photoVisible = false"
+		/>
 	</view>
 </template>
 
@@ -131,8 +154,9 @@
  */
 import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
-import { formatDateTime } from '@/utils/format.js'
+import { formatDateTime, rocketName, astroName } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
+import { rocketIdOf } from '@/utils/rocket-lookup.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 
@@ -170,8 +194,15 @@ export default {
 			otdOpen: false,
 			// 模板要读这个常量，挂到 data 上（options API 的模板访问不到模块作用域）
 			OTD_FOLD,
-			// 往年今日展开了哪一条（存 id，点同一条收起）
-			expanded: '',
+			// 此刻在天上的横滑位置：点右侧箭头时累加，让列表自己滑一段
+			astroLeft: 0,
+			// 滑过之后提示就没意义了，收掉
+			astroMoved: false,
+			// 大图弹层
+			photoVisible: false,
+			photoItem: null,
+			// 型号库 id，点开图之后异步反查（型号库 532 条，不该压在首屏）
+			photoRocketId: '',
 			// 倒计时组件的 net 需要「未来」的那条，用时钟兜住页面长时间不动的场景
 			nowTick: Date.now()
 		}
@@ -193,11 +224,20 @@ export default {
 			return fullImageOf(thumb) || thumb
 		},
 
+		/** LL2 的名字是「火箭型号 | 任务名」，卡片上只留任务名 ——
+		    火箭型号下一行已经单独写了，重复两遍会把两行额度用光 */
+		dailyTitle() {
+			const d = this.daily
+			if (!d) return ''
+			const parts = (d.name || '').split('|')
+			return (parts.length > 1 ? parts[1] : parts[0]).trim()
+		},
+
 		dailyMeta() {
 			const d = this.daily
 			if (!d) return ''
 			const when = formatDateTime(d.net)
-			return [d.cname, when].filter(Boolean).join(' · ')
+			return [rocketName({ name: d.cname }), when].filter(Boolean).join(' · ')
 		},
 
 		inSpace() {
@@ -221,19 +261,13 @@ export default {
 			return this.onthisday.map((x) => {
 				const title = x.nameZh || x.name || '未命名任务'
 				const meta = [x.rocket, x.agency].filter(Boolean).join(' · ')
-				// 展开后那句：精确时间 + 发射场 + 结果
-				const when = formatDateTime(x.net)
-				const result = x.status === 'Success' ? '成功' : x.status === 'Failure' ? '失败' : ''
-				const more = [when && when + ' 发射', x.site, result].filter(Boolean).join(' · ')
 				return {
-					// 统一成字符串：LL2 的 id 是 uuid，但个别旧分片是数字，
-					// 展开态用 === 比较，类型不一致会点不开
+					// 统一成字符串：LL2 的 id 是 uuid，但个别旧分片是数字
 					id: String(x.id || x.net || ''),
 					net: x.net,
 					img: x.img,
 					title,
 					meta,
-					more: more || meta,
 					yearsAgo: Math.max(1, thisYear - (x.y || thisYear))
 				}
 			})
@@ -302,20 +336,34 @@ export default {
 			this.loadAll(true)
 		},
 
-		previewDaily() {
-			if (!this.daily) return
-			const full = fullImageOf(this.daily.thumb) || this.daily.thumb
-			uni.previewImage({ urls: [full], current: full })
+		/**
+		 * 看大图。图先出，型号 id 后到 —— 反查要加载型号库（532 条），
+		 * 压在大图上等它等于让用户对着黑屏等，晚半秒出现「看这枚火箭」按钮就行。
+		 */
+		async openPhoto(item) {
+			if (!item) return
+			this.photoItem = item
+			this.photoRocketId = ''
+			this.photoVisible = true
+
+			const rid = await rocketIdOf(item.cname)
+			// 等待期间可能已经关掉或换了另一张，别把 id 塞给错的那张
+			if (this.photoItem === item && this.photoVisible) this.photoRocketId = rid
+		},
+
+		/** 横滑列表滑过之后，右侧的「还有内容」提示就该消失 */
+		onAstroScroll(e) {
+			if (!this.astroMoved && (e.detail.scrollLeft || 0) > 8) this.astroMoved = true
+		},
+
+		/** 点提示箭头：卡片宽 168rpx + 间距 16rpx，一次滑过两屏多一点 */
+		slideAstro() {
+			this.astroLeft += 550
 		},
 
 		goAstronaut(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/astronaut/astronaut?id=' + id })
-		},
-
-		toggleOtd(id) {
-			const key = String(id || '')
-			this.expanded = this.expanded === key ? '' : key
 		},
 
 		toggleOtdOpen() {
@@ -327,9 +375,14 @@ export default {
 			uni.switchTab({ url: '/pages/index/index' })
 		},
 
-		goLaunch(id) {
+		/**
+		 * 进发射详情。net 是可选的加速提示：归档里的老任务不在
+		 * 已发射快照内，详情页要靠它直接定位到历史分片，否则要一片片翻。
+		 */
+		goLaunch(id, net) {
 			if (!id) return
-			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + id })
+			const q = net ? '&net=' + encodeURIComponent(net) : ''
+			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + id + q })
 		}
 	}
 }
@@ -370,44 +423,6 @@ export default {
 	margin-left: 12rpx;
 	color: #6b7891;
 	font-size: 22rpx;
-}
-
-/* 区块头右侧的折叠入口：margin-left:auto 靠右，
-   不改 sec-head 的 justify-content（「此刻在天上」那两个元素不能分开） */
-.sec-more {
-	display: flex;
-	align-items: center;
-	margin-left: auto;
-	padding: 4rpx 0 4rpx 16rpx;
-}
-
-.sec-more-hover {
-	opacity: 0.6;
-}
-
-.sec-more-text {
-	color: #38bdf8;
-	font-size: 23rpx;
-}
-
-/* 固定成正方形小盒再居中：› 这个字形本身在字盒里偏下，
-   直接旋转 90° 会连偏移一起转过去，看着歪 */
-.sec-more-arrow {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 24rpx;
-	height: 24rpx;
-	margin-left: 4rpx;
-	color: #38bdf8;
-	font-size: 23rpx;
-	line-height: 1;
-	transition: transform 0.18s ease;
-}
-
-/* 展开时同一个 chevron 转 90° 朝下，不用再画一个箭头 */
-.sec-more-arrow.is-open {
-	transform: rotate(90deg);
 }
 
 /* ---- 1 每日一图 ---- */
@@ -499,6 +514,10 @@ export default {
 	margin-bottom: 30rpx;
 }
 
+.inspace-wrap {
+	position: relative;
+}
+
 .inspace-scroll {
 	width: 100%;
 	white-space: nowrap;
@@ -506,6 +525,47 @@ export default {
 
 .inspace-row {
 	display: flex;
+}
+
+/* 右边缘提示：一块渐隐盖住边缘，上面浮一个半透明圆形箭头。
+   渐隐层必须 pointer-events:none，否则它会把横向滑动的手势一起吃掉，
+   只让箭头那一小块可点 */
+.inspace-fade {
+	position: absolute;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	width: 130rpx;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	padding-right: 4rpx;
+	box-sizing: border-box;
+	background: linear-gradient(to right, rgba(10, 14, 23, 0) 0%, rgba(10, 14, 23, 0.86) 58%, #0a0e17 100%);
+	pointer-events: none;
+}
+
+.inspace-nudge {
+	width: 56rpx;
+	height: 56rpx;
+	border-radius: 28rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	/* 卡片是「图 + 名字 + 在轨天数」三行，垂直居中会落在名字上；
+	   往上提一点，正好压在头像的视觉中心 */
+	margin-bottom: 40rpx;
+	background: rgba(24, 32, 46, 0.76);
+	border: 1rpx solid rgba(255, 255, 255, 0.18);
+	color: rgba(255, 255, 255, 0.78);
+	font-size: 32rpx;
+	line-height: 1;
+	pointer-events: auto;
+}
+
+.inspace-nudge-hover {
+	background: rgba(56, 189, 248, 0.28);
+	border-color: rgba(56, 189, 248, 0.5);
 }
 
 .acard {
@@ -585,13 +645,24 @@ export default {
 	font-size: 23rpx;
 }
 
-/* 用 » （右双角引号）而不是连写两个 ›：
-   两个 chevron 中间自带一段字距，收 letter-spacing 也收不干净，看着像散开 */
+/* 固定成正方形小盒再居中：› 这个字形本身在字盒里偏下，
+   直接旋转会连偏移一起转过去，看着歪 */
 .more-arrow {
-	margin-left: 6rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24rpx;
+	height: 24rpx;
+	margin-left: 4rpx;
 	color: #38bdf8;
 	font-size: 23rpx;
 	line-height: 1;
+	transition: transform 0.18s ease;
+}
+
+/* 展开态：同一个 chevron 转 -90° 朝上，不用再画一个箭头 */
+.more-arrow.is-up {
+	transform: rotate(-90deg);
 }
 
 /* ---- 4 往年今日 ---- */
@@ -662,22 +733,6 @@ export default {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-/* 展开后的补充行与提示：淡蓝，和上两行灰字区分开，但都不抢「N 年前的今天」 */
-.otd-more {
-	display: block;
-	margin-top: 8rpx;
-	color: #7dd3fc;
-	font-size: 21rpx;
-	line-height: 1.4;
-}
-
-.otd-hint {
-	display: block;
-	margin-top: 6rpx;
-	color: #4d5a6e;
-	font-size: 20rpx;
 }
 
 /* ---- 空态 ---- */

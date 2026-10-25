@@ -188,6 +188,65 @@ export function nationZh(nation) {
 }
 
 /**
+ * 中国航天员的中文名。
+ *
+ * LL2 全站只给拼音（Zhu Yangzhu），中国用户看到「Zhu Yangzhu」基本认不出是谁，
+ * 而拼音转汉字有大量同音字，程序推不出来，只能查表。
+ *
+ * 前 26 位是公开报道过、写法确定的航天员；
+ * 后 5 位（陈全 / 吴飞 / 张洪章 / 张智远 / 黎家盈）是 LL2 较新录入的批次，
+ * 汉字按常见写法转写 —— 若与实际不符，改这里对应那一行即可。
+ * 香港用粤语拼音（Lai Ka-ying），与普通话拼音规律不同。
+ *
+ * 表里没有的中国人保留拼音原文：宁可显示拼音，也不要编一个错的名字。
+ */
+const CHINA_ASTRO_ZH = {
+	'Yang Liwei': '杨利伟',
+	'Fei Junlong': '费俊龙',
+	'Nie Haisheng': '聂海胜',
+	'Zhai Zhigang': '翟志刚',
+	'Liu Boming': '刘伯明',
+	'Jing Haipeng': '景海鹏',
+	'Liu Wang': '刘旺',
+	'Liu Yang': '刘洋',
+	'Wang Yaping': '王亚平',
+	'Zhang Xiaoguang': '张晓光',
+	'Chen Dong': '陈冬',
+	'Deng Qingming': '邓清明',
+	'Zhang Lu': '张陆',
+	'Ye Guangfu': '叶光富',
+	'Tang Hongbo': '汤洪波',
+	'Cai Xuzhe': '蔡旭哲',
+	'Zhu Yangzhu': '朱杨柱',
+	'Gui Haichao': '桂海潮',
+	'Tang Shengjie': '唐胜杰',
+	'Jiang Xinlin': '江新林',
+	'Li Cong': '李聪',
+	'Li Guangsu': '李广苏',
+	'Song Lingdong': '宋令东',
+	'Wang Haozhe': '王浩泽',
+	'Chen Zhongrui': '陈中瑞',
+	// —— 以下 5 位是 LL2 新录入批次，写法待核对 ——
+	'Wang Jie': '王杰',
+	'Chen Quan': '陈全',
+	'Wu Fei': '吴飞',
+	'Zhang Hongzhang': '张洪章',
+	'Zhang Zhiyuan': '张智远',
+	'Lai Ka-ying': '黎家盈'
+}
+
+/**
+ * 航天员显示名：中国籍换成中文，其余保留原拼写。
+ * 只认 nation === 'China'，避免同名的外籍人士被误译。
+ */
+export function astroName(a) {
+	if (!a) return ''
+	const raw = a.name || ''
+	if (a.nation !== 'China') return raw
+	return CHINA_ASTRO_ZH[raw] || raw
+}
+
+/**
  * 中国运载火箭的中文名。
  *
  * 只收「确定无疑」的型号：朱雀、谷神星、快舟。
