@@ -1,9 +1,9 @@
 'use strict'
 
 /**
- * 发射图片全量补齐 + 图库聚合数据
+ * 发射图片全量补齐 + 全量图库分片
  *
- * 两件事一次请求顺路做完（共用同一批 normal 列表响应，不额外耗配额）：
+ * 三件事一次请求顺路做完（共用同一批 normal 列表响应，不额外耗配额）：
  *
  * 1. **原图镜像（preset full）**：把每条发射的 image.image_url 镜像到 COS，
  *    宽 2000 / 上限 1.2MB。列表和瀑布流继续用缩略图（几十 KB），
@@ -11,39 +11,77 @@
  *    COS key 的 hash 只依赖原始 URL、后缀只依赖宽度，所以同一张图
  *    thumb = space-img/{hash}.jpg 与 full = space-img/{hash}_2000.jpg
  *    可以纯字符串互推，**不需要任何 schema 变更和 DATA_VERSION 升级**。
- *    前端推导失败的（还没扫到的）由调用方回退缩略图。
  *
- * 2. **gallery.json**：图库聚合页的数据源。从同一批响应里收集
- *    「有图的发射」压成 {id, name, net, thumb, credit, cname} 行，
- *    按 net 倒序累积。聚合页一个请求就能出瀑布流，
- *    不用为了拼图把 upcoming/previous/归档分片全拉一遍。
+ * 2. **全量累积库**（gallery-all.json，**不对外**）：跨轮累积图库的全部记录。
+ *    CI 是干净环境，每轮都要先从 COS 读回来、合并本轮新扫到的、再写回去。
+ *
+ * 3. **对外分片**：
+ *      space-data/gallery.json     索引 + 第 0 片（最新 500 张），旧前端照样能读 list
+ *      space-data/gallery/1.json   第 1 片 … 依此类推
+ *    分片按 net 倒序切，**片号越小越新**。前端先拉索引出第一屏，
+ *    滑到底再按需拉下一片，不用一次吞下整个图库。
+ *
+ * 为什么不像 v3.1.9 那样截断（当时是 KEEP=800 硬砍）：
+ *   那是"最近 800 次有图的发射"，不是图库。游标继续往 1957 年扫也没用，
+ *   老图扫进来立刻被 slice 挤掉。全量约 7654 条发射，按图去重后约 2500 张，
+ *   单文件 700KB 一次性下发不可接受 —— 所以改分片，而不是砍数据。
+ *
+ * 去重：LL2 严重复用配图（实测 200 条发射只有 73 张不同图，重复率 64%）。
+ *   同一张图只留 net 最新那次发射，否则图库横滚三屏都在放同一枚火箭。
  *
  * 游标策略：与 videos.js 同款游标循环 —— previous 按 net 降序稳定排列，
  * 从最新往最老扫（最近发射的原图最先可用），扫完一圈归零重扫，
- * 顺带把新发射、以及之前镜像失败漏掉的图补上。
- * 全量约 7654 条 / 每轮 100 条 = 77 轮；挂在 video 轮（每小时 1 次）上，3 天出头扫完。
+ * 顺带把新发射、以及之前镜像失败漏掉的图补上。新发射永远在 offset=0
+ * 附近，所以"新数据自动进来"是游标归零后的第一轮就生效的。
  *
- * 配额：每轮 2 个请求（2 页 × limit50）。与 video 轮合计 4 次，
- * 小时预算仍然在 15 次以内（见 sync.yml 头部注释）。
+ * 配额：每轮 4 个请求（1 页最新 + 游标 3 页 × limit50）。与 video 轮合计 6 次，
+ * 常规小时仍在 15 次预算内；和 timeline 撞在同一小时会短暂超（见 sync.yml 头部）。
+ * 单页失败只跳过该页（continue），整轮不中断，下一圈自然补上。
  */
 
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 const { getJson } = require('./lib/fetch')
 const { upload, hasCosConfig, readCosJson } = require('./lib/cos')
 const { mirrorImages } = require('./lib/image')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 const STATE_KEY = 'space-data/history/state-images.json'
-const GALLERY_KEY = 'space-data/gallery.json'
+const INDEX_KEY = 'space-data/gallery.json'
+// 内部累积库，不上前端白名单，只给本脚本自己读回来续写
+const ALL_KEY = 'space-data/gallery-all.json'
+const chunkKey = (i) => 'space-data/gallery/' + i + '.json'
 
-// 每轮扫多少条发射 = 2 个请求（limit 50 × 2）
-const PER_RUN = Number(process.env.IMAGE_PER_RUN || 100)
+// 每轮扫多少条发射 = 3 个请求（limit 50 × 3）
+const PER_RUN = Number(process.env.IMAGE_PER_RUN || 150)
 const PAGE = 50
-// 图库聚合保留上限。800 张 × ~150B ≈ 120KB，两列瀑布流够翻很久
-const KEEP = 800
+// 每个分片多少条。500 × ~280B ≈ 140KB，一次拉一片对小程序来说刚好
+const CHUNK = 500
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v))
+
+// 必须与 utils/data.js 和 scripts/sync.js 的 DATA_VERSION 一致。
+// gallery 单独产出，不走 sync.js 的写文件路径，容易漏改 —— verify-pure 有对拍
+const DATA_VERSION = 12
+
+const md5 = (s) => crypto.createHash('md5').update(s).digest('hex').slice(0, 12)
+
+/**
+ * 图片去重用的 key：剥掉尺寸后缀再比。
+ *
+ * thumb = space-img/{hash}.jpg、full = space-img/{hash}_2000.jpg 是同一张图，
+ * 万一哪天 thumb 预设宽度变了（{hash}_400.jpg），按完整 URL 去重就失效了。
+ * 剥掉 `_数字` 后缀才能一直对上。
+ */
+function thumbKey(url) {
+	return str(url).replace(/_\d+(?=\.[a-z0-9]+$)/i, '')
+}
+
+const timeOf = (r) => {
+	const t = new Date(str(r && r.net)).getTime()
+	return isNaN(t) ? 0 : t
+}
 
 async function readState() {
 	try {
@@ -57,28 +95,57 @@ async function readState() {
 	return { cursor: 0, total: 0 }
 }
 
+/**
+ * 读回累积库。首次上线（v3.1.9 → v3.1.10）时 gallery-all.json 还不存在，
+ * 退回旧的 gallery.json 继承那 200 条，不然要从零重扫。
+ */
+async function readAccum() {
+	let all = null
+	try {
+		all = await readCosJson(ALL_KEY)
+	} catch (e) {
+		console.warn('  ! 累积库读取失败，本轮按空库处理: ' + e.message)
+	}
+	if (all && Array.isArray(all.list)) return all
+
+	// 本地干跑（无 COS 密钥）：继承上一轮写到 dist 的图库，不然每跑一次都从零开始
+	try {
+		const local = JSON.parse(fs.readFileSync(path.join(OUT_DIR, 'gallery.json'), 'utf8'))
+		if (local && Array.isArray(local.list) && local.list.length) {
+			return { v: 1, list: local.list }
+		}
+	} catch (e) {
+		// 第一次跑，dist 里什么都没有
+	}
+
+	try {
+		const legacy = await readCosJson(INDEX_KEY)
+		if (legacy && Array.isArray(legacy.list) && legacy.list.length) {
+			console.log(`  · 迁移旧 gallery.json 的 ${legacy.list.length} 条到累积库`)
+			return { v: 1, list: legacy.list }
+		}
+	} catch (e) {
+		// 旧文件不存在是正常的
+	}
+	return { v: 1, list: [] }
+}
+
 async function runImages() {
 	if (!hasCosConfig()) {
 		console.log('  · 未配置 COS 密钥，只写本地 dist，不上传')
 	}
 	fs.mkdirSync(OUT_DIR, { recursive: true })
+	fs.mkdirSync(path.join(OUT_DIR, 'gallery'), { recursive: true })
 
 	const state = await readState()
 	let cursor = Number(state.cursor) || 0
 	let total = Number(state.total) || 0
+	const prevSig = state.sig && typeof state.sig === 'object' ? state.sig : {}
 
-	// 线上 gallery 优先；本地干跑时 COS 上还没有，退回上次写的 dist
-	let gallery = await readCosJson(GALLERY_KEY)
-	if (!gallery) {
-		try {
-			gallery = JSON.parse(fs.readFileSync(path.join(OUT_DIR, 'gallery.json'), 'utf8'))
-		} catch (e) {
-			gallery = null
-		}
-	}
+	const accum = await readAccum()
 	const byId = new Map()
-	for (const x of (gallery && gallery.list) || []) {
-		if (x && x.id) byId.set(String(x.id), x)
+	for (const x of accum.list) {
+		if (x && x.id) byId.set(str(x.id), x)
 	}
 	const before = byId.size
 
@@ -87,7 +154,24 @@ async function runImages() {
 	// 镜像完 image 变成 COS 缩略图地址（进 gallery），imageFull 的结果
 	// 已经落在 COS 上、不需要进任何 JSON（前端用 fullImageOf 推导）。
 	const rawRows = []
-	for (let off = cursor; off < cursor + PER_RUN; off += PAGE) {
+
+	// 本轮的抓取位置：**固定先扫一页最新的（offset=0），再扫游标**。
+	//
+	// 为什么必须多花这一个请求：新发射永远出现在列表最前端。
+	// 游标如果正在 3000 的位置，新发射要等整圈扫完（51 小时）才轮到 ——
+	// 用户看到的图库会一直缺最近几天的图。这一页把延迟压到 1 小时内。
+	const offsets = []
+	const seenOff = new Set()
+	const addOff = (o) => {
+		if (o >= 0 && !seenOff.has(o)) {
+			seenOff.add(o)
+			offsets.push(o)
+		}
+	}
+	addOff(0)
+	for (let off = cursor; off < cursor + PER_RUN; off += PAGE) addOff(off)
+
+	for (const off of offsets) {
 		let d
 		try {
 			d = await getJson(
@@ -97,7 +181,7 @@ async function runImages() {
 		} catch (e) {
 			// 单页失败不影响整轮：游标照常推进，下一圈补上
 			console.warn(`  ! offset=${off} 抓取失败: ${e.message}`)
-			break
+			continue
 		}
 		if (!total && d.count) total = d.count
 		const results = d.results || []
@@ -116,7 +200,9 @@ async function runImages() {
 		if (results.length < PAGE) break
 	}
 
-	console.log(`  图片: 游标 ${cursor}/${total || '?'} / 本轮有图 ${rawRows.length} 条 / 已聚合 ${before} 张`)
+	console.log(
+		`  图片: 游标 ${cursor}/${total || '?'} / 本轮有图 ${rawRows.length} 条 / 累积库 ${before} 条`
+	)
 
 	if (rawRows.length) {
 		await mirrorImages(rawRows, [
@@ -125,7 +211,7 @@ async function runImages() {
 		])
 	}
 
-	// ---- 组装 gallery ----
+	// ---- 合并进累积库 ----
 	for (const r of rawRows) {
 		if (!r.image) continue // 原始图镜像失败时 image 保持原地址，仍可进 gallery
 		byId.set(r.id, {
@@ -138,53 +224,148 @@ async function runImages() {
 		})
 	}
 
-	const next = cursor + PER_RUN
-	const list = [...byId.values()]
-		.sort((a, b) => new Date(b.net || 0) - new Date(a.net || 0))
-		.slice(0, KEEP)
-
-	const payload = {
-		v: 1,
-		dataset: 'gallery',
-		generatedAt: new Date().toISOString(),
-		count: list.length,
-		served: list.length,
-		cursor: total ? (next >= total ? 0 : next) : next,
-		total,
-		list
+	// ---- 按图去重 + 时间倒序 ----
+	// 同一张配图可能被几十次发射复用，只留 net 最新那次：
+	// 点开大图时看到的任务信息才跟"最近一次用这张图"对得上
+	const byThumb = new Map()
+	for (const x of byId.values()) {
+		if (!x || !x.thumb) continue
+		const k = thumbKey(x.thumb)
+		const prev = byThumb.get(k)
+		if (!prev || timeOf(x) > timeOf(prev)) byThumb.set(k, x)
 	}
 
-	const filePath = path.join(OUT_DIR, 'gallery.json')
-	fs.writeFileSync(filePath, JSON.stringify(payload), 'utf8')
-	const kb = (fs.statSync(filePath).size / 1024).toFixed(1)
-	console.log(`  → gallery.json  ${list.length} 张 / ${kb} KB`)
+	const list = [...byThumb.values()].sort((a, b) => timeOf(b) - timeOf(a))
+	const chunks = Math.max(1, Math.ceil(list.length / CHUNK))
 
-	// 游标状态也要落盘。CI 是干净环境，dist 里不会有历史文件，
-	// 忘了写这行、只在上传时引用，就会 ENOENT 崩掉（v3.1.9 首跑实测）
+	console.log(
+		`  图库: ${list.length} 张唯一图（原始 ${byId.size} 条记录，去重省掉 ${byId.size - list.length} 条）/ ${chunks} 片`
+	)
+
+	// ---- 写分片：内容没变的跳过上传 ----
+	// 老图扫完后绝大多数分片不会变，不比对的话每小时白传 700KB。
+	//
+	// generatedAt 必须跟着**数据变化**走，不能每轮取 now：它一旦每轮都变，
+	// 每个分片的 JSON 每轮都不同，比对就永远判定"变了"，等于白比对。
+	// 所以先看整个 list 有没有变，没变就沿用上一轮的时间戳。
+	const listSig = md5(JSON.stringify(list))
+	const dataAt =
+		listSig === state.listSig && state.dataAt
+			? state.dataAt
+			: new Date().toISOString()
+
+	const sig = {}
+	const written = []
+	for (let i = 0; i < chunks; i++) {
+		const slice = list.slice(i * CHUNK, (i + 1) * CHUNK)
+		// 片级签名只算内容：片号/总数变了才需要重传
+		const s = md5(JSON.stringify(slice))
+		sig[i] = s
+
+		const body = {
+			v: DATA_VERSION,
+			dataset: 'gallery',
+			chunk: i,
+			count: list.length,
+			chunks,
+			generatedAt: dataAt,
+			list: slice
+		}
+
+		// 第 0 片挂索引元信息，别让前端为了 count/chunks 多拉一个文件
+		const out =
+			i === 0
+				? Object.assign({}, body, {
+						launchTotal: total,
+						chunkSize: CHUNK,
+						served: slice.length
+					})
+				: body
+
+		const text = JSON.stringify(out)
+		const file =
+			i === 0
+				? path.join(OUT_DIR, 'gallery.json')
+				: path.join(OUT_DIR, 'gallery', i + '.json')
+
+		fs.writeFileSync(file, text, 'utf8')
+		written.push({ i, file, sig: s, bytes: text.length })
+	}
+
+	// 累积库落在 dist 里，本地干跑时也能续写。
+	// 这里的 v 是**内部文件格式版本**，与前端 DATA_VERSION 语义无关
+	// （同 archive.js 的 av：内部格式自己演进，不牵动前端缓存）
+	const allFile = path.join(OUT_DIR, 'gallery-all.json')
+	const allText = JSON.stringify({
+		v: 1,
+		count: list.length,
+		updatedAt: new Date().toISOString(),
+		list
+	})
+	fs.writeFileSync(allFile, allText, 'utf8')
+
+	const next = cursor + PER_RUN
+	const payloadCursor = total ? (next >= total ? 0 : next) : next
+
 	fs.writeFileSync(
 		path.join(OUT_DIR, 'state-images.json'),
-		JSON.stringify({ v: 1, cursor: payload.cursor, total, at: payload.generatedAt }),
+		JSON.stringify({
+			v: 1,
+			cursor: payloadCursor,
+			total,
+			sig,
+			// 图数基线：下轮判断"产出缩水"要用它，不能用累积库条数
+			pics: list.length,
+			// list 签名与它的时间戳：两者都没变才说明本轮数据真没动
+			listSig,
+			dataAt,
+			at: new Date().toISOString()
+		}),
 		'utf8'
 	)
 
-	// 产出缩水保险（与 videos.js 同思路）：存量 >20 时骤减按事故处理，拒传
-	if (before > 20 && list.length < Math.floor(before * 0.3)) {
-		console.error(`  ! gallery 产出 ${list.length} 远小于存量 ${before}，疑似丢失，拒传`)
-		return { rows: rawRows.length, total: before, rejected: true }
+	// 产出缩水保险（与 videos.js 同思路）：存量 >20 时骤减按事故处理，拒传。
+	// 基线与上轮的**去重后图数**比，不能用累积库条数 ——
+	// LL2 配图重复率高，累积 7000 条可能只对应 2500 张图，拿 7000 当基线会永远误判
+	const prevPics = Number(state.pics) || 0
+	if (prevPics > 20 && list.length < Math.floor(prevPics * 0.6)) {
+		console.error(`  ! 图库产出 ${list.length} 远小于上轮 ${prevPics}，疑似丢失，拒传`)
+		return { rows: rawRows.length, total: prevPics, rejected: true }
 	}
 
-	await upload(filePath, GALLERY_KEY, 'public, max-age=1800')
+	// ---- 上传 ----
+	// 顺序：累积库 → 分片（含索引/第 0 片）→ 游标状态。
+	// 数据传了游标没传，下一轮重扫这一批（无害）；
+	// 游标传了数据没传，中间一段就永远没人扫了 —— 所以游标必须最后
+	if (hasCosConfig()) {
+		await upload(allFile, ALL_KEY, 'no-cache', 'application/json')
 
-	// 游标最后落盘：数据传了游标没传，下一轮会重扫这一批（probe 会兜住，无害）；
-	// 游标传了数据没传，中间一段就永远没人扫了 —— 所以顺序必须是先数据后游标
-	await upload(
-		path.join(OUT_DIR, 'state-images.json'),
-		STATE_KEY,
-		'no-cache',
-		'application/json'
-	)
+		let uploaded = 0
+		for (const w of written) {
+			if (prevSig[w.i] === w.sig) continue
+			const key = w.i === 0 ? INDEX_KEY : chunkKey(w.i)
+			await upload(w.file, key, 'public, max-age=1800', 'application/json')
+			uploaded++
+		}
+		console.log(`  → 分片上传 ${uploaded}/${written.length}（其余内容未变，跳过）`)
 
-	return { rows: rawRows.length, total: list.length, cursor: payload.cursor }
+		await upload(
+			path.join(OUT_DIR, 'state-images.json'),
+			STATE_KEY,
+			'no-cache',
+			'application/json'
+		)
+	}
+
+	const kb = (allText.length / 1024).toFixed(1)
+	console.log(`  → 图库  ${list.length} 张 / ${chunks} 片 / 累积库 ${kb} KB`)
+
+	return {
+		rows: rawRows.length,
+		total: list.length,
+		chunks,
+		cursor: payloadCursor
+	}
 }
 
 module.exports = { runImages }

@@ -53,7 +53,9 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v9: launcher 简介中文化（descriptionZh），型号图片全量镜像
 // v10: launch 增加 imageThumb / imageCredit / pad.image* / vid
 // v11: launch 增加 rocketBrief（火箭技术参数内联）、pad.map_image、机构累计发射数
-const DATA_VERSION = 11
+// v12: gallery 改为全量分片（索引带 chunks / chunkSize / launchTotal），
+//      images 轮从 2 小时 100 条提到每小时 150 条，两天扫全历史发射
+const DATA_VERSION = 12
 
 /** 读 COS 上已生成的 JSON。桶是公有读，直接走 CDN 地址 */
 async function readCosJson(key) {
@@ -515,13 +517,15 @@ async function runDataset(name) {
 		return
 	}
 
-	// 原图全量补齐 + 图库聚合数据。与 video 一样靠游标循环慢慢扫全量，
-	// 独立 cron（每 2 小时）的原因见 sync.yml 头部的请求预算表
+	// 原图全量补齐 + 全量图库分片。与 video 一样靠游标循环慢慢扫全量，
+	// 独立 cron（每小时）的原因见 sync.yml 头部的请求预算表
 	if (dataset === 'images') {
 		fs.mkdirSync(OUT_DIR, { recursive: true })
-		console.log('\n=== 同步 images（原图全量 + gallery） ===')
+		console.log('\n=== 同步 images（原图全量 + gallery 分片） ===')
 		const im = await runImages()
-		console.log(`  gallery.json  本轮 ${im.rows} 张 / 累计 ${im.total} 张${im.rejected ? '（拒传）' : ''}`)
+		console.log(
+			`  gallery  本轮扫到 ${im.rows} 条 / 图库累计 ${im.total} 张唯一图 / ${im.chunks || 0} 片${im.rejected ? '（拒传）' : ''}`
+		)
 		return
 	}
 

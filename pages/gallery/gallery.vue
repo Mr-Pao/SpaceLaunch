@@ -45,8 +45,14 @@
 			</view>
 
 			<view class="foot">
-				<text class="foot-count"><text class="foot-num">{{ images.length }}</text> 张在漂流</text>
+				<text class="foot-count"><text class="foot-num">{{ total }}</text> 张在库里</text>
 				<text class="foot-tip">点任意一张看大图</text>
+			</view>
+
+			<!-- 横滚墙只能「看着流」，翻不到 1957 年。想看全就去全量页 -->
+			<view class="all-btn" hover-class="all-btn-hover" @click="goAll">
+				<text class="all-text">看全部 {{ total }} 张</text>
+				<text class="all-arrow">›</text>
 			</view>
 		</view>
 
@@ -100,6 +106,9 @@ export default {
 		return {
 			loading: true,
 			images: [],
+			// 图库总张数（全量、去重后），底部「看全部」用它。
+			// 和 images.length 不是一回事：images 只是第 0 片
+			total: 0,
 			// 四行各自的原始图（渲染时再拼一份副本）
 			raw: [[], [], [], []],
 			// 大图弹层
@@ -138,6 +147,7 @@ export default {
 		const list = ((g && g.list) || []).filter((x) => x && x.thumb)
 
 		this.images = list
+		this.total = (g && g.count) || list.length
 
 		// 四行交错分配：i % 4，这样同一场发射的相邻图不会挤在同一行
 		const buckets = [[], [], [], []]
@@ -150,6 +160,10 @@ export default {
 	},
 
 	methods: {
+		goAll() {
+			uni.navigateTo({ url: '/pages/gallery-all/gallery-all' })
+		},
+
 		/**
 		 * 点开看大图。
 		 * 传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
@@ -321,6 +335,36 @@ export default {
 .foot-tip {
 	color: #7d8ba0;
 	font-size: 21rpx;
+}
+
+/* ---- 看全部 ---- */
+.all-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	align-self: center;
+	margin-top: 24rpx;
+	padding: 16rpx 34rpx;
+	border-radius: 999rpx;
+	border: 1rpx solid #1e2b3d;
+	background: rgba(56, 189, 248, 0.06);
+}
+
+.all-btn-hover {
+	background: rgba(56, 189, 248, 0.16);
+}
+
+.all-text {
+	color: #38bdf8;
+	font-size: 25rpx;
+	letter-spacing: 1rpx;
+}
+
+.all-arrow {
+	margin-left: 8rpx;
+	color: #38bdf8;
+	font-size: 30rpx;
+	line-height: 1;
 }
 
 /* ---- 空态 / 加载 ---- */

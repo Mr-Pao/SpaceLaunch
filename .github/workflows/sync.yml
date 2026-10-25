@@ -10,14 +10,16 @@ name: sync-space-data
 #   previous    1 次/小时
 #   timeline    约 2 次/小时（每 3 小时 6 条单条详情，8 条会在 timeline 轮撞 15 次限额）
 #   video       2 次/小时（每轮 10 条发射，detailed 一页 5 条）
-#   images      1 次/小时（每 2 小时跑一轮 2 个请求：原图全量补齐 + gallery）
+#   images      4 次/小时（每轮 4 个请求：1 页最新 + 游标 3 页，原图补齐 + 图库分片）
 #   cores       每天 1 轮 2 个请求（detailed，UTC 23:00 = 北京 07:00）
 #   astronauts  每天 1 轮 9 个请求（detailed，UTC 23:10 = 北京 07:10）
 #   onthisday   0 次 LL2（只读自家 COS 上的快照 + 归档分片），UTC 03:45 = 北京 11:45
-#   合计        常规小时 10 次；含 timeline 的小时 14 次；
-#               agencies / astronauts 那个小时会短暂到 18，每天一次、429 两三个请求无碍
-# 注意：images 放奇数小时的 50 分，错开 timeline（0,3,6…点的 20 分），
-# 否则 timeline 轮会被顶到 16 次撞限额。
+#   合计        常规小时 13 次；含 timeline 的小时 17 次；
+#               agencies / astronauts 那个小时会短暂到 21，每天一次、429 两三个请求无碍
+#               （images 与 timeline 撞在 0/9/12… 点的那一小时，多出的请求会被 429 挡掉，
+#                 images 单页失败只跳过该页，下一圈补，不影响已有数据）
+# 注意：images 放每小时的 50 分，错开 timeline（0,3,6…点的 20 分）
+# 与 video（40 分），尽量不在同一分钟内挤。
 #
 # 注意：cron 用的是 UTC。北京时间 = UTC+8
 
@@ -38,9 +40,10 @@ on:
     # 发射视频：每小时。只有 mode=detailed 才返回 vid_urls，一页 5 条约 12 秒，
     # 每轮 10 条 = 2 个请求。定在 40 分，避开其它任务的 0 / 15 / 20 / 30 分
     - cron: '40 * * * *'
-    # 发射原图全量补齐 + 图库聚合：每 2 小时（奇数小时 50 分），每轮 2 个请求。
-    # 放奇数小时是为了错开 timeline 的 0,3,6…点 20 分 —— 同小时叠加会撞 15 次限额
-    - cron: '50 1-23/2 * * *'
+    # 发射原图全量补齐 + 全量图库分片：每小时（50 分），每轮 3 个请求。
+    # 全量约 7654 条发射，每轮 150 条 → 约 51 轮，两天扫完一圈；
+    # 之后游标归零重扫，新发射自动进图库（新发射永远在 offset=0 附近）
+    - cron: '50 * * * *'
   # 手动触发（含本机无 API 访问时）：改 scripts/sync-request.json 里的 dataset 再 push 即可。
   # GitHub App / 手机上也能改这个文件，是最省事的"跑一次某数据集"入口。
   push:
@@ -150,7 +153,7 @@ jobs:
           # 视频每轮抓多少条发射：detailed 一页 5 条，10 条 = 2 个请求
           VIDEO_PER_RUN: '10'
           # 原图全量补齐每轮扫多少条发射：normal 一页 50 条，100 条 = 2 个请求
-          IMAGE_PER_RUN: '100'
+          IMAGE_PER_RUN: '150'
         run: node sync.js --dataset=${{ steps.pick.outputs.dataset }}
 
       # GitHub 规定：公开仓库连续 60 天无提交，定时任务会被自动停用。

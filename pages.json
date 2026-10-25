@@ -51,6 +51,14 @@
 			}
 		},
 		{
+			"path": "pages/gallery-all/gallery-all",
+			"style": {
+				"navigationBarTitleText": "全部图片",
+				"backgroundTextStyle": "light",
+				"onReachBottomDistance": 300
+			}
+		},
+		{
 			"path": "pages/launch/launchInfo",
 			"style": {
 				"navigationBarTitleText": "发射任务详情"

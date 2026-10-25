@@ -39,7 +39,10 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 // v6: 增加任务名中文 mission.nameZh
 // v7: stats 增加任务 id / 名称 / 发射场
 // v8: stats 改为按年预聚合输出
-const DATA_VERSION = 11
+// v9: gallery 改为全量分片（索引带 chunks / chunkSize / launchTotal），
+//     并新增按需拉分片的 galleryChunk()。不升版本的话，
+//     老用户手里的单文件缓存 6 小时内不会刷新，全量页只翻得动第 0 片
+const DATA_VERSION = 12
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {
@@ -70,8 +73,9 @@ const FILES = {
 	// 发射视频（官方直播 / 回放 / 第三方转播）。只有 mode=detailed 才返回
 	// vid_urls，CI 每小时抓 10 条发射，按 id 索引；媒体页拿它补记录上的 vid
 	videos: 'videos.json',
-	// 图库聚合页：CI 侧从发射列表顺路压好的「有图的发射」清单（缩略图 +
-	// 署名 + 时间），按 net 倒序。聚合页一个请求出瀑布流，不用拼多个数据集
+	// 图库：CI 侧从发射列表顺路压好的「有图的发射」清单（缩略图 +
+	// 署名 + 时间），按 net 倒序。这是**索引 + 第 0 片**，
+	// 后面还有 gallery/1.json、gallery/2.json … 用 galleryChunk() 按需拉
 	gallery: 'gallery.json'
 }
 
@@ -251,6 +255,10 @@ function fetchDataset(name) {
 			generatedAt: body.generatedAt,
 			count: body.count,
 			served: body.served,
+			// gallery 分片元信息：没有就是老的单文件版本，按 1 片处理
+			chunks: body.chunks,
+			chunkSize: body.chunkSize,
+			launchTotal: body.launchTotal,
 			list: body.list,
 			savedAt: Date.now()
 		}
@@ -344,8 +352,62 @@ function decorate(data, stale) {
 		count: typeof data.count === 'number' ? data.count : data.list.length,
 		served: data.served || data.list.length,
 		generatedAt: data.generatedAt || '',
+		// 只有 gallery 会带这三个，其它数据集拿到的是兜底值
+		chunks: data.chunks || 1,
+		chunkSize: data.chunkSize || 0,
+		launchTotal: data.launchTotal || 0,
 		stale: !!stale
 	}
+}
+
+// ============ 图库分片 ============
+
+// 分片不进 Storage：一份 140KB，五片就把 10MB 配额吃掉一截，
+// 而且滑到底才用得到。只活在本会话内存里，杀进程后重拉（一次请求而已）
+const chunkMemory = {}
+const chunkInflight = {}
+
+/**
+ * 拉图库的第 i 片（i 从 1 开始）
+ *
+ * 第 0 片就是 gallery 数据集本身（索引文件带 list），不要再拉一遍 ——
+ * 那等于把第一屏下载两次。
+ *
+ * @param {number} i 分片号
+ * @returns {Promise<{list:Array, chunk:number, count:number, chunks:number}>}
+ */
+export function galleryChunk(i) {
+	i = Number(i) || 0
+	if (i <= 0) return Promise.resolve({ list: [], chunk: 0, count: 0, chunks: 1 })
+	if (chunkMemory[i]) return Promise.resolve(chunkMemory[i])
+	if (chunkInflight[i]) return chunkInflight[i]
+
+	// 时间戳按小时取整：同一小时内所有人命中同一份 CDN 缓存，
+	// 按分钟取会让 CDN 每秒都是新 URL，等于没有缓存
+	const url = CDN_BASE + '/gallery/' + i + '.json?t=' + Math.floor(Date.now() / 3600000)
+
+	const p = request(url).then((body) => {
+		const d = {
+			list: body.list || [],
+			chunk: body.chunk != null ? body.chunk : i,
+			count: body.count || 0,
+			chunks: body.chunks || 0
+		}
+		chunkMemory[i] = d
+		return d
+	})
+
+	chunkInflight[i] = p
+	const clear = () => {
+		if (chunkInflight[i] === p) delete chunkInflight[i]
+	}
+	p.then(clear, clear)
+	return p
+}
+
+/** 丢掉已加载的分片（图库下拉刷新整库时用） */
+export function clearChunks() {
+	Object.keys(chunkMemory).forEach((k) => delete chunkMemory[k])
 }
 
 /**
@@ -433,6 +495,8 @@ export function freshnessText(generatedAt) {
 
 /** 清空本项目所有缓存（调试或数据结构大改时用） */
 export function clear() {
+	clearChunks()
+
 	Object.keys(FILES).forEach((name) => {
 		delete memory[name]
 		delete inflight[name]
@@ -469,5 +533,7 @@ export default {
 	refresh,
 	freshnessText,
 	clear,
+	galleryChunk,
+	clearChunks,
 	CDN_BASE
 }
