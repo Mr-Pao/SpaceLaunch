@@ -197,6 +197,46 @@
 					</view>
 				</view>
 
+				<!-- 芯级：这个型号真实飞过的第一级硬件，编号 + 战绩。
+				     数据来自芯级库（CI 每天全量抓），按型号 id 聚合 -->
+				<view class="section" v-if="cores.length">
+					<view class="section-head">
+						<text class="section-title">芯级</text>
+						<text class="section-note">{{ cores.length }} 枚</text>
+					</view>
+
+					<view class="core-card">
+						<view
+							class="core-row"
+							v-for="c in coresShown"
+							:key="c.id"
+							hover-class="core-hover"
+							@click="toggleCore(c.id)"
+						>
+							<view class="core-body">
+								<view class="core-top">
+									<text class="core-serial">{{ c.serial || ('#' + c.id) }}</text>
+									<text class="corebadge" :class="'corebadge-' + c.statusCls">{{ c.statusText }}</text>
+								</view>
+
+								<view class="core-meta">
+									<text class="core-stat">已飞 {{ c.flights || 0 }} 次</text>
+									<text class="core-stat" v-if="c.showLanding">回收成功 {{ c.landed }}/{{ c.landedTry }}</text>
+									<text class="core-last" v-if="c.last">末飞 {{ (c.last || '').slice(0, 10) }}</text>
+								</view>
+
+								<text class="core-detail" v-if="openCore === c.id && (c.detailsZh || c.details)">
+									{{ c.detailsZh || c.details }}
+								</text>
+							</view>
+						</view>
+
+						<view class="more-btn" v-if="cores.length > CORE_FOLD" @click="coresOpen = !coresOpen">
+							<text class="more-text">{{ coresOpen ? '收起' : '展开全部 ' + cores.length + ' 枚' }}</text>
+						</view>
+					</view>
+				</view>
+
 				<!-- 发射场地：从该系列的发射记录里聚合出来的 -->
 				<block v-if="!reviewMode">
 					<view class="section" v-if="pads.length">
@@ -280,7 +320,8 @@ import {
 	agencyLabel,
 	countryOf,
 	isStillUpcoming,
-	textUnits
+	textUnits,
+	coreStatus
 } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import { collectMedia } from '@/utils/media.js'
@@ -291,6 +332,8 @@ import navMixin from '@/utils/nav-mixin.js'
 const SERIES_MIN = 3
 // 发射列表默认露几条，其余收起来（参考页也是先给几条，想看再展开）
 const FOLD = 3
+// 芯级列表默认露几枚。Falcon 9 在册 20+ 枚，全铺会把页面拉得很长
+const CORE_FOLD = 6
 
 export default {
 	mixins: [navMixin],
@@ -302,6 +345,11 @@ export default {
 			all: [],
 			config: null,
 			records: [],
+			// 芯级个体库（cores.json 全量），按 configId 过滤后展示
+			coresAll: [],
+			coresOpen: false,
+			// 点开的芯级编号（展开看简介）
+			openCore: null,
 			loading: true,
 			navSolid: false,
 			// 审核模式：隐藏外部资料、发射场地与发射列表
@@ -309,6 +357,7 @@ export default {
 			descOpen: false,
 			// 发射列表默认折叠到 FOLD 条，点「展开全部」再看完整列表
 			FOLD,
+			CORE_FOLD,
 			upcomingOpen: false,
 			historyOpen: false,
 			// hero 轮播当前页
@@ -413,9 +462,41 @@ export default {
 			return [...set].join('、')
 		},
 
+		/**
+		 * 该型号的芯级个体。LL2 的 launcher_config.id 与型号库 id 同源，
+		 * 直接按 configId 匹配；排序现役优先、已飞次数降序。
+		 * serial 里的数字抽出来比，避免 B10 排到 B1067 后面。
+		 */
+		cores() {
+			if (!this.config) return []
+			const id = String(this.config.id)
+			const list = this.coresAll.filter((x) => x && String(x.configId) === id)
+			return list
+				.map((x) => {
+					const st = coreStatus(x.status)
+					return {
+						...x,
+						statusText: st.text,
+						statusCls: st.cls,
+						// expended（设计上不回收）不显示回收行，避免误导
+						showLanding: x.landedTry > 0
+					}
+				})
+				.sort((a, b) => {
+					const ao = a.status === 'active' ? 0 : 1
+					const bo = b.status === 'active' ? 0 : 1
+					if (ao !== bo) return ao - bo
+					if ((b.flights || 0) !== (a.flights || 0)) return (b.flights || 0) - (a.flights || 0)
+					return String(a.serial).localeCompare(String(b.serial), 'en', { numeric: true })
+				})
+		},
+
+		coresShown() {
+			return this.coresOpen ? this.cores : this.cores.slice(0, CORE_FOLD)
+		},
+
 		/** 构型卡片：名称、首飞、六格参数、底行战绩 */
-		variants() {
-			const list = this.siblings
+		variants() {			const list = this.siblings
 			if (!list.length) return []
 
 			const curId = String(this.rocketId)
@@ -569,6 +650,7 @@ export default {
 
 		await this.loadConfig()
 		await this.loadRecords()
+		this.loadCores()
 		this.loading = false
 	},
 
@@ -605,6 +687,24 @@ export default {
 				const c = x.rocket && x.rocket.configuration
 				return c && ids[String(c.id)]
 			})
+		},
+
+		/**
+		 * 芯级个体库。不 await：加载失败或数据集未生成都静默降级，
+		 * 页面只是不显示「芯级」区块，不能因此卡住整页
+		 */
+		async loadCores() {
+			try {
+				const d = await spaceData.load('cores')
+				this.coresAll = (d && d.list) || []
+			} catch (e) {
+				console.warn('[rocket] 芯级库不可用', e)
+			}
+		},
+
+		/** 点一枚芯级展开/收起它的简介 */
+		toggleCore(id) {
+			this.openCore = this.openCore === id ? null : id
 		},
 
 		/** 切到同系列的另一个构型：原地替换，返回时回列表而不是逐个退栈 */
@@ -1401,6 +1501,93 @@ function byNetDesc(a, b) {
 	border-top: 2rpx solid #3d4a5c;
 	border-right: 2rpx solid #3d4a5c;
 	transform: rotate(45deg);
+}
+
+/* ---- 芯级 ---- */
+.core-card {
+	padding: 6rpx 24rpx;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	border-radius: 20rpx;
+}
+
+.core-row {
+	padding: 22rpx 0;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.04);
+}
+
+.core-row:first-child {
+	border-top: none;
+}
+
+.core-hover {
+	opacity: 0.7;
+}
+
+.core-top {
+	display: flex;
+	align-items: center;
+}
+
+.core-serial {
+	color: #e2e8f0;
+	font-size: 28rpx;
+	font-weight: 600;
+	font-family: 'DIN Alternate', 'Helvetica Neue', monospace;
+}
+
+.corebadge {
+	flex-shrink: 0;
+	margin-left: 14rpx;
+	padding: 4rpx 14rpx;
+	border-radius: 6rpx;
+	font-size: 20rpx;
+	background: rgba(255, 255, 255, 0.06);
+	color: #6b7891;
+}
+
+/* 现役：亮蓝；坠毁/炸毁：暗红；退役/已消耗：默认灰 */
+.corebadge-ok {
+	background: rgba(56, 189, 248, 0.16);
+	color: #38bdf8;
+}
+
+.corebadge-bad {
+	background: rgba(248, 113, 113, 0.14);
+	color: #f87171;
+}
+
+.core-meta {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	margin-top: 8rpx;
+}
+
+.core-stat {
+	color: #94a3b8;
+	font-size: 22rpx;
+}
+
+.core-stat + .core-stat {
+	margin-left: 20rpx;
+}
+
+.core-last {
+	margin-left: auto;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.core-detail {
+	display: block;
+	margin-top: 12rpx;
+	padding: 14rpx 18rpx;
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 12rpx;
+	color: #94a3b8;
+	font-size: 22rpx;
+	line-height: 1.6;
 }
 
 /* ---- 底部 ---- */

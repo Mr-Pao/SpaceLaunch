@@ -91,6 +91,28 @@ export function statusInfo(status) {
 }
 
 /**
+ * 芯级个体状态中文化。
+ *
+ * LL2 /launchers/ 的 status 是固定枚举（实测全库只出现 5 种）：
+ * active 现役 / retired 退役 / expended 已消耗（设计上不回收，飞完即弃）/
+ * lost 坠毁（回收失败）/ destroyed 炸毁（地面事故等）。查表不走翻译。
+ */
+const CORE_STATUS = {
+	active: { text: '现役', cls: 'ok' },
+	retired: { text: '退役', cls: 'dim' },
+	expended: { text: '已消耗', cls: 'dim' },
+	lost: { text: '坠毁', cls: 'bad' },
+	destroyed: { text: '炸毁', cls: 'bad' }
+}
+
+export function coreStatus(status) {
+	const key = typeof status === 'string' ? status : (status && status.name) || ''
+	const hit = CORE_STATUS[key]
+	if (hit) return { text: hit.text, cls: hit.cls }
+	return { text: key || '未知', cls: 'dim' }
+}
+
+/**
  * 中国运载火箭的中文名。
  *
  * 只收「确定无疑」的型号：朱雀、谷神星、快舟。

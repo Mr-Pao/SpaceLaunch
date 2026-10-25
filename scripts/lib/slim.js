@@ -411,11 +411,45 @@ function slimLauncher(c) {
 	}
 }
 
+/**
+ * 芯级个体（/launchers/）：每一枚真实存在过的第一级硬件。
+ * 与 /launcher_configurations/（slimLauncher，型号库）是两个实体 ——
+ * 这里是「B1067」这样的单枚编号。flights / successful_landings /
+ * first_launch_date / last_launch_date / launcher_config **只在
+ * mode=detailed 下返回**，normal 里连 flights 都没有（实测）。
+ * launcher_config.id 与发射快照 rocket.configuration.id 同源，
+ * 前端火箭详情页按型号 id 聚合出「这型火箭的全部芯级」。
+ */
+function slimCore(l) {
+	const cfg = l.launcher_config || {}
+	return {
+		id: l.id ?? null,
+		serial: str(l.serial_number),
+		// 固定枚举：active / retired / expended / lost / destroyed，
+		// 前端 format.coreStatusZh 查表中文化，不走翻译接口
+		status: str(l.status && l.status.name),
+		proven: Boolean(l.flight_proven),
+		flights: num(l.flights),
+		landed: num(l.successful_landings),
+		landedTry: num(l.attempted_landings),
+		first: str(l.first_launch_date),
+		last: str(l.last_launch_date),
+		configId: cfg.id ?? null,
+		configName: str(cfg.full_name) || str(cfg.name),
+		img: thumbUrl(l.image),
+		credit: imageCredit(l.image),
+		details: str(l.details),
+		// 中文由 localize 按原文哈希回填，前端 detailsZh || details 回退
+		detailsZh: ''
+	}
+}
+
 module.exports = {
 	slimLaunch,
 	slimEvent,
 	slimAgency,
 	slimLauncher,
+	slimCore,
 	slimPad,
 	slimStatLaunch
 }

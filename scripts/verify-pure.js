@@ -170,6 +170,16 @@ async function testFormat() {
 	eq(f.seriesName('PSLV'), 'PSLV', '系列名：未收录保留英文')
 	eq(f.seriesName(''), '', '系列名：空值安全返回')
 
+	// coreStatus：芯级状态是 LL2 固定枚举（实测全库 5 种），查表不走翻译
+	eq(f.coreStatus('active').text, '现役', '芯级：active 现役')
+	eq(f.coreStatus('retired').text, '退役', '芯级：retired 退役')
+	eq(f.coreStatus('expended').text, '已消耗', '芯级：expended 已消耗（设计上不回收）')
+	eq(f.coreStatus('lost').cls, 'bad', '芯级：lost 坠毁标红')
+	eq(f.coreStatus('destroyed').text, '炸毁', '芯级：destroyed 炸毁')
+	eq(f.coreStatus('unknown-ish').text, 'unknown-ish', '芯级：未知枚举保留原文不猜')
+	eq(f.coreStatus('').text, '未知', '芯级：空值安全返回')
+	eq(f.coreStatus({ name: 'active' }).text, '现役', '芯级：对象形态也能取到 name')
+
 	// 视觉宽度：中文按双宽算，用来判断简介要不要折叠
 	eq(f.textUnits(''), 0, '视觉宽度：空值 0')
 	eq(f.textUnits('abc'), 3, '视觉宽度：纯英文按字母数')

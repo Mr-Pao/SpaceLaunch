@@ -144,11 +144,28 @@ function localizeLaunchers(list) {
 	)
 }
 
+/**
+ * core.details → detailsZh
+ *
+ * 196 枚芯级的个体简介（多是「这枚芯级执行过哪些著名任务」），
+ * 同样按原文哈希永久缓存，首轮翻一次，之后每天零命中。
+ */
+function localizeCores(list) {
+	return fill(
+		list,
+		(x) => x.details,
+		(x, zh) => {
+			x.detailsZh = zh
+		}
+	)
+}
+
 module.exports = {
 	localizeLaunches,
 	localizeLaunchNames,
 	localizeEvents,
 	localizeAgencies,
 	localizePads,
-	localizeLaunchers
+	localizeLaunchers,
+	localizeCores
 }

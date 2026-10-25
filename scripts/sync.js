@@ -26,10 +26,11 @@ const { slimLaunch,
 	slimEvent,
 	slimAgency,
 	slimStatLaunch,
-	slimLauncher } = require('./lib/slim')
+	slimLauncher,
+	slimCore } = require('./lib/slim')
 const { aggregateByYear } = require('./lib/aggregate')
 const { upload } = require('./lib/cos')
-const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers } = require('./lib/localize')
+const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers, localizeCores } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
 // 发射快照本身不带火箭技术参数（normal 模式的 configuration 只有名字），
 // 同步时用型号库按 config id 内联进去，前端就不用为一张卡多拉 568KB
@@ -223,6 +224,34 @@ const DATASETS = {
 			}
 
 			return { count, list: all.map(slimLauncher) }
+		}
+	},
+
+	cores: {
+		file: 'cores.json',
+		cacheControl: 'public, max-age=86400',
+		images: ['img'],
+		localize: localizeCores,
+		/**
+		 * 芯级个体库：196 枚、limit=100 → 2 页。flights / launcher_config
+		 * 只在 detailed 下返回（normal 里没有），好在 detailed 也不重，
+		 * 实测一页 100 条约 1 分钟，每天一轮 2 个请求。
+		 */
+		async fetch() {
+			const all = []
+			let count = 0
+
+			for (let offset = 0; offset < 500; offset += 100) {
+				const j = await getJson(
+					`/launchers/?limit=100&offset=${offset}&mode=detailed&format=json`
+				)
+				count = j.count
+				const results = j.results || []
+				all.push(...results)
+				if (!results.length || offset + results.length >= count) break
+			}
+
+			return { count, list: all.map(slimCore) }
 		}
 	},
 
