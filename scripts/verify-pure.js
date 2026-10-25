@@ -721,12 +721,58 @@ function testOnThisDay() {
 	eq(pickOnThisDay(many, NOW).list.length, 40, '超过上限截到 40 条')
 }
 
+// ---------- daily.js（每日一图，ESM）----------
+
+async function testDaily() {
+	const tmp = path.join(os.tmpdir(), 'sl-daily-check.mjs')
+	fs.copyFileSync(path.join(__dirname, '..', 'utils', 'daily.js'), tmp)
+	const d = await import(pathToFileURL(tmp).href)
+
+	eq(d.pickDaily([], 20714), null, '每日一图：空列表返回 null')
+	eq(d.pickDaily(null, 20714), null, '每日一图：非数组安全返回')
+
+	// 100 张假图（thumb 唯一）
+	const list = []
+	for (let i = 0; i < 100; i++) {
+		list.push({ id: 'id' + i, thumb: 'https://cos/space-img/' + i.toString(16).padStart(16, 'a') + '.jpg' })
+	}
+
+	// 同一天反复调用必须一样（进页十次不能看到十张）
+	const a = d.pickDaily(list, 20714)
+	const b = d.pickDaily(list, 20714)
+	eq(a.id === b.id, true, '每日一图：同一天恒定')
+
+	// 相邻两天不能是同一张，也不能是列表里相邻的两条（原来是取模，必然相邻）
+	const days = []
+	for (let i = 0; i < 365; i++) days.push(d.pickDaily(list, 20714 + i).id)
+	const uniq = new Set(days)
+	eq(uniq.size > 90, true, '每日一图：365 天覆盖 > 90 张（实测 ' + uniq.size + '）')
+	let same = 0
+	for (let i = 1; i < days.length; i++) if (days[i] === days[i - 1]) same++
+	eq(same <= 6, true, '每日一图：相邻两天重复 ≤ 6 次（实测 ' + same + '）')
+
+	// 列表头部插入一条新图，当天这张不该跟着变（原来的取模做法会整体后移）
+	let stable = 0
+	for (let s = 0; s < 200; s++) {
+		const before = d.pickDaily(list, 20714 + s).id
+		const after = d.pickDaily([{ id: 'new', thumb: 'https://cos/space-img/new.jpg' }].concat(list), 20714 + s).id
+		if (before === after) stable++
+	}
+	eq(stable >= 190, true, '每日一图：插入新图后当天不跳变（200 次中稳定 ' + stable + '）')
+
+	// 同一张图被多条发射复用（LL2 实际情况：200 条只有 73 张图），
+	// 去重后不会因为重复条目而改变结果
+	const dup = list.concat([{ id: 'dup', thumb: list[3].thumb }])
+	eq(d.pickDaily(dup, 20714).id, d.pickDaily(list, 20714).id, '每日一图：重复缩略图不影响结果')
+}
+
 ;(async () => {
 	await testFormat()
 	await testSearchMatch()
 	await testMedia()
 	await testTimeline()
 	await testCraft()
+	await testDaily()
 	testVideo()
 	testOnThisDay()
 })()

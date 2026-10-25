@@ -8,8 +8,8 @@
 
 		<!-- 审核态：与其它 tab 页一致，整页不放动态数据 -->
 		<block v-if="!reviewMode">
-			<!-- 1 每日一图。按「日序号」取模挑图，同一天反复进来看到的是同一张，
-			     跨天才换 —— 用随机数的话每次进页都换，就没有「今天这张」的意思了 -->
+			<!-- 1 每日一图。按「北京天序号」哈希抽图，同一天反复进来看到的是同一张，
+			     跨天才换 —— 用真随机的话每次进页都换，就没有「今天这张」的意思了 -->
 			<view class="daily" v-if="daily" hover-class="daily-hover" @click="openPhoto(daily)">
 				<image class="daily-img" :src="dailySrc" mode="aspectFill" @error="imgBroken = true"></image>
 				<view class="daily-shade"></view>
@@ -22,6 +22,19 @@
 					<text class="daily-name">{{ dailyTitle }}</text>
 					<text class="daily-meta" v-if="dailyMeta">{{ dailyMeta }}</text>
 					<text class="daily-credit" v-if="daily.credit">@{{ daily.credit }}</text>
+
+					<!-- 两个出口压在图上：整卡点击是看大图，这两个要 .stop，
+					     否则会一并触发外层，图先弹出来再跳页，观感很乱 -->
+					<view class="daily-acts">
+						<view class="daily-link" hover-class="daily-link-hover" @click.stop="goLaunch(daily.id)">
+							<text class="daily-link-text">查看详情</text>
+							<text class="daily-link-arrow">›</text>
+						</view>
+						<view class="daily-link" hover-class="daily-link-hover" @click.stop="goGallery">
+							<text class="daily-link-text">更多图片</text>
+							<text class="daily-link-arrow">›</text>
+						</view>
+					</view>
 				</view>
 			</view>
 
@@ -158,6 +171,7 @@ import { syncTabBar } from '@/utils/tabbar.js'
 import { formatDateTime, rocketName, astroName as astroNameOf } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
 import { rocketIdOf } from '@/utils/rocket-lookup.js'
+import { pickDaily } from '@/utils/daily.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 
@@ -210,11 +224,11 @@ export default {
 	},
 
 	computed: {
-		// 每日一图：日序号取模。gallery 按 net 倒序，取模后分布是均匀的
+		// 每日一图：按「北京天序号」在 gallery 里哈希抽一张，同一天恒定。
+		// 早先是用天序号直接对 length 取模 —— 列表是新→旧倒序的，那等于
+		// 「一天往前翻一张」，相邻两天永远是同一次发射的相邻照片。
 		daily() {
-			if (!this.gallery.length) return null
-			const idx = this.daySeed() % this.gallery.length
-			return this.gallery[idx]
+			return pickDaily(this.gallery, this.daySeed())
 		},
 
 		// 优先 2000px 原图（卡片铺满整行，480px 会糊），加载失败回退缩略图
@@ -381,6 +395,11 @@ export default {
 			uni.switchTab({ url: '/pages/index/index' })
 		},
 
+		/** 图库是 tab 页，只能 switchTab；navigateTo 会直接失败 */
+		goGallery() {
+			uni.switchTab({ url: '/pages/gallery/gallery' })
+		},
+
 		/**
 		 * 进发射详情。net 是可选的加速提示：归档里的老任务不在
 		 * 已发射快照内，详情页要靠它直接定位到历史分片，否则要一片片翻。
@@ -513,6 +532,40 @@ export default {
 	margin-top: 4rpx;
 	color: rgba(255, 255, 255, 0.42);
 	font-size: 20rpx;
+}
+
+/* 两个出口靠右，与署名同一列；中间留 34rpx，手指点「查看详情」不会误触「更多图片」 */
+.daily-acts {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	margin-top: 12rpx;
+}
+
+.daily-link {
+	display: flex;
+	align-items: center;
+	padding: 8rpx 0 8rpx 34rpx;
+}
+
+.daily-link-hover {
+	opacity: 0.6;
+}
+
+/* 压在照片上，用亮天蓝 + 半透明底，避免浅色蓝天背景上读不出来 */
+.daily-link-text {
+	color: #7dd3fc;
+	font-size: 23rpx;
+	font-weight: 500;
+	text-shadow: 0 1rpx 6rpx rgba(0, 0, 0, 0.6);
+}
+
+.daily-link-arrow {
+	margin-left: 4rpx;
+	color: #7dd3fc;
+	font-size: 23rpx;
+	line-height: 1;
+	text-shadow: 0 1rpx 6rpx rgba(0, 0, 0, 0.6);
 }
 
 /* ---- 2 此刻在天上 ---- */
