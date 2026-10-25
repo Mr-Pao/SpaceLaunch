@@ -34,12 +34,7 @@
 			<text class="foot-text" v-else>{{ items.length }} / {{ total || items.length }}</text>
 		</view>
 
-		<photo-view
-			:visible="photoVisible"
-			:list="items"
-			:index="photoIndex"
-			@close="photoVisible = false"
-		/>
+		<!-- 点图直接进详情页的图片优先态，这里不再放大图弹层 -->
 	</view>
 </template>
 
@@ -64,6 +59,7 @@
  *   看起来依然是参差的。
  */
 import spaceData from '@/utils/data.js'
+import { setAlbum } from '@/utils/album.js'
 
 // 三档高度（rpx）。差得够开才看得出参差，又不能差到一屏只放两张
 const HEIGHTS = [360, 440, 520]
@@ -88,9 +84,7 @@ export default {
 			// 已加载的分片数（第 0 片算 1）
 			loaded: 0,
 			chunks: 1,
-			total: 0,
-			photoVisible: false,
-			photoIndex: 0
+			total: 0
 		}
 	},
 
@@ -158,11 +152,25 @@ export default {
 			}
 		},
 
+		/**
+		 * 点开一张：进详情页的图片优先态。
+		 * 已加载的全部图作为相册上下文，进去后左右滑能一直翻下去
+		 * （翻到已加载边界就到底了，再回来看墙会继续往下加载）
+		 */
 		preview(gi) {
 			const n = this.items.length
 			if (!n) return
-			this.photoIndex = Math.max(0, Math.min(Number(gi) || 0, n - 1))
-			this.photoVisible = true
+
+			const at = Math.max(0, Math.min(Number(gi) || 0, n - 1))
+			const item = this.items[at]
+			if (!item) return
+
+			setAlbum(this.items, at, 'gallery-all')
+			uni.navigateTo({
+				url:
+					'/pages/launch/launchInfo?id=' + item.id + '&photo=1' +
+					(item.net ? '&net=' + encodeURIComponent(item.net) : '')
+			})
 		}
 	}
 }

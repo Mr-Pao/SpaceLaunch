@@ -66,13 +66,7 @@
 			<text class="empty-sub">历史图片正在由后台逐批补齐，过几个小时再来看看</text>
 		</view>
 
-		<!-- 大图弹层：点任意一张打开，同一行内可左右滑动切换 -->
-		<photo-view
-			:visible="photoVisible"
-			:list="photoList"
-			:index="photoIndex"
-			@close="photoVisible = false"
-		/>
+		<!-- 点图直接进详情页的图片优先态，这里不再放大图弹层 -->
 	</view>
 </template>
 
@@ -93,6 +87,7 @@
  * 看着像「三个相框」而不是「墙」。4 行、行高交替，才真的密不透风。
  */
 import spaceData from '@/utils/data.js'
+import { setAlbum } from '@/utils/album.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 
 // 每行取多少张（复制后翻倍就是这个数 ×2 的节点数）
@@ -109,11 +104,7 @@ export default {
 			// 和 images.length 不是一回事：images 只是第 0 片
 			total: 0,
 			// 四行各自的原始图（渲染时再拼一份副本）
-			raw: [[], [], [], []],
-			// 大图弹层：list + 起始下标，弹层内部自己管左右滑
-			photoVisible: false,
-			photoList: [],
-			photoIndex: 0
+			raw: [[], [], [], []]
 		}
 	},
 
@@ -164,19 +155,26 @@ export default {
 		},
 
 		/**
-		 * 点开看大图。
+		 * 点开看大图：直接进详情页的「图片优先态」。
 		 * 传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
 		 *
-		 * 把整行交给弹层，而不是单张：同一行里左右滑就能继续看，
-		 * 不用退出来再点下一张。
+		 * 把整行作为相册上下文交出去：进去以后左右滑继续看同一行，
+		 * 上拉才变成这次发射的详情 —— 不用在图库和详情页之间来回退。
 		 */
 		preview(row, i) {
 			const list = this.raw[row]
 			if (!list.length) return
 
-			this.photoList = list
-			this.photoIndex = i % list.length
-			this.photoVisible = true
+			const at = i % list.length
+			const item = list[at]
+			if (!item) return
+
+			setAlbum(list, at, 'gallery')
+			uni.navigateTo({
+				url:
+					'/pages/launch/launchInfo?id=' + item.id + '&photo=1' +
+					(item.net ? '&net=' + encodeURIComponent(item.net) : '')
+			})
 		}
 	}
 }

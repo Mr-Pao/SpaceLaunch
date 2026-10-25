@@ -1,17 +1,67 @@
 <template>
-<!-- 发射详情内容。pages/launch/launchInfo 和图片大图弹层（photo-view）共用这一份，
-	 这样从图上升起来的详情和点列表进去的详情是同一套东西，不会各画一版 -->
-	<view class="page" :class="{ 'page-sheet': sheet }">
-		<!-- 加载中：抽屉模式下来自上层的图已经在同一位置显示着了，
-		     这里必须用同一张图占住首图位，否则「上拉到位」的那一下会闪出空白 -->
-		<view class="loading" :class="{ 'is-sheet': sheet }" v-if="loading">
-			<image
-				v-if="cover"
-				class="loading-cover"
-				:src="cover"
-				mode="aspectFill"
-			></image>
-			<text class="loading-text" v-else>加载中...</text>
+<!-- 发射详情。从列表点进来直接是详情；从图库/每日一图点进来走「图片优先态」：
+	 首图先占满整屏，上拉（页面滚动）时它收缩成详情页的首图，滚到位就是同一页 -->
+	<view class="page">
+		<!-- 图片层：钉在屏幕顶，高度由滚动量驱动（整屏 → 660rpx）。
+		     收缩的同时图片从「完整显示」交叉到「满宽裁切」，看起来就是这张图
+		     自己变成了详情页的首图。它是 fixed，滚到位后撤掉，
+		     交给下面 .hero 那张真首图接管，之后才跟手一起滚 -->
+		<view
+			class="stage"
+			v-if="photoOn"
+			:style="stageStyle"
+			@touchstart="onTouchStart"
+			@touchmove="onTouchMove"
+			@touchend="onTouchEnd"
+			@touchcancel="onTouchEnd"
+		>
+			<view
+				class="stage-cell"
+				v-for="i in cells"
+				:key="i"
+				:style="cellStyle(i)"
+				@click="onStageTap"
+			>
+				<!-- 两层同一张图：fit 完整显示、fill 满宽裁切，随进度交叉 -->
+				<image
+					class="stage-img"
+					:src="srcOf(i)"
+					mode="aspectFit"
+					:style="{ opacity: 1 - fillOpacity }"
+					@error="markBroken(i)"
+				></image>
+				<image
+					class="stage-img stage-img-fill"
+					:src="srcOf(i)"
+					mode="aspectFill"
+					:style="{ opacity: fillOpacity }"
+					@error="markBroken(i)"
+				></image>
+			</view>
+
+			<!-- 图上信息：不做标题栏，只在底部压一行轻提示 -->
+			<view class="stage-bar" :style="{ opacity: barOpacity }">
+				<view class="stage-bar-main">
+					<text class="stage-title">{{ photoTitle }}</text>
+					<text class="stage-meta" v-if="photoMeta">{{ photoMeta }}</text>
+				</view>
+				<view class="stage-hint">
+					<text class="stage-hint-arrow">︿</text>
+					<text class="stage-hint-text">上拉</text>
+				</view>
+			</view>
+
+			<view class="stage-count" v-if="album.length > 1 && p < 0.05">
+				{{ cur + 1 }} / {{ album.length }}
+			</view>
+		</view>
+
+		<!-- 图片优先态多占的一屏：正文起点 = winH − 滚动量，
+		     与图片层底边严格重合，所以内容是从图的下缘接上来的 -->
+		<view class="spacer" v-if="photoOn" :style="{ height: spacerH }"></view>
+
+		<view class="loading" v-if="loading">
+			<text class="loading-text">加载中...</text>
 		</view>
 
 		<view class="empty" v-else-if="!detail">
@@ -384,6 +434,13 @@ import {
 import { pickTimeline, sortedTimeline, parseDuration, tlLabel, tlRelative } from '@/utils/timeline.js'
 import * as fav from '@/utils/favorites.js'
 import { getConfig } from '@/utils/config.js'
+import { getAlbum } from '@/utils/album.js'
+import { fullImageOf } from '@/utils/media.js'
+
+// 详情页首图高度，必须与下面 .hero 的 height 一致（660rpx）
+const HERO_RPX = 660
+// 判定「横滑还是纵向滚动」的最小位移，太小会把点击误判成滑动
+const DIR_LOCK = 8
 
 export default {
 	props: {
@@ -391,12 +448,12 @@ export default {
 		id: { type: String, default: '' },
 		// 大致时间（net）：往历史归档里翻的时候用来直达分片，可为空
 		net: { type: String, default: '' },
-		// 弹层模式：内容被塞进从图底下升起的抽屉里，只有一根下拉条没有导航栏
-		sheet: { type: Boolean, default: false },
-		// 抽屉里还没读到详情时先顶在首图位的那张图（调用方手上现成的一张），
-		// 内容和上层的看图区是同一个 URL，交接时看不出换过
-		cover: { type: String, default: '' }
+		// 图片优先态：进来时首图占满整屏，上拉时收缩成详情页的首图，
+		// 收缩到位后就是普通详情页。从图库/每日一图点进来时用这个模式
+		photo: { type: Boolean, default: false }
 	},
+
+	emits: ['switch'],
 
 	watch: {
 		// id 和 net 常常一起变，合成一个 key 只触发一次加载
@@ -405,6 +462,17 @@ export default {
 			handler() {
 				this.load()
 			}
+		},
+
+		// 壳换了参数（页面实例被复用）时，当前任务与相册位置一起跟上
+		id(v) {
+			if (!v || v === this.curId) return
+			this.curId = v
+			this.curNet = this.net || ''
+			const i = this.album.findIndex((x) => x && String(x.id) === String(v))
+			this.cur = i >= 0 ? i : 0
+			this.st = 0
+			if (this.photo) uni.pageScrollTo({ scrollTop: 0, duration: 0 })
 		}
 	},
 
@@ -423,10 +491,107 @@ export default {
 			// 时间线是展开全部还是只给接下来几步
 			tlOpen: false,
 			// 审核模式：隐藏任务描述 / 天气顾虑 / 失败原因等长文，只留参数
-			reviewMode: false
+			reviewMode: false,
+
+			// ---- 图片优先态（photo）----
+			// 当前正在看的这条（横滑会换，不再等于 prop 的 id）
+			curId: '',
+			curNet: '',
+			// 在相册里的位置
+			cur: 0,
+			album: [],
+			// 页面滚动量（由壳的 onPageScroll 转发进来）
+			st: 0,
+			winW: 375,
+			winH: 667,
+			// 详情页首图高度（px）：660rpx 换算，必须与 .hero 的 height 一致
+			heroPx: 330,
+			// 横向跟手位移
+			dx: 0,
+			dragging: false,
+			dir: '',
+			startX: 0,
+			startY: 0,
+			moved: false,
+			// 原图 404 的下标：退回缩略图，至少还有图看
+			broken: {},
+			// 上一次手指离开的时刻：滑完手抬起时系统可能补一个 click
+			moveEndAt: 0
 		}
 	},
 	computed: {
+		// ---- 图片优先态 ----
+		// 真的是从图库/每日一图点进来、且拿得到相册记录时才启用。
+		// 分享打开没有相册，自然退回普通详情页
+		photoOn() {
+			return this.photo && Boolean(this.curItem)
+		},
+		curItem() {
+			return this.album[this.cur] || null
+		},
+		// 形变行程：首图从整屏收到 660rpx 要滚的距离
+		range() {
+			return Math.max(1, this.winH - this.heroPx)
+		},
+		// 形变进度 0（纯看图）→ 1（详情页）
+		p() {
+			return Math.max(0, Math.min(1, this.st / this.range))
+		},
+		// 只渲染相邻三张：多了浪费，少了横滑会露白
+		cells() {
+			const n = this.album.length
+			const out = []
+			for (let i = this.cur - 1; i <= this.cur + 1; i++) {
+				if (i >= 0 && i < n) out.push(i)
+			}
+			return out
+		},
+		/**
+		 * 图片层：高度整屏 → 660rpx。
+		 *
+		 * 为什么用滚动驱动而不是手势驱动：从图库点进来是「进页面」，
+		 * 页面滚多少图片就缩多少，滚到位接着往下滚就是详情 —— 一套滚动，
+		 * 没有「手势接管再交还」的接缝。
+		 */
+		stageStyle() {
+			const h = Math.max(this.heroPx, this.winH - Math.min(this.st, this.range))
+			const op = this.p >= 1 ? 0 : 1
+			// 撤掉后不能再接手势，否则手指从首图上划过时详情页滚不动
+			const pe = op === 0 ? 'none' : 'auto'
+			return `height:${h}px;opacity:${op};pointer-events:${pe}`
+		},
+		/**
+		 * 正文前垫一屏高的空白。
+		 *
+		 * 这一屏是图片优先态多占的空间：正文起点 = winH − st，
+		 * 图片层底边也正好 = winH − st，两者严格重合，所以图片收缩时
+		 * 内容是从它下缘「接上来」的，不会盖住也不会露缝。
+		 */
+		spacerH() {
+			return this.photoOn ? this.winH + 'px' : '0px'
+		},
+		// aspectFill 那一层的透明度：p 到 0.65 全交给裁切版
+		fillOpacity() {
+			return Math.min(1, Math.max(0, (this.p - 0.08) / 0.57))
+		},
+		// 图上那行信息比图片更早退场，不然会跟着图一起被挤扁
+		barOpacity() {
+			return Math.max(0, 1 - this.p * 2.4)
+		},
+		photoTitle() {
+			const raw = (this.curItem && this.curItem.name) || ''
+			const parts = raw.split('|')
+			return parts.length > 1 ? parts[1].trim() : raw
+		},
+		photoMeta() {
+			const it = this.curItem
+			if (!it) return ''
+			const rocket = rocketNameOf({ name: it.cname })
+			const when = formatDateTime(it.net)
+			const credit = it.credit ? '@' + it.credit : ''
+			return [rocket, when, credit].filter(Boolean).join(' · ')
+		},
+
 		// 首图轮播数据。目前 LL2 一个任务只给一张图，
 		// 留成数组是为了以后多图源接进来时直接生效
 		heroImages() {
@@ -745,10 +910,40 @@ export default {
 			return (this.detail && this.detail.image) || '/static/logo.png'
 		},
 
-		// 加载触发器：id 和 net 常在同一个 tick 里一起变，
+		// 加载触发器：curId 与 curNet 常在同一个 tick 里一起变（横滑切图也是），
 		// 分别 watch 会重复加载两遍，合成一个 key 只触发一次
 		loadKey() {
-			return (this.id || '') + '|' + (this.net || '')
+			return (this.curId || '') + '|' + (this.curNet || '')
+		}
+	},
+
+	created() {
+		// 相册上下文：从图库 / 每日一图点进来时，调用方把那一组图放进来了，
+		// 详情页靠它支持横滑换图。分享打开没有上下文，自然退回单条详情
+		const a = getAlbum()
+		this.album = a.list || []
+		this.curId = this.id || ''
+		this.curNet = this.net || ''
+		this.cur = Number(a.at) || 0
+
+		if (this.album.length) {
+			// 相册里校准位置：id 对不上就是旧上下文，宁可退化成单张
+			const i = this.album.findIndex((x) => x && String(x.id) === String(this.curId))
+			if (i >= 0) {
+				this.cur = i
+				if (!this.curNet) this.curNet = this.album[i].net || ''
+			} else {
+				this.cur = -1
+			}
+		}
+
+		try {
+			const info = uni.getSystemInfoSync()
+			this.winW = info.windowWidth || 375
+			this.winH = info.windowHeight || 667
+			this.heroPx = uni.upx2px(HERO_RPX) || 330
+		} catch (e) {
+			// 取不到就用 375×667 / 首图 330px，绝大多数机型在这个值附近
 		}
 	},
 
@@ -759,6 +954,120 @@ export default {
 	},
 
 	methods: {
+		// ---- 图片优先态：滚动驱动形变 ----
+		/**
+		 * 壳把页面的滚动量转发进来。
+		 *
+		 * 普通详情页直接返回：每帧 setData 一个数字是白花的开销，
+		 * 而普通模式本来就靠页面自己滚。
+		 */
+		setScroll(top) {
+			if (!this.photoOn) return
+			const r = this.range
+			const v = top > 0 ? top : 0
+			// 形变走完图片层已经撤掉，再往下滚只是详情页自己滚，不必跟着记
+			if (v >= r) {
+				if (this.st !== r) this.st = r
+				return
+			}
+			if (Math.abs(v - this.st) < 1) return
+			this.st = v
+		},
+
+		// 原图取 COS 上的 _2000 版本，还没补齐的退回缩略图
+		srcOf(i) {
+			const it = this.album[i]
+			if (!it) return ''
+			const thumb = it.thumb || ''
+			if (this.broken[i]) return thumb
+			return fullImageOf(thumb) || thumb
+		},
+
+		markBroken(i) {
+			if (this.broken[i]) return
+			this.broken = Object.assign({}, this.broken, { [i]: true })
+		},
+
+		cellStyle(i) {
+			const x = (i - this.cur) * this.winW + this.dx
+			const tr = this.dragging ? 'none' : 'transform .26s cubic-bezier(.2,.8,.3,1)'
+			return `width:${this.winW}px;transform:translateX(${x}px);transition:${tr}`
+		},
+
+		onTouchStart(e) {
+			// 已经缩成首图就看详情了，此时横滑会和滚动抢，直接不接
+			if (!this.photoOn || this.p > 0.02) return
+			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+			if (!t) return
+			this.startX = t.clientX
+			this.startY = t.clientY
+			this.dx = 0
+			this.dir = ''
+			this.moved = false
+			this.dragging = true
+		},
+
+		onTouchMove(e) {
+			if (!this.dragging) return
+			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+			if (!t) return
+
+			const mx = t.clientX - this.startX
+			const my = t.clientY - this.startY
+
+			// 先定方向，定了就不再改：横滑途中手指总会有点上下偏移，
+			// 每帧重判会让图片上下抖
+			if (!this.dir) {
+				if (Math.abs(mx) > Math.abs(my) && Math.abs(mx) > DIR_LOCK) this.dir = 'h'
+				else if (Math.abs(my) > Math.abs(mx) && Math.abs(my) > DIR_LOCK) this.dir = 'v'
+				else return
+			}
+			// 纵向交给页面滚动（页面滚动是原生的，这里不拦）
+			if (this.dir !== 'h') return
+
+			this.moved = true
+			// 首尾越界给阻尼：手指还在动，图几乎不动，一眼就知道到头了
+			let x = mx
+			if ((this.cur <= 0 && mx > 0) || (this.cur >= this.album.length - 1 && mx < 0)) {
+				x = mx * 0.28
+			}
+			this.dx = x
+		},
+
+		onTouchEnd() {
+			if (!this.dragging) return
+			const dx = this.dx
+			const moved = this.moved
+
+			this.dragging = false
+			this.dir = ''
+			// 拖动结束后系统还会补一个 click，用它挡掉，否则滑一张就跳去详情
+			if (moved) this.moveEndAt = Date.now()
+
+			this.dx = 0
+			if (!moved) return
+
+			const limit = this.winW * 0.2
+			let target = this.cur
+			if (dx <= -limit && this.cur < this.album.length - 1) target = this.cur + 1
+			else if (dx >= limit && this.cur > 0) target = this.cur - 1
+			if (target === this.cur) return
+
+			// 关键：cur 与 dx 必须同一帧改完。
+			// 新图位移从 (target-cur)*W + dx 变成 0，正好接住手指松开的位置
+			this.cur = target
+			const it = this.album[target]
+			this.curId = String(it.id)
+			this.curNet = it.net || ''
+			this.$emit('switch', this.curId)
+		},
+
+		// 点图 = 想看这次发射：直接把页面滚到详情态，比再滑一下省事
+		onStageTap() {
+			if (this.moveEndAt && Date.now() - this.moveEndAt < 400) return
+			uni.pageScrollTo({ scrollTop: this.range, duration: 260 })
+		},
+
 		// 展示开关（App onLaunch 已预热，命中内存缓存，零开销）。
 		// 页面壳在 onShow 里还会再调一次：navigateBack 回来时实例被复用、不会重新
 		// mounted，开关要是切过，长文该跟着变
@@ -775,7 +1084,7 @@ export default {
 		 * 用户在图上连滑几张再上拉，前一张的请求可能后到，会把内容盖成别人的。
 		 */
 		async load() {
-			const id = this.id
+			const id = this.curId
 			const seq = (this._seq = (this._seq || 0) + 1)
 
 			if (!id) {
@@ -803,7 +1112,7 @@ export default {
 			// 统计页失败复盘、已发射页更早条目都属于这类，之前会直接白屏。
 			// net 可让查找直接跳到目标分片（findById 内部有限深与缓存上限）
 			if (!d) {
-				d = await findByIdInArchive(id, this.net)
+				d = await findByIdInArchive(id, this.curNet)
 				if (this._seq !== seq) return
 			}
 
@@ -1215,26 +1524,136 @@ export default {
 	padding-bottom: 60rpx;
 }
 
-/* 抽屉模式：底下是图片弹层的抽屉，底部留白交给抽屉自己算，内容顶到底 */
-.page-sheet {
-	padding-bottom: 24rpx;
+/* ---- 图片优先态 ---- */
+
+/* 图片层：钉在屏幕顶，高度由 setScroll 驱动（整屏 → 660rpx） */
+.stage {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	overflow: hidden;
+	z-index: 20;
+	/* 必须不透明：aspectFit 的上下黑边一旦透光，
+	     会露出下面正在往上顶的详情内容 */
+	background: #04060a;
+}
+
+.stage-cell {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	height: auto;
+	will-change: transform;
+}
+
+.stage-img {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+/* 满宽裁切那一层：叠在完整显示那一层上，随进度交叉 */
+.stage-img-fill {
+	position: absolute;
+	left: 0;
+	top: 0;
+}
+
+/* 图上那行信息：压在底部，上拉时先退场 */
+.stage-bar {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	padding: 40rpx 44rpx 56rpx;
+	background: linear-gradient(180deg, rgba(4, 6, 10, 0) 0%, rgba(4, 6, 10, 0.82) 100%);
+}
+
+.stage-bar-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.stage-title {
+	display: block;
+	color: #eef3fa;
+	font-size: 32rpx;
+	font-weight: 600;
+	line-height: 1.35;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.stage-meta {
+	display: block;
+	margin-top: 8rpx;
+	color: rgba(214, 226, 240, 0.72);
+	font-size: 23rpx;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.stage-hint {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	margin-left: 26rpx;
+	padding-bottom: 4rpx;
+}
+
+.stage-hint-arrow {
+	color: rgba(255, 255, 255, 0.62);
+	font-size: 26rpx;
+	line-height: 1;
+	animation: stage-breathe 1.8s ease-in-out infinite;
+}
+
+.stage-hint-text {
+	margin-top: 6rpx;
+	color: rgba(255, 255, 255, 0.5);
+	font-size: 20rpx;
+}
+
+@keyframes stage-breathe {
+	0%,
+	100% {
+		opacity: 0.35;
+		transform: translateY(0);
+	}
+	50% {
+		opacity: 0.95;
+		transform: translateY(-4rpx);
+	}
+}
+
+.stage-count {
+	position: absolute;
+	left: 50%;
+	bottom: 18rpx;
+	transform: translateX(-50%);
+	padding: 4rpx 16rpx;
+	border-radius: 20rpx;
+	background: rgba(0, 0, 0, 0.32);
+	color: rgba(255, 255, 255, 0.72);
+	font-size: 20rpx;
+}
+
+/* 图片优先态多占的那一屏，高度由 spacerH 给 */
+.spacer {
+	width: 100%;
 }
 
 .loading,
 .empty {
 	padding: 240rpx 60rpx;
 	text-align: center;
-}
-
-/* 抽屉里不用留白：首图就是直接从顶部开始的 */
-.loading.is-sheet {
-	padding: 0;
-}
-
-.loading-cover {
-	display: block;
-	width: 100%;
-	height: 660rpx;
 }
 
 .loading-text,

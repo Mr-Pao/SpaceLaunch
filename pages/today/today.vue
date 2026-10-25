@@ -86,10 +86,18 @@
 
 				<next-launch :item="next" @select="goLaunch(next.id)" />
 
-				<!-- 今日页只放一条，想看全部去发射页 -->
-				<view class="more-row" hover-class="more-hover" @click="goFeed">
-					<text class="more-text">更多发射</text>
-					<text class="more-arrow">›</text>
+				<!-- 两个出口并排靠右，和每日一图那两个链接同一套排法：
+				     整卡点击是看详情，「查看详情」是同一个去处但目标更明确，
+				     「更多发射」去发射页。今日页只放一条，看全部得换页 -->
+				<view class="next-acts">
+					<view class="next-link" hover-class="next-link-hover" @click="goLaunch(next.id)">
+						<text class="next-link-text">查看详情</text>
+						<text class="next-link-arrow">›</text>
+					</view>
+					<view class="next-link" hover-class="next-link-hover" @click="goFeed">
+						<text class="next-link-text">更多发射</text>
+						<text class="next-link-arrow">›</text>
+					</view>
 				</view>
 			</view>
 
@@ -141,14 +149,7 @@
 			</view>
 		</block>
 
-		<!-- 大图弹层：点每日一图打开。放在 block 外，审核态没有数据也就不会触发 -->
-		<photo-view
-			:visible="photoVisible"
-			:list="photoList"
-			:index="0"
-			:status-bar-h="statusBarH"
-			@close="photoVisible = false"
-		/>
+		<!-- 点图直接进详情页的图片优先态，这里不再放大图弹层 -->
 	</view>
 </template>
 
@@ -171,6 +172,7 @@ import { syncTabBar } from '@/utils/tabbar.js'
 import { formatDateTime, rocketName, astroName as astroNameOf } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
 import { pickDaily } from '@/utils/daily.js'
+import { setAlbum } from '@/utils/album.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 
@@ -212,9 +214,6 @@ export default {
 			astroLeft: 0,
 			// 滑过之后提示就没意义了，收掉
 			astroMoved: false,
-			// 大图弹层：每日一图只有一张，list 给单元素
-			photoVisible: false,
-			photoList: [],
 			// 倒计时组件的 net 需要「未来」的那条，用时钟兜住页面长时间不动的场景
 			nowTick: Date.now()
 		}
@@ -354,13 +353,19 @@ export default {
 		},
 
 		/**
-		 * 看大图。每日一图只有一张，交给弹层的 list 就是单元素 ——
-		 * 同一套组件，左右滑自然滑不动（首尾都是它自己）。
+		 * 看大图：进详情页的图片优先态。
+		 * 每日一图只有一张，相册上下文就是单元素 —— 左右滑自然滑不动，
+		 * 上拉才是这次发射的详情。
 		 */
 		openPhoto(item) {
 			if (!item) return
-			this.photoList = [item]
-			this.photoVisible = true
+
+			setAlbum([item], 0, 'today')
+			uni.navigateTo({
+				url:
+					'/pages/launch/launchInfo?id=' + item.id + '&photo=1' +
+					(item.net ? '&net=' + encodeURIComponent(item.net) : '')
+			})
 		},
 
 		/** 横滑列表滑过之后，右侧的「还有内容」提示就该消失 */
@@ -679,6 +684,38 @@ export default {
 }
 
 /* 卡片下面那行出口：靠右，天蓝色，和卡内「查看详情 ›」是同一套视觉语言 */
+/* 下次发射的两个出口：和每日一图那两个链接同一套排法（靠右并排、› 统一） */
+.next-acts {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	margin-top: 12rpx;
+	padding-right: 4rpx;
+}
+
+.next-link {
+	display: flex;
+	align-items: center;
+	padding: 8rpx 0 8rpx 34rpx;
+}
+
+.next-link-hover {
+	opacity: 0.6;
+}
+
+.next-link-text {
+	color: #38bdf8;
+	font-size: 23rpx;
+	font-weight: 500;
+}
+
+.next-link-arrow {
+	margin-left: 4rpx;
+	color: #38bdf8;
+	font-size: 23rpx;
+	line-height: 1;
+}
+
 .more-row {
 	display: flex;
 	align-items: center;
