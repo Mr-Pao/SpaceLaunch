@@ -49,19 +49,20 @@
 				</scroll-view>
 			</view>
 
-			<!-- 3 下次发射：金色倒计时卡 -->
-			<view class="next" v-if="next" hover-class="next-hover" @click="goLaunch(next.id)">
-				<view class="next-head">
-					<text class="next-tag">下次发射</text>
-					<text class="next-time">{{ nextTime }}</text>
+			<!-- 3 下次发射：直接用发射页那张卡（next-launch 组件），
+			     两个页面看到的是同一个东西 —— 自己再画一张，改版时必然画歪 -->
+			<view class="next-wrap" v-if="next">
+				<view class="sec-head">
+					<text class="sec-title">下次发射</text>
 				</view>
 
-				<view class="next-cd">
-					<countdown :net="next.net" tone="gold" size="lg" />
-				</view>
+				<next-launch :item="next" @select="goLaunch(next.id)" />
 
-				<text class="next-name">{{ nextTitle }}</text>
-				<text class="next-meta" v-if="nextMeta">{{ nextMeta }}</text>
+				<!-- 今日页只放一条，想看全部去发射页 -->
+				<view class="more-row" hover-class="more-hover" @click="goFeed">
+					<text class="more-text">更多发射</text>
+					<text class="more-arrow">»</text>
+				</view>
 			</view>
 
 			<!-- 4 往年今日 -->
@@ -69,11 +70,23 @@
 				<view class="sec-head">
 					<text class="sec-title">往年今日</text>
 					<text class="sec-sub">{{ otd.length }} 次发射</text>
+
+					<!-- 默认只露三条：这是「顺手看一眼」的内容，不是要坐这儿读的。
+					     想多看再展开，页面才不至于一进来就要滑很久 -->
+					<view
+						class="sec-more"
+						v-if="otd.length > OTD_FOLD"
+						hover-class="sec-more-hover"
+						@click="toggleOtdOpen"
+					>
+						<text class="sec-more-text">{{ otdOpen ? '收起' : '更多 ' + (otd.length - OTD_FOLD) + ' 条' }}</text>
+						<text class="sec-more-arrow" :class="{ 'is-open': otdOpen }">›</text>
+					</view>
 				</view>
 
 				<view
 					class="otd-item"
-					v-for="x in otd"
+					v-for="x in otdShown"
 					:key="x.id || x.net"
 					hover-class="otd-hover"
 					@click="toggleOtd(x.id)"
@@ -118,7 +131,7 @@
  */
 import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
-import { formatDateTime, launchTitle, rocketName } from '@/utils/format.js'
+import { formatDateTime } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -126,6 +139,9 @@ import navMixin from '@/utils/nav-mixin.js'
 // 北京时间的「日序号」：用它取模挑每日一图，跨天才变
 const BJ_OFFSET = 8 * 60 * 60 * 1000
 const WEEK_ZH = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+
+// 往年今日默认露几条（展开前的折叠线）
+const OTD_FOLD = 3
 
 /**
  * 导航栏那句日期。
@@ -150,6 +166,10 @@ export default {
 			astronauts: [],
 			upcoming: [],
 			onthisday: [],
+			// 往年今日是否展开（默认折叠到 OTD_FOLD 条）
+			otdOpen: false,
+			// 模板要读这个常量，挂到 data 上（options API 的模板访问不到模块作用域）
+			OTD_FOLD,
 			// 往年今日展开了哪一条（存 id，点同一条收起）
 			expanded: '',
 			// 倒计时组件的 net 需要「未来」的那条，用时钟兜住页面长时间不动的场景
@@ -193,29 +213,12 @@ export default {
 			return list.slice().sort((a, b) => new Date(a.net) - new Date(b.net))[0]
 		},
 
-		nextTitle() {
-			return this.next ? launchTitle(this.next) : ''
-		},
-
-		nextTime() {
-			const d = this.next
-			if (!d) return ''
-			return formatDateTime(d.net) || '时间待定'
-		},
-
-		nextMeta() {
-			const d = this.next
-			if (!d) return ''
-			const rocket = rocketName(d.rocket && d.rocket.configuration)
-			const agency = (d.launch_service_provider && d.launch_service_provider.name) || ''
-			const site = (d.pad && d.pad.location && d.pad.location.name) || ''
-			return [rocket, agency, site].filter(Boolean).join(' · ')
-		},
-
-		// 往年今日：补上「N 年前」和标题，模板里就不用做逻辑
+		// 往年今日：补上「N 年前」和标题，模板里就不用做逻辑。
+		// 不做条数截断 —— CI 侧上限 40 条，折叠态只渲染 3 条，
+		// 展开时才全出（图片都带 lazy-load，四十张不至于卡）
 		otd() {
 			const thisYear = new Date(this.nowTick + BJ_OFFSET).getUTCFullYear()
-			return this.onthisday.slice(0, 12).map((x) => {
+			return this.onthisday.map((x) => {
 				const title = x.nameZh || x.name || '未命名任务'
 				const meta = [x.rocket, x.agency].filter(Boolean).join(' · ')
 				// 展开后那句：精确时间 + 发射场 + 结果
@@ -234,6 +237,11 @@ export default {
 					yearsAgo: Math.max(1, thisYear - (x.y || thisYear))
 				}
 			})
+		},
+
+		// 实际渲染的往年今日：折叠态只给前三条
+		otdShown() {
+			return this.otdOpen ? this.otd : this.otd.slice(0, OTD_FOLD)
 		}
 	},
 
@@ -310,6 +318,15 @@ export default {
 			this.expanded = this.expanded === key ? '' : key
 		},
 
+		toggleOtdOpen() {
+			this.otdOpen = !this.otdOpen
+		},
+
+		// 发射页是 tab 页，只能用 switchTab（navigateTo 会直接失败）
+		goFeed() {
+			uni.switchTab({ url: '/pages/index/index' })
+		},
+
 		goLaunch(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + id })
@@ -353,6 +370,44 @@ export default {
 	margin-left: 12rpx;
 	color: #6b7891;
 	font-size: 22rpx;
+}
+
+/* 区块头右侧的折叠入口：margin-left:auto 靠右，
+   不改 sec-head 的 justify-content（「此刻在天上」那两个元素不能分开） */
+.sec-more {
+	display: flex;
+	align-items: center;
+	margin-left: auto;
+	padding: 4rpx 0 4rpx 16rpx;
+}
+
+.sec-more-hover {
+	opacity: 0.6;
+}
+
+.sec-more-text {
+	color: #38bdf8;
+	font-size: 23rpx;
+}
+
+/* 固定成正方形小盒再居中：› 这个字形本身在字盒里偏下，
+   直接旋转 90° 会连偏移一起转过去，看着歪 */
+.sec-more-arrow {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24rpx;
+	height: 24rpx;
+	margin-left: 4rpx;
+	color: #38bdf8;
+	font-size: 23rpx;
+	line-height: 1;
+	transition: transform 0.18s ease;
+}
+
+/* 展开时同一个 chevron 转 90° 朝下，不用再画一个箭头 */
+.sec-more-arrow.is-open {
+	transform: rotate(90deg);
 }
 
 /* ---- 1 每日一图 ---- */
@@ -507,61 +562,36 @@ export default {
 	font-size: 21rpx;
 }
 
-/* ---- 3 下次发射（金色） ---- */
-.next {
+/* ---- 3 下次发射 ---- */
+.next-wrap {
 	margin-bottom: 30rpx;
-	padding: 26rpx 26rpx 24rpx;
-	border-radius: 24rpx;
-	/* 暖金底 + 金边，与全站的天蓝做区分：这是今天唯一一个「还会发生」的东西 */
-	background: linear-gradient(160deg, rgba(245, 195, 59, 0.13), rgba(245, 195, 59, 0.03));
-	border: 1rpx solid rgba(245, 195, 59, 0.34);
-	box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.22);
 }
 
-.next-hover {
-	background: linear-gradient(160deg, rgba(245, 195, 59, 0.2), rgba(245, 195, 59, 0.06));
-}
-
-.next-head {
+/* 卡片下面那行出口：靠右，天蓝色，和卡内「查看详情 ›」是同一套视觉语言 */
+.more-row {
 	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
+	align-items: center;
+	justify-content: flex-end;
+	margin-top: 10rpx;
+	padding: 8rpx 4rpx;
 }
 
-.next-tag {
-	color: #f5c33b;
-	font-size: 22rpx;
-	font-weight: 600;
-	letter-spacing: 3rpx;
+.more-hover {
+	opacity: 0.6;
 }
 
-.next-time {
-	color: rgba(245, 195, 59, 0.72);
-	font-size: 22rpx;
-}
-
-.next-cd {
-	margin: 14rpx 0 16rpx;
-}
-
-.next-name {
-	display: -webkit-box;
-	color: #ffffff;
-	font-size: 30rpx;
-	font-weight: 600;
-	line-height: 1.34;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-}
-
-.next-meta {
-	display: block;
-	margin-top: 8rpx;
-	color: #6b7891;
+.more-text {
+	color: #38bdf8;
 	font-size: 23rpx;
-	line-height: 1.4;
+}
+
+/* 用 » （右双角引号）而不是连写两个 ›：
+   两个 chevron 中间自带一段字距，收 letter-spacing 也收不干净，看着像散开 */
+.more-arrow {
+	margin-left: 6rpx;
+	color: #38bdf8;
+	font-size: 23rpx;
+	line-height: 1;
 }
 
 /* ---- 4 往年今日 ---- */

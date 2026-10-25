@@ -1,5 +1,5 @@
 <template>
-	<view class="cd" :class="['cd-' + size, tone === 'gold' ? 'cd-gold' : '']">
+	<view class="cd" :class="'cd-' + size">
 		<text class="cd-t" v-if="showLabel">T-</text>
 
 		<view class="cd-group" v-if="!ended">
@@ -30,9 +30,7 @@ export default {
 	props: {
 		net: { type: String, default: '' },
 		size: { type: String, default: 'lg' },
-		showLabel: { type: Boolean, default: true },
-		// 配色：默认天蓝（发射页），gold 给今日页的金色倒计时卡
-		tone: { type: String, default: 'sky' }
+		showLabel: { type: Boolean, default: true }
 	},
 
 	data() {
@@ -161,23 +159,5 @@ export default {
 
 .cd-lg .cd-over {
 	font-size: 44rpx;
-}
-
-/* 金色版：今日页「下次发射」卡。数字用亮金而不是纯白 ——
-   卡片底色本身就是暖金描边，白字会显得像另一套配色 */
-.cd-gold .cd-t {
-	color: #f5c33b;
-}
-
-.cd-gold .cd-num {
-	color: #ffe6a3;
-}
-
-.cd-gold .cd-unit {
-	color: rgba(245, 195, 59, 0.62);
-}
-
-.cd-gold .cd-over {
-	color: #f5c33b;
 }
 </style>
