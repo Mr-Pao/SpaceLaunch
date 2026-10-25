@@ -24,7 +24,12 @@
 
 			<view class="nl-foot">
 				<text class="nl-time">{{ timeText }}</text>
-				<text class="nl-more">查看详情 ›</text>
+				<!-- 出口放在卡内右下角：整卡点击也是看详情，「查看详情」只是把去处写明白。
+				     发射页不需要「更多发射」（那页本来就是全部），所以用 more 开关 -->
+				<view class="nl-acts">
+					<text class="nl-more">查看详情 ›</text>
+					<text v-if="more" class="nl-more" @click.stop="$emit('more')">更多发射 ›</text>
+				</view>
 			</view>
 		</view>
 	</view>
@@ -37,7 +42,9 @@ export default {
 	name: 'next-launch',
 
 	props: {
-		item: { type: Object, required: true }
+		item: { type: Object, required: true },
+		// 底部右下角是否多给一个「更多发射」（今日页只放一条，需要换页看全部）
+		more: { type: Boolean, default: false }
 	},
 
 	computed: {
@@ -192,13 +199,29 @@ export default {
 	border-top: 1rpx solid rgba(255, 255, 255, 0.05);
 }
 
+.nl-acts {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
 .nl-time {
 	color: #4a5568;
 	font-size: 23rpx;
+	/* 时间可能到分钟，别把两个出口挤掉 */
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
 .nl-more {
 	color: #38bdf8;
 	font-size: 25rpx;
+}
+
+/* 两个出口之间留一口气，紧贴着会看起来像一个词 */
+.nl-more + .nl-more {
+	margin-left: 22rpx;
 }
 </style>

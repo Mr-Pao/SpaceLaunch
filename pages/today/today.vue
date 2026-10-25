@@ -84,21 +84,14 @@
 					<text class="sec-title">下次发射</text>
 				</view>
 
-				<next-launch :item="next" @select="goLaunch(next.id)" />
-
-				<!-- 两个出口并排靠右，和每日一图那两个链接同一套排法：
-				     整卡点击是看详情，「查看详情」是同一个去处但目标更明确，
-				     「更多发射」去发射页。今日页只放一条，看全部得换页 -->
-				<view class="next-acts">
-					<view class="next-link" hover-class="next-link-hover" @click="goLaunch(next.id)">
-						<text class="next-link-text">查看详情</text>
-						<text class="next-link-arrow">›</text>
-					</view>
-					<view class="next-link" hover-class="next-link-hover" @click="goFeed">
-						<text class="next-link-text">更多发射</text>
-						<text class="next-link-arrow">›</text>
-					</view>
-				</view>
+				<!-- 两个出口在卡片内部右下角（next-launch 的 foot 行），
+				     不再另起一行挂在卡外面 -->
+				<next-launch
+					:item="next"
+					:more="true"
+					@select="goLaunch(next.id)"
+					@more="goFeed"
+				/>
 			</view>
 
 			<!-- 4 往年今日 -->
@@ -684,38 +677,6 @@ export default {
 }
 
 /* 卡片下面那行出口：靠右，天蓝色，和卡内「查看详情 ›」是同一套视觉语言 */
-/* 下次发射的两个出口：和每日一图那两个链接同一套排法（靠右并排、› 统一） */
-.next-acts {
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	margin-top: 12rpx;
-	padding-right: 4rpx;
-}
-
-.next-link {
-	display: flex;
-	align-items: center;
-	padding: 8rpx 0 8rpx 34rpx;
-}
-
-.next-link-hover {
-	opacity: 0.6;
-}
-
-.next-link-text {
-	color: #38bdf8;
-	font-size: 23rpx;
-	font-weight: 500;
-}
-
-.next-link-arrow {
-	margin-left: 4rpx;
-	color: #38bdf8;
-	font-size: 23rpx;
-	line-height: 1;
-}
-
 .more-row {
 	display: flex;
 	align-items: center;

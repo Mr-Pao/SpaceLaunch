@@ -421,7 +421,7 @@ import {
 	craftTypeName,
 	craftStatusName,
 	destName,
-	agencyLabel,
+	agencyLabel as agencyLabelOf,
 	countryOf,
 	clock,
 	longDate,
@@ -717,7 +717,7 @@ export default {
 			const out = []
 			if (c.config && c.config !== c.name) out.push(c.config)
 			if (c.type) out.push(craftTypeName(c.type))
-			if (c.agency) out.push(agencyLabel(c.agency))
+			if (c.agency) out.push(agencyLabelOf(c.agency))
 			return out.join(' · ')
 		},
 		craftStatusText() {
@@ -972,6 +972,16 @@ export default {
 			}
 			if (Math.abs(v - this.st) < 1) return
 			this.st = v
+		},
+
+		/**
+		 * 机构国的中文简称。
+		 *
+		 * 模板只能看到实例成员，模块作用域里 import 进来的函数它是看不见的
+		 * （之前 astroName 就是这么崩过一次），所以这里要给一层壳。
+		 */
+		agencyLabel(name) {
+			return agencyLabelOf(name)
 		},
 
 		// 原图取 COS 上的 _2000 版本，还没补齐的退回缩略图
