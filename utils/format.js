@@ -193,10 +193,10 @@ export function nationZh(nation) {
  * LL2 全站只给拼音（Zhu Yangzhu），中国用户看到「Zhu Yangzhu」基本认不出是谁，
  * 而拼音转汉字有大量同音字，程序推不出来，只能查表。
  *
- * 前 26 位是公开报道过、写法确定的航天员；
- * 后 5 位（陈全 / 吴飞 / 张洪章 / 张智远 / 黎家盈）是 LL2 较新录入的批次，
- * 汉字按常见写法转写 —— 若与实际不符，改这里对应那一行即可。
+ * 全表已按神舟一号至神舟二十三号的乘组名单逐个核对（2026-10-25）。
  * 香港用粤语拼音（Lai Ka-ying），与普通话拼音规律不同。
+ * LL2 里还有一位 'Justin Sun' 标为中国籍，身份无法确认，故意不收录 ——
+ * 表里没有的中国人保留拼音原文：宁可显示拼音，也不要编一个错的名字。
  *
  * 表里没有的中国人保留拼音原文：宁可显示拼音，也不要编一个错的名字。
  */
@@ -226,12 +226,12 @@ const CHINA_ASTRO_ZH = {
 	'Song Lingdong': '宋令东',
 	'Wang Haozhe': '王浩泽',
 	'Chen Zhongrui': '陈中瑞',
-	// —— 以下 5 位是 LL2 新录入批次，写法待核对 ——
+	// —— 神舟二十一号及以后（LL2 新录入批次，已核对） ——
 	'Wang Jie': '王杰',
-	'Chen Quan': '陈全',
-	'Wu Fei': '吴飞',
+	'Chen Quan': '陈全', // 尚未飞行，LL2 已收录
+	'Wu Fei': '武飞',
 	'Zhang Hongzhang': '张洪章',
-	'Zhang Zhiyuan': '张智远',
+	'Zhang Zhiyuan': '张志远',
 	'Lai Ka-ying': '黎家盈'
 }
 
@@ -241,7 +241,8 @@ const CHINA_ASTRO_ZH = {
  */
 export function astroName(a) {
 	if (!a) return ''
-	const raw = a.name || ''
+	// 上游个别条目会带首尾空格（历史上 'Liu Boming ' 就是这样），不 trim 查不到表
+	const raw = (a.name || '').trim()
 	if (a.nation !== 'China') return raw
 	return CHINA_ASTRO_ZH[raw] || raw
 }

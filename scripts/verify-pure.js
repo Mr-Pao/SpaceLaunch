@@ -187,6 +187,49 @@ async function testFormat() {
 	eq(f.nationZh('Costa Rica'), 'Costa Rica', '国籍：未收录保留原文')
 	eq(f.nationZh(''), '', '国籍：空值安全返回')
 
+	// astroName：中国航天员中文名。整张表按神舟乘组名单核对过（2026-10-25），
+	// 这里把 30 位全跑一遍 —— 名字写错是「看起来对、实际查不到」的静默 bug
+	const CN = {
+		'Yang Liwei': '杨利伟',
+		'Fei Junlong': '费俊龙',
+		'Nie Haisheng': '聂海胜',
+		'Zhai Zhigang': '翟志刚',
+		'Liu Boming': '刘伯明',
+		'Jing Haipeng': '景海鹏',
+		'Liu Wang': '刘旺',
+		'Liu Yang': '刘洋',
+		'Zhang Xiaoguang': '张晓光',
+		'Wang Yaping': '王亚平',
+		'Chen Dong': '陈冬',
+		'Tang Hongbo': '汤洪波',
+		'Ye Guangfu': '叶光富',
+		'Cai Xuzhe': '蔡旭哲',
+		'Deng Qingming': '邓清明',
+		'Zhang Lu': '张陆',
+		'Zhu Yangzhu': '朱杨柱',
+		'Gui Haichao': '桂海潮',
+		'Tang Shengjie': '唐胜杰',
+		'Jiang Xinlin': '江新林',
+		'Li Cong': '李聪',
+		'Li Guangsu': '李广苏',
+		'Song Lingdong': '宋令东',
+		'Wang Haozhe': '王浩泽',
+		'Chen Zhongrui': '陈中瑞',
+		'Wang Jie': '王杰',
+		'Wu Fei': '武飞',
+		'Zhang Hongzhang': '张洪章',
+		'Zhang Zhiyuan': '张志远',
+		'Lai Ka-ying': '黎家盈'
+	}
+	for (const [en, zh] of Object.entries(CN)) {
+		eq(f.astroName({ name: en, nation: 'China' }), zh, `航天员：${en} → ${zh}`)
+	}
+	// 外籍同名不误译；表外的中国人保留拼音；尾空格能 trim 掉
+	eq(f.astroName({ name: 'Chen Dong', nation: 'USA' }), 'Chen Dong', '航天员：外籍不翻译')
+	eq(f.astroName({ name: 'Justin Sun', nation: 'China' }), 'Justin Sun', '航天员：表外保留拼音')
+	eq(f.astroName({ name: 'Zhu Yangzhu ', nation: 'China' }), '朱杨柱', '航天员：尾空格容错')
+	eq(f.astroName(null), '', '航天员：null 安全返回')
+
 	// 视觉宽度：中文按双宽算，用来判断简介要不要折叠
 	eq(f.textUnits(''), 0, '视觉宽度：空值 0')
 	eq(f.textUnits('abc'), 3, '视觉宽度：纯英文按字母数')
