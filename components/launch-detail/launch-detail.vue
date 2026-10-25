@@ -2,8 +2,16 @@
 <!-- 发射详情内容。pages/launch/launchInfo 和图片大图弹层（photo-view）共用这一份，
 	 这样从图上升起来的详情和点列表进去的详情是同一套东西，不会各画一版 -->
 	<view class="page" :class="{ 'page-sheet': sheet }">
-		<view class="loading" v-if="loading">
-			<text class="loading-text">加载中...</text>
+		<!-- 加载中：抽屉模式下来自上层的图已经在同一位置显示着了，
+		     这里必须用同一张图占住首图位，否则「上拉到位」的那一下会闪出空白 -->
+		<view class="loading" :class="{ 'is-sheet': sheet }" v-if="loading">
+			<image
+				v-if="cover"
+				class="loading-cover"
+				:src="cover"
+				mode="aspectFill"
+			></image>
+			<text class="loading-text" v-else>加载中...</text>
 		</view>
 
 		<view class="empty" v-else-if="!detail">
@@ -384,7 +392,10 @@ export default {
 		// 大致时间（net）：往历史归档里翻的时候用来直达分片，可为空
 		net: { type: String, default: '' },
 		// 弹层模式：内容被塞进从图底下升起的抽屉里，只有一根下拉条没有导航栏
-		sheet: { type: Boolean, default: false }
+		sheet: { type: Boolean, default: false },
+		// 抽屉里还没读到详情时先顶在首图位的那张图（调用方手上现成的一张），
+		// 内容和上层的看图区是同一个 URL，交接时看不出换过
+		cover: { type: String, default: '' }
 	},
 
 	watch: {
@@ -1213,6 +1224,17 @@ export default {
 .empty {
 	padding: 240rpx 60rpx;
 	text-align: center;
+}
+
+/* 抽屉里不用留白：首图就是直接从顶部开始的 */
+.loading.is-sheet {
+	padding: 0;
+}
+
+.loading-cover {
+	display: block;
+	width: 100%;
+	height: 660rpx;
 }
 
 .loading-text,

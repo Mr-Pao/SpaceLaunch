@@ -1,10 +1,11 @@
 <template>
 	<view class="pv" v-if="visible">
-		<!-- 图片区：横滑切换。
-		     不用 swiper 是因为纵向的手势会被原生组件吞掉，
-		     自绘 transform 才能同时拿到横纵两组位移。 -->
+		<!-- 图片区：高度从整屏一路收缩到详情页首图的高度（660rpx）。
+		     收缩的同时 picture 也从「完整显示」交叉到「满宽裁切」，
+		     所以手指往上推时，看到的就是这张图自己变成了详情页的首图 -->
 		<view
 			class="pv-stage"
+			:style="stageStyle"
 			@touchstart="onTouchStart"
 			@touchmove="onTouchMove"
 			@touchend="onTouchEnd"
@@ -17,10 +18,19 @@
 				:style="cellStyle(i)"
 				@click="onStageTap"
 			>
+				<!-- 两层同一张图：fit 完整显示、fill 满宽裁切，随进度交叉 -->
 				<image
 					class="pv-img"
 					:src="srcOf(list[i], i)"
 					mode="aspectFit"
+					:style="{ opacity: 1 - fillOpacity }"
+					@error="markBroken(i)"
+				></image>
+				<image
+					class="pv-img pv-img-fill"
+					:src="srcOf(list[i], i)"
+					mode="aspectFill"
+					:style="{ opacity: fillOpacity }"
 					@error="markBroken(i)"
 				></image>
 			</view>
@@ -28,50 +38,55 @@
 			<view class="pv-empty" v-if="!curItem">
 				<text class="pv-empty-text">图片加载失败</text>
 			</view>
-		</view>
 
-		<!-- 信息条：任务名 + 拍摄方 + 「上拉看详情」 -->
-		<view class="pv-bar">
-			<view class="pv-bar-main">
-				<text class="pv-title">{{ title }}</text>
-				<text class="pv-meta" v-if="meta">{{ meta }}</text>
+			<!-- 信息条：浮在图底，上拉时先它一步淡出。原来那条「上拉看详情」
+			     的提示并进来，不再单独占一行 -->
+			<view class="pv-bar" :style="{ opacity: barOpacity }">
+				<view class="pv-bar-main">
+					<text class="pv-title">{{ title }}</text>
+					<text class="pv-meta" v-if="meta">{{ meta }}</text>
+				</view>
+				<view class="pv-hint">
+					<text class="pv-hint-arrow">︿</text>
+					<text class="pv-hint-text">上拉</text>
+				</view>
 			</view>
-			<view class="pv-up" @click="openSheet">
-				<text class="pv-up-arrow">︿</text>
-				<text class="pv-up-text">上拉看详情</text>
+
+			<!-- 页码：多张才显示，单张（每日一图）不打扰 -->
+			<view class="pv-count" v-if="list.length > 1 && sheetP < 0.05">
+				<text class="pv-count-text">{{ cur + 1 }} / {{ list.length }}</text>
 			</view>
 		</view>
 
-		<!-- 页码：多张才显示，单张（每日一图）不打扰 -->
-		<view class="pv-count" v-if="list.length > 1">
-			<text class="pv-count-text">{{ cur + 1 }} / {{ list.length }}</text>
-		</view>
-
-		<!-- 详情抽屉：整屏升起，里面就是 pages/launch/launchInfo 用的那个组件本身，
-		     不是另画一版摘要。手指往上推它就跟手上移，松手过阈值再补完剩下的行程 -->
+		<!-- 详情抽屉：里面就是 pages/launch/launchInfo 用的那个组件本身。
+		     位移量是 (1-p) × (屏高 - 首图高)：抽屉顶部永远比图片区底边高出一个
+		     首图的高度，那段被图片区压着，两层的图不会打架。p=1 时落到底，
+		     图片区撤掉，抽屉里的首图正好接住 -->
 		<view class="pv-sheet" :style="sheetStyle">
-			<view
-				class="pv-sheet-top"
-				:style="{ paddingTop: statusBarH + 'px' }"
-				@touchstart.stop="onSheetStart"
-				@touchmove.stop.prevent="onSheetMove"
-				@touchend.stop="onSheetEnd"
-				@touchcancel.stop="onSheetEnd"
-			>
-				<view class="pv-sheet-back" @click="closeSheet">‹</view>
-				<view class="pv-handle-bar"></view>
-				<text class="pv-sheet-cap">发射任务</text>
-			</view>
-
-			<!-- scroll-view 必须拿到确定高度才滚得动：flex:1 + height:0 是万能写法 -->
 			<scroll-view class="pv-sheet-body" scroll-y>
-				<launch-detail v-if="sheetOn" :id="sheetId" :net="sheetNet" :sheet="true" />
+				<launch-detail
+					v-if="sheetOn"
+					:id="sheetId"
+					:net="sheetNet"
+					:sheet="true"
+					:cover="coverSrc"
+				/>
 			</scroll-view>
 		</view>
 
+		<!-- 抽屉里的退一层：浮在首图左上，和微信胶囊同一水平带。
+		     必须放在抽屉外面 —— 图片区（z-index 6）压着抽屉（5），
+		     放里面会被刚好处在首图位置的那块盖住 -->
+		<view
+			class="pv-back"
+			v-if="sheetP > 0.9"
+			:style="{ top: closeTop }"
+			hover-class="pv-back-hover"
+			@click="closeSheet"
+		>‹</view>
+
 		<!-- 关闭键放右上，与微信胶囊同一水平带，拇指够得到。
-		     抽屉展开后它会盖在详情页首图上，所以抽屉一开就隐起来，
-		     那一步的「退」交给抽屉顶部的 ‹ 和下拉手势 -->
+		     抽屉拉开后它让位给 ‹，否则会盖在详情首图上 -->
 		<view
 			class="pv-close"
 			v-if="!sheetOpen"
@@ -91,10 +106,15 @@
  *
  * 两条手势：
  *   · 左右滑 —— 在同一个列表里翻图，不必退出再点
- *   · 上拉   —— 把整条发射详情从底下升起来
+ *   · 上拉   —— 图片自己收缩成详情页的首图，下面把整条详情顶上来
  *
- * 上拉拉起的是 components/launch-detail 本身，和点列表进 pages/launch/launchInfo
- * 看到的是同一份内容，不是另画一版摘要 —— 所以滑到顶继续翻，就是那个页面。
+ * 上拉不是「盖一个面板上来」，而是做了一次形变：
+ *   图片区高度    整屏  →  660rpx（详情页首图高度）
+ *   图片本身      aspectFit 完整显示  →  aspectFill 满宽裁切（两层交叉）
+ *   信息条        淡出
+ *   详情抽屉      从底下升起，里面是 components/launch-detail 本身
+ * 松手后抽屉落到底，图片区与抽屉里的首图位置、裁切完全一致，直接接管，
+ * 于是「看完图往上推」和「从列表点进详情页」最终是同一个页面。
  *
  * 为什么不直接上 swiper：swiper 是原生组件，纵向的 touch 事件拿不到，
  * 上拉手势会和横滑抢。自己用 touch + transform 才能区分横纵方向。
@@ -113,10 +133,12 @@ import { setTabBarHidden } from '@/utils/tabbar.js'
 
 // 判定「是横滑还是上拉」的最小位移，太小会把点击误判成滑动
 const DIR_LOCK = 8
-// 手指推满多少屏高算「抽屉完全拉开」：留一点阻尼感，不用真拉一整屏
+// 手指推满多少屏高算「完全展开」：留一点阻尼，不用真拉一整屏
 const SHEET_TRAVEL = 0.55
 // 松手时超过这个进度就补完剩下的行程
 const SHEET_COMMIT = 0.3
+// 详情页首图高度，必须与 launch-detail 里的 .hero 一致（那边是 660rpx）
+const HERO_RPX = 660
 
 export default {
 	name: 'photo-view',
@@ -127,7 +149,7 @@ export default {
 		list: { type: Array, default: () => [] },
 		// 从哪一张开始
 		index: { type: Number, default: 0 },
-		// 状态栏高度（px），用来给关闭键与抽屉顶条定位
+		// 状态栏高度（px），用来给关闭键与 ‹ 定位
 		statusBarH: { type: Number, default: 20 }
 	},
 
@@ -138,6 +160,8 @@ export default {
 			cur: 0,
 			winW: 375,
 			winH: 667,
+			// 详情页首图高度（px），created 里按屏宽换算
+			heroH: 330,
 			// 横向跟手位移
 			dx: 0,
 			dragging: false,
@@ -152,15 +176,12 @@ export default {
 			moveEndAt: 0,
 			// 原图 404 的下标集合：退回缩略图，至少还能看到图
 			broken: {},
-			// 抽屉行程 0（收起）→ 1（全开）。跟手时直接写它
+			// 形变进度 0（纯看图）→ 1（详情页）
 			sheetP: 0,
-			// 跟手期间关掉过渡，否则每一帧都会被 CSS 追一次，手感和果冻一样
+			// 跟手期间关掉过渡，否则每一帧都被 CSS 追一次，手感像果冻
 			sheetFollow: false,
-			// 抽屉里的详情组件只在真正拉开过之后才挂载：
-			// 否则每滑一张图都会触发一次详情加载
-			sheetOn: false,
-			// 抽屉顶条上的下拉手势
-			sStartY: 0
+			// 详情组件只在真正拉开过之后才挂载：否则每滑一张图都会触发一次详情加载
+			sheetOn: false
 		}
 	},
 
@@ -206,18 +227,49 @@ export default {
 			return (this.curItem && this.curItem.net) || ''
 		},
 
-		// 抽屉开没开：只要露出一截就算开，✕ 就该让位
-		sheetOpen() {
-			return this.sheetP > 0.02
+		// 抽屉里详情还在加载时，先用同一张图顶住首图位（srcOf 会走 _2000 版本），
+		// 这样「上拉到位、图片区撤掉」的那一帧不会闪出空白
+		coverSrc() {
+			if (!this.curItem) return ''
+			return this.srcOf(this.curItem, this.cur)
 		},
 
+		p() {
+			return Math.max(0, Math.min(1, this.sheetP || 0))
+		},
+
+		// 抽屉开没开：只要露出一截就算开，✕ 就该让位
+		sheetOpen() {
+			return this.p > 0.02
+		},
+
+		// aspectFill 那一层的透明度：p 到 0.65 时完全交给裁切版
+		fillOpacity() {
+			return Math.min(1, Math.max(0, (this.p - 0.08) / 0.57))
+		},
+
+		// 信息条比图片更早退场，不然会跟着图一起被挤扁
+		barOpacity() {
+			return Math.max(0, 1 - this.p * 2.4)
+		},
+
+		// 图片区：整屏 → 首图高
+		stageStyle() {
+			const h = this.winH - this.p * (this.winH - this.heroH)
+			const tr = this.sheetFollow ? 'none' : 'height .3s cubic-bezier(.2,.8,.3,1)'
+			// 落到底之后把图片区撤掉，让详情页自己的首图接管（滚动才跟手）。
+			// 抽屉里加载态用的就是同一张图、同一位置，所以撤掉这一帧看不出来
+			const op = this.p >= 1 ? 0 : 1
+			// 撤掉后不能再接手势，否则手指从首图上划过时详情页滚不动
+			const pe = op === 0 ? 'none' : 'auto'
+			return `height:${h}px;opacity:${op};pointer-events:${pe};transition:${tr},opacity .01s linear`
+		},
+
+		// 抽屉：顶部始终比图片区底边高出一个首图高
 		sheetStyle() {
-			const p = Math.max(0, Math.min(1, this.sheetP || 0))
-			const y = (1 - p) * 100
-			const tr = this.sheetFollow
-				? 'none'
-				: 'transform .3s cubic-bezier(.2,.8,.3,1)'
-			return `transform:translateY(${y}%);transition:${tr}`
+			const y = (1 - this.p) * (this.winH - this.heroH)
+			const tr = this.sheetFollow ? 'none' : 'transform .3s cubic-bezier(.2,.8,.3,1)'
+			return `transform:translateY(${y}px);transition:${tr}`
 		}
 	},
 
@@ -250,8 +302,9 @@ export default {
 			const info = uni.getSystemInfoSync()
 			this.winW = info.windowWidth || 375
 			this.winH = info.windowHeight || 667
+			this.heroH = uni.upx2px(HERO_RPX) || 330
 		} catch (e) {
-			// 取不到就用 375×667，绝大多数机型在这个值附近
+			// 取不到就用 375×667、首图 330px，绝大多数机型在这个值附近
 		}
 	},
 
@@ -284,7 +337,7 @@ export default {
 			return `width:${this.winW}px;left:0;transform:translateX(${x}px);transition:${tr}`
 		},
 
-		// ---- 图片区手势 ----
+		// ---- 手势 ----
 		onTouchStart(e) {
 			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
 			if (!t) return
@@ -316,8 +369,8 @@ export default {
 
 			if (this.dir === 'v') {
 				this.dy = my
-				// 抽屉已经全开时再往上推没意义，也不再跟手
-				if (!this.sheetOn) {
+				// 完全展开后不再跟手，图片区已经撤了
+				if (this.p < 1) {
 					const travel = this.winH * SHEET_TRAVEL
 					this.sheetFollow = true
 					this.sheetP = Math.max(0, Math.min(1, -my / travel))
@@ -345,8 +398,8 @@ export default {
 			if (dir === 'v') {
 				this.sheetFollow = false
 				// 推到 30% 就补完剩下的行程，回弹也是同一套过渡
-				if (!this.sheetOn && this.sheetP > SHEET_COMMIT) this.openSheet()
-				else if (!this.sheetOn) this.sheetP = 0
+				if (this.p > SHEET_COMMIT) this.openSheet()
+				else this.sheetP = 0
 				this.dx = 0
 				this.dy = 0
 				return
@@ -376,15 +429,12 @@ export default {
 		onStageTap() {
 			// 拖动结束后系统可能补一个 click，滑完一张就把弹层关了 —— 挡掉
 			if (this.moveEndAt && Date.now() - this.moveEndAt < 400) return
-			// 抽屉露出一截时点图区先收抽屉，符合「先退一层」的直觉
-			if (this.sheetOpen) {
-				this.closeSheet()
-				return
-			}
+			// 已经形变到详情页时，点图区不该退出：那是详情页的首图
+			if (this.p > 0.02) return
 			this.close()
 		},
 
-		// ---- 详情抽屉 ----
+		// ---- 抽屉 ----
 		openSheet() {
 			if (!this.curItem) return
 			this.sheetOn = true
@@ -395,34 +445,10 @@ export default {
 		closeSheet() {
 			this.sheetFollow = false
 			this.sheetP = 0
-			// 等收起动画走完再卸载，否则内容会先消失、抽屉空着往上缩
-			const at = this.sheetP
+			// 等收起动画走完再卸载，否则内容会先消失、抽屉空着往下退
 			setTimeout(() => {
-				if (this.sheetP === at) this.sheetOn = false
+				if (this.sheetP === 0) this.sheetOn = false
 			}, 320)
-		},
-
-		// 抽屉顶条：下拉收起。滚动交给下面的 scroll-view，
-		// 手势只挂在这根条上，才不会和列表滚动抢
-		onSheetStart(e) {
-			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-			if (!t) return
-			this.sStartY = t.clientY
-			this.sheetFollow = true
-		},
-
-		onSheetMove(e) {
-			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-			if (!t) return
-			const dy = t.clientY - this.sStartY
-			const travel = this.winH * 0.4
-			this.sheetP = Math.max(0, Math.min(1, 1 - dy / travel))
-		},
-
-		onSheetEnd() {
-			this.sheetFollow = false
-			if (this.sheetP < 0.65) this.closeSheet()
-			else this.sheetP = 1
 		}
 	}
 }
@@ -436,27 +462,31 @@ export default {
 	top: 0;
 	bottom: 0;
 	z-index: 900;
-	display: flex;
-	flex-direction: column;
 	/* 几乎全黑：看图时周围越暗越好，留一点透明度还能看出是浮层 */
 	background: rgba(4, 6, 10, 0.97);
 	overflow: hidden;
 }
 
-/* ---- 图片区：三个 cell 绝对定位叠在同一块区域 ---- */
+/* ---- 图片区：高度由 sheetP 驱动，从整屏收到首图高 ---- */
 .pv-stage {
-	position: relative;
-	flex: 1;
-	min-height: 0;
-	/* 顶部留给关闭键，左右不留白 —— 看图就该尽量大 */
-	padding-top: 88rpx;
-	box-sizing: border-box;
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
 	overflow: hidden;
+	/* 压在抽屉之上（5）：抽屉顶部那一段首图由这一层顶替，
+	     两层的裁切一致，所以看不出是两张图。
+	     p=1 时本层撤掉（opacity 0），抽屉里的真首图接上 */
+	z-index: 6;
+	/* 必须不透明：aspectFit 的上下黑边一旦透光，
+	     就会看见下面抽屉里那张 aspectFill 的图 */
+	background: #04060a;
 }
 
 .pv-cell {
 	position: absolute;
-	top: 88rpx;
+	left: 0;
+	top: 0;
 	bottom: 0;
 	height: auto;
 	will-change: transform;
@@ -466,6 +496,13 @@ export default {
 	width: 100%;
 	height: 100%;
 	display: block;
+}
+
+/* 满宽裁切那一层：叠在完整显示那一层上，随进度交叉 */
+.pv-img-fill {
+	position: absolute;
+	left: 0;
+	top: 0;
 }
 
 .pv-empty {
@@ -484,15 +521,21 @@ export default {
 	font-size: 26rpx;
 }
 
-/* ---- 信息条 ---- */
+/* ---- 信息条：浮在图底 ---- */
 .pv-bar {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
 	display: flex;
 	align-items: flex-end;
-	padding: 20rpx 32rpx 34rpx;
+	padding: 60rpx 32rpx 34rpx;
 	/* 底部兜底值必须写在 env() 之前：Android 内核不认识 env 时整条 calc 作废 */
 	padding-bottom: 34rpx;
 	padding-bottom: calc(34rpx + constant(safe-area-inset-bottom));
 	padding-bottom: calc(34rpx + env(safe-area-inset-bottom));
+	/* 图上压字，得有底色托一把，否则白图直接看不清 */
+	background: linear-gradient(to bottom, rgba(4, 6, 10, 0) 0%, rgba(4, 6, 10, 0.82) 62%);
 }
 
 .pv-bar-main {
@@ -516,13 +559,13 @@ export default {
 .pv-meta {
 	display: block;
 	margin-top: 8rpx;
-	color: #6b7891;
+	color: #8a95a8;
 	font-size: 22rpx;
 	line-height: 1.4;
 }
 
-/* 「上拉看详情」：不是按钮，只是把「还能往上」这件事说出来 */
-.pv-up {
+/* 「上拉」提示：不是按钮，只是把「还能往上」说出来 */
+.pv-hint {
 	flex-shrink: 0;
 	display: flex;
 	flex-direction: column;
@@ -530,15 +573,15 @@ export default {
 	padding: 4rpx 8rpx;
 }
 
-.pv-up-arrow {
+.pv-hint-arrow {
 	color: #38bdf8;
 	font-size: 26rpx;
 	line-height: 1;
 	animation: upHint 1.8s ease-in-out infinite;
 }
 
-.pv-up-text {
-	margin-top: 4rpx;
+.pv-hint-text {
+	margin-top: 2rpx;
 	color: #4f7f9c;
 	font-size: 20rpx;
 }
@@ -575,7 +618,7 @@ export default {
 	line-height: 1.3;
 }
 
-/* ---- 详情抽屉 ---- */
+/* ---- 详情抽屉：整屏，内容就是详情页本身 ---- */
 .pv-sheet {
 	position: absolute;
 	left: 0;
@@ -585,58 +628,13 @@ export default {
 	z-index: 5;
 	display: flex;
 	flex-direction: column;
-	/* 和详情页同一个底色，抽屉升到底时看不出接缝 */
+	/* 和详情页同一个底色，升到底时看不出接缝 */
 	background: #0a0e17;
-	/* 位移与过渡都走 inline style（sheetStyle），跟手时要临时关掉过渡 */
 	transform: translateY(100%);
 	will-change: transform;
 }
 
-/* 顶条：‹ 收起 + 拖动条 + 「发射任务」。
-   手势只挂这一条，下面 scroll-view 该滚就滚，互不打扰 */
-.pv-sheet-top {
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: flex-end;
-	flex-shrink: 0;
-	height: 88rpx;
-	padding-bottom: 10rpx;
-	box-sizing: content-box;
-	background: #0e1420;
-	border-bottom: 1rpx solid #16203020;
-}
-
-.pv-handle-bar {
-	width: 76rpx;
-	height: 8rpx;
-	border-radius: 4rpx;
-	background: #2b3a4f;
-}
-
-.pv-sheet-cap {
-	margin-top: 8rpx;
-	color: #55637a;
-	font-size: 20rpx;
-	line-height: 1.2;
-}
-
-.pv-sheet-back {
-	position: absolute;
-	left: 16rpx;
-	bottom: 14rpx;
-	width: 56rpx;
-	height: 56rpx;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: #c9d4e6;
-	font-size: 40rpx;
-	line-height: 1;
-}
-
-/* scroll-view 要拿到确定高度才滚得动：flex:1 + height:0 是万能写法 */
+/* scroll-view 要拿到确定高度才滚得动 */
 .pv-sheet-body {
 	flex: 1;
 	height: 0;
@@ -644,9 +642,11 @@ export default {
 	background: #0a0e17;
 }
 
-/* ---- 关闭键 ---- */
-.pv-close {
+/* ---- 关闭键 / 返回键 ---- */
+.pv-close,
+.pv-back {
 	position: absolute;
+	left: auto;
 	right: 24rpx;
 	width: 64rpx;
 	height: 64rpx;
@@ -657,12 +657,28 @@ export default {
 	background: rgba(255, 255, 255, 0.12);
 	border: 1rpx solid rgba(255, 255, 255, 0.18);
 	color: #ffffff;
-	font-size: 28rpx;
 	line-height: 1;
 	z-index: 10;
 }
 
+.pv-close {
+	font-size: 28rpx;
+}
+
 .pv-close-hover {
+	background: rgba(255, 255, 255, 0.22);
+}
+
+/* 退一层：放左上，免得和右上胶囊撞 */
+.pv-back {
+	left: 24rpx;
+	right: auto;
+	font-size: 44rpx;
+	padding-bottom: 6rpx;
+	box-sizing: border-box;
+}
+
+.pv-back-hover {
 	background: rgba(255, 255, 255, 0.22);
 }
 </style>
