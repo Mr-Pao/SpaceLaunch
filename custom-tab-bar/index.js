@@ -42,7 +42,11 @@ function resolveReview(raw, override) {
 		const info = wx.getAccountInfoSync()
 		envVersion = (info && info.miniProgram && info.miniProgram.envVersion) || ''
 		version = String((info && info.miniProgram && info.miniProgram.version) || '').trim()
-	} catch (e) {}
+	} catch (e) {
+		// API 不存在 = 基础库 < 2.2.2 的极老用户，按 devtools 口径放行完整态，
+		// 与 utils/config.js 的 envName 保持一致（审核员设备基础库必然是新的）
+		envVersion = 'devtools'
+	}
 
 	// 只有开发者工具放行。审核员是 develop 环境（version 恒为空），
 	// 旧规则「非 release 一律完整态」会把审核员也放进去 —— 已实测证实，勿回退。

@@ -8,9 +8,9 @@ name: sync-space-data
 #   upcoming    4 次/小时
 #   events      1 次/小时
 #   previous    1 次/小时
-#   timeline    约 2.7 次/小时（每 3 小时 8 条单条详情）
+#   timeline    约 2 次/小时（每 3 小时 6 条单条详情，8 条会在 timeline 轮撞 15 次限额）
 #   video       2 次/小时（每轮 10 条发射，detailed 一页 5 条）
-#   合计        约 11 次/小时，仍在 15 次以内
+#   合计        约 10 次/小时，timeline 轮峰值 14 次，均在 15 次以内
 #   agencies    每天 1 轮 4 个请求（唯一需要真翻页的数据集）
 #
 # 注意：cron 用的是 UTC。北京时间 = UTC+8
@@ -124,8 +124,9 @@ jobs:
           # auto 表示 Google 挂了自动降级到 MyMemory，两条都挂就保留英文
           TRANSLATE_PROVIDER: auto
           # 时间线每轮抓多少条：sync 自身约用 6 次/小时，这里留 8 条，
-          # 合计仍在未认证限额 15 次/小时之内
-          TIMELINE_PER_RUN: '8'
+          # timeline 轮 = upcoming 4 + events 1 + previous 1 + 单条详情 6 = 12 次，
+          # 留 3 次余量；8 条时峰值 16 > 15 会被 429 打断整轮（评审 P1-2）
+          TIMELINE_PER_RUN: '6'
           # 视频每轮抓多少条发射：detailed 一页 5 条，10 条 = 2 个请求
           VIDEO_PER_RUN: '10'
         run: node sync.js --dataset=${{ steps.pick.outputs.dataset }}

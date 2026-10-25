@@ -225,6 +225,13 @@ async function runTimelines() {
 		`  → ${FILE}  ${list.length} 条 / ${kb} KB（本轮新增时间线 ${added}、航天器 ${crafts}、空 ${empty}、失败 ${failed}）`
 	)
 
+	// 第二层保险（P1-1）：哪怕 readCosJson 之后的链路还有未知的清空路径，
+	// 产出比存量缩水太多时宁可这轮不更新 —— 线上数据比时效重要
+	if (before > 20 && list.length < Math.floor(before * 0.3)) {
+		console.error(`  ! 产出 ${list.length} 条远小于存量 ${before} 条，疑似数据丢失，拒传（线上旧数据保留）`)
+		return { added, empty, failed, total: before, rejected: true }
+	}
+
 	await upload(filePath, KEY, 'public, max-age=1800')
 
 	return { added, crafts, empty, failed, total: list.length }

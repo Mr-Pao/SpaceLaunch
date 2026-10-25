@@ -70,6 +70,12 @@ const SOFT_TTL = {
 	previous: 60 * 60 * 1000,
 	events: 30 * 60 * 1000,
 	agencies: 24 * 60 * 60 * 1000,
+	// 以下都是每天才更新一次的大数据集，默认 15 分钟会让每次进页
+	// 都触发后台刷新白拉一遍（评审 P2-4），统一放宽到 12 小时
+	upcomingMore: 12 * 60 * 60 * 1000,
+	launchers: 12 * 60 * 60 * 1000,
+	pads: 12 * 60 * 60 * 1000,
+	stats: 12 * 60 * 60 * 1000,
 	// 时间线每 3 小时才补几条，TTL 给宽一点，别为了几条新记录反复拉
 	timelines: 3 * 60 * 60 * 1000,
 	// 视频每小时补 10 条，历史发射的 webcast 基本不会变，同样给宽
@@ -88,7 +94,10 @@ const HARD_TTL = {
 	agencies: 2 * 24 * 60 * 60 * 1000,
 	launchers: 2 * 24 * 60 * 60 * 1000,
 	// pads 变化极慢（每天刷一次），但它带 251 张地图图 URL，体积不小
-	pads: 3 * 24 * 60 * 60 * 1000
+	pads: 3 * 24 * 60 * 60 * 1000,
+	// 评审 P2-5 补：这两个新增数据集单份 200KB+，不设硬 TTL 会永久驻留
+	timelines: 2 * 24 * 60 * 60 * 1000,
+	videos: 2 * 24 * 60 * 60 * 1000
 }
 
 function hardTtl(name) {
@@ -145,7 +154,7 @@ function readStorage(name) {
 
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
-const EVICT_ORDER = ['pads', 'launchers', 'agencies', 'upcomingMore', 'stats', 'events', 'previous']
+const EVICT_ORDER = ['pads', 'launchers', 'agencies', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous']
 
 function writeStorage(name, data) {
 	try {
@@ -400,12 +409,30 @@ export function freshnessText(generatedAt) {
 export function clear() {
 	Object.keys(FILES).forEach((name) => {
 		delete memory[name]
+		delete inflight[name]
 		try {
 			uni.removeStorageSync(cacheKey(name))
 		} catch (e) {
 			// ignore
 		}
 	})
+
+	// cacheKey 带 DATA_VERSION，升版本后旧 key 上面清不到，会永久残留在
+	// 用户的 Storage 里（评审 P2-6）。按前缀把历史版本一并扫掉
+	try {
+		const info = uni.getStorageInfoSync()
+		for (const k of (info && info.keys) || []) {
+			if (typeof k === 'string' && k.indexOf('sl_data_') === 0) {
+				try {
+					uni.removeStorageSync(k)
+				} catch (e) {
+					// 单个清不掉不影响其它
+				}
+			}
+		}
+	} catch (e) {
+		// 拿不到 key 列表（个别端没实现）就只清当前版本
+	}
 }
 
 export default {

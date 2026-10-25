@@ -195,6 +195,12 @@ async function runVideos() {
 		`  → ${FILE}  ${list.length} 条 / ${kb} KB（本轮 ${got} 条、其中有视频 ${withVid}、失败 ${failed}）`
 	)
 
+	// 第二层保险（P1-1）：产出比存量缩水太多时宁可这轮不更新
+	if (before > 20 && list.length < Math.floor(before * 0.3)) {
+		console.error(`  ! 产出 ${list.length} 条远小于存量 ${before} 条，疑似数据丢失，拒传（线上旧数据保留）`)
+		return { got, withVid, failed, total: before, rejected: true }
+	}
+
 	await upload(filePath, KEY, 'public, max-age=1800')
 
 	return { got, withVid, failed, total: list.length }

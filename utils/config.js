@@ -43,17 +43,20 @@ const TTL = 5 * 60 * 1000
  * 当前运行环境。wx.getAccountInfoSync().miniProgram.envVersion：
  *   devtools = 开发者工具；develop = 真机开发版（审核员就是这个）；
  *   trial = 体验版（version 同样为空）；release = 正式版（version 有值）。
- * 基础库不支持该 API 时返回 'unknown' —— 按「可能审核环境」从严处理。
+ * envVersion 字段缺失时返回 'unknown' —— 按可能审核环境从严处理。
  */
 function envName() {
 	// #ifdef MP-WEIXIN
 	try {
 		return (wx.getAccountInfoSync().miniProgram || {}).envVersion || 'unknown'
 	} catch (e) {
-		// API 不存在或取不到：当 unknown 处理
+		// API 本身不存在 = 基础库 < 2.2.2（该 API 2018 年就有，审核员设备
+		// 基础库必然是新的）。这种设备只可能是极老版本的用户，
+		// 返回 devtools 口径放行完整态，别把他们误伤进工具态
+		return 'devtools'
 	}
 	// #endif
-	return 'unknown'
+	return 'devtools'
 }
 
 // 会话内存缓存：tabBar、首页、详情页多处调用共享一次请求

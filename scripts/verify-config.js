@@ -23,7 +23,13 @@ const CONFIG_URL = pathToFileURL(path.join(__dirname, '..', 'utils', 'config.js'
 
 function stub(envVersion, version, remote, override) {
 	globalThis.wx = {
-		getAccountInfoSync: () => ({ miniProgram: { envVersion, version } })
+		// envVersion 传 'legacy' 模拟基础库 < 2.2.2：getAccountInfoSync 直接不存在
+		getAccountInfoSync:
+			envVersion === 'legacy'
+				? () => {
+						throw new Error('not supported')
+					}
+				: () => ({ miniProgram: { envVersion, version } })
 	}
 	globalThis.uni = {
 		// 暗门覆盖存在 storage 的这个键下（config.js 的 OVERRIDE_KEY）
@@ -56,6 +62,9 @@ const CASES = [
 	// trial 体验版同样没有 version —— 白名单非空时都进工具态
 	['体验版(trial)白名单非空 → 工具态', 'trial', '', { reviewVersions: ['3.0.10'] }, true],
 	['审核员(develop)白名单非空 → 工具态', 'develop', '', { reviewVersions: ['3.0.10'] }, true],
+	// 基础库 < 2.2.2 没有 getAccountInfoSync：这类极老用户按完整态放行，
+	// 不误伤（审核员设备基础库必然是新的）
+	['老基础库(API不存在) → 完整态', 'legacy', '', { reviewVersions: ['3.0.10'] }, false],
 
 	// 暗门：模拟版本号（开发版也能看审核员视角）
 	['模拟 3.1.0 命中白名单（开发版）', 'develop', '', { reviewVersions: ['3.1.0'] }, true, { version: '3.1.0' }],

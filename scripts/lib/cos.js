@@ -108,19 +108,27 @@ async function upload(localPath, key, cacheControl, contentType) {
  * 桶是公有读，所以**不需要密钥**——只要桶名和地域。
  * 这一点很关键：本地干跑增量脚本时没有 secret，也能读到线上已有数据，
  * 从而算出「哪些还没抓过」，不必每次都从零开始。
+ *
+ * 错误语义（2026-10-25 评审 P1-1 修正，别改回去）：
+ *   404 = 文件还不存在 → 返回 null，调用方按「从零开始」处理，这是正常态；
+ *   网络失败 / 5xx / 解析失败 = **抛错**，调用方中止本轮 ——
+ *   以前一律按 null 处理，增量脚本会拿着「空存量」只写入本轮几条
+ *   就覆盖上传，线上几百条历史数据一次清零且不可自愈。
  */
 async function readCosJson(key) {
 	const { COS_BUCKET, COS_REGION } = process.env
 	if (!COS_BUCKET || !COS_REGION) return null
 	const url = `https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${key}`
+
+	let res
 	try {
-		const res = await fetch(url, { signal: AbortSignal.timeout(30000) })
-		if (!res.ok) return null
-		return await res.json()
+		res = await fetch(url, { signal: AbortSignal.timeout(30000) })
 	} catch (e) {
-		console.warn(`  · 读取 ${key} 失败（按空处理）: ${e.message}`)
-		return null
+		throw new Error(`读取 ${key} 网络失败: ${e.message}`)
 	}
+	if (res.status === 404) return null
+	if (!res.ok) throw new Error(`读取 ${key} 失败: HTTP ${res.status}`)
+	return await res.json()
 }
 
 module.exports = { upload, hasCosConfig, getClient, headObject, putBuffer, readCosJson }
