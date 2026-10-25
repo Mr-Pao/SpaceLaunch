@@ -154,7 +154,8 @@
  */
 import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
-import { formatDateTime, rocketName, astroName } from '@/utils/format.js'
+// 导入改名：模板只能访问实例上的东西，想直接调就得在 methods 里挂一层
+import { formatDateTime, rocketName, astroName as astroNameOf } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
 import { rocketIdOf } from '@/utils/rocket-lookup.js'
 import { getConfig } from '@/utils/config.js'
@@ -305,6 +306,11 @@ export default {
 	},
 
 	methods: {
+		/** 模板里用 astroName(a)：中国籍显示中文名。options API 的模板看不到模块作用域 */
+		astroName(a) {
+			return astroNameOf(a)
+		},
+
 		daySeed() {
 			return Math.floor((Date.now() + BJ_OFFSET) / 86400000)
 		},
