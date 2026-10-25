@@ -61,6 +61,12 @@ const FILES = {
 	// 宇航员库（862 人，detailed）：in_space 筛「此刻在天上」，
 	// bio 只保留了在轨人员的（详情页入口只有这张卡片）
 	astronauts: 'astronauts.json',
+	// 空间站（15 个，活性站 + 历史站），详情页展示乘组/远征队/对接史
+	spacestations: 'spacestations.json',
+	// 远征队（165 条，乘组 + 所属空间站），详情页乘组卡点宇航员跳转
+	expeditions: 'expeditions.json',
+	// 对接事件（飞船→空间站），按 stationId 过滤进空间站详情页
+	dockings: 'dockings.json',
 	// 发射工位库（251 个 pad，含地图图与累计发射数），pad 详情页用
 	pads: 'pads.json',
 	// 统计页数据：CI 侧按年预聚合好的结果，前端只负责展示与年度切换
@@ -95,6 +101,9 @@ const SOFT_TTL = {
 	cores: 12 * 60 * 60 * 1000,
 	// 宇航员库同上（在轨状态一天变一次足够）
 	astronauts: 12 * 60 * 60 * 1000,
+	spacestations: 12 * 60 * 60 * 1000,
+	expeditions: 12 * 60 * 60 * 1000,
+	dockings: 12 * 60 * 60 * 1000,
 	pads: 12 * 60 * 60 * 1000,
 	stats: 12 * 60 * 60 * 1000,
 	// 往年今日：北京时间过 0 点就换一天，不能等 12 小时。
@@ -185,7 +194,7 @@ function readStorage(name) {
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
 // onthisday 排在最后丢：它只有几 KB，首页首屏要用，丢了反而要等网络
-const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday']
+const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday', 'spacestations', 'expeditions', 'dockings']
 
 function writeStorage(name, data) {
 	try {

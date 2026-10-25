@@ -571,6 +571,134 @@ function slimAstronaut(a) {
 	}
 }
 
+/**
+ * 远征队 / 空间站当前乘员共用的「乘员一行」裁剪。
+ *
+ * LL2 里 crew 元素是 { role:{role}, astronaut:{...} }，astronaut 自带缩略图
+ * profile_image_thumbnail，直接取字符串（thumbUrl 期望对象，这里绕过）。
+ * 宇航员详情页点乘员按 id 跳；img 给列表头像用。
+ */
+function slimCrewMember(c) {
+	const a = (c && c.astronaut) || {}
+	const role = (c && c.role && c.role.role) || ''
+	const ag = a.agency || {}
+	return {
+		id: a.id ?? null,
+		name: str(a.name),
+		role: str(role),
+		agency: str(ag.abbrev || ag.name),
+		img: str(a.profile_image_thumbnail) || str(a.profile_image)
+	}
+}
+
+/**
+ * 空间站（/spacestation/，mode=detailed，仅 15 个）。
+ *
+ * 关键字段：active_expeditions（当前远征队，detailed 才有，自带 crew）——直接内联，
+ * 详情页就不必跨数据集查乘组了。owners 是完整 agency 数组（含长 description），
+ * 只留缩写/国别/徽标。description 走 localize 翻中文（前端 descZh 回退）。
+ */
+function slimStation(s) {
+	const owners = Array.isArray(s.owners)
+		? s.owners.map((o) => ({
+				name: str(o.name),
+				abbrev: str(o.abbrev),
+				cc: str(o.country_code),
+				logo: str(o.logo_url || o.image_url)
+		  }))
+		: []
+
+	const exps = Array.isArray(s.active_expeditions)
+		? s.active_expeditions.map((e) => ({
+				id: e.id ?? null,
+				name: str(e.name),
+				start: str(e.start),
+				end: str(e.end),
+				crew: (e.crew || []).map(slimCrewMember)
+		  }))
+		: []
+
+	// 当前乘组：合并所有 active expedition 的 crew（ISS 偶有多条远征队并行），按 id 去重
+	const crew = []
+	const seen = {}
+	for (const e of exps) {
+		for (const m of e.crew) {
+			if (m.id != null && seen[m.id]) continue
+			seen[m.id] = true
+			crew.push(m)
+		}
+	}
+
+	return {
+		id: s.id ?? null,
+		name: str(s.name),
+		status: str(s.status && s.status.name),
+		type: str(s.type && s.type.name),
+		founded: str(s.founded),
+		deorbited: str(s.deorbited),
+		orbit: str(s.orbit),
+		height: num(s.height),
+		width: num(s.width),
+		mass: num(s.mass),
+		volume: num(s.volume),
+		onboardCrew: num(s.onboard_crew),
+		docked: num(s.docked_vehicles),
+		img: str(s.image_url),
+		desc: str(s.description),
+		descZh: '',
+		owners,
+		crew: exps.length ? crew : [],
+		expeditions: exps.map((e) => ({ id: e.id, name: e.name, start: e.start, end: e.end }))
+	}
+}
+
+/**
+ * 远征队（/expedition/，mode=detailed，165 条）。
+ *
+ * crew 元素含 role + astronaut 完整对象；station 是 {id,name} 或直接 null（老数据）。
+ * mission_patches 是徽章图数组，只留 image_url。详情页乘组卡点宇航员 id 跳详情；
+ * 空间站链接按 stationId 跳 station 页。
+ */
+function slimExpedition(e) {
+	const ss = e.spacestation || {}
+	return {
+		id: e.id ?? null,
+		name: str(e.name),
+		start: str(e.start),
+		end: str(e.end),
+		stationId: ss.id ?? null,
+		stationName: str(ss.name),
+		crew: (e.crew || []).map(slimCrewMember),
+		patches: (e.mission_patches || []).map((p) => str(p.image_url)).filter(Boolean)
+	}
+}
+
+/**
+ * 对接事件（/docking_event/，mode=detailed）。
+ *
+ * 字段干净：docking/departure 时间、flight_vehicle.spacecraft（飞船本体，
+ * 含 serial + spacecraft_config 型号 + agency）、space_station 目标站。
+ * 数量随正式库可能几百条，slim 后每条 ~200B，整体可控。
+ */
+function slimDocking(d) {
+	const sv = (d.flight_vehicle && d.flight_vehicle.spacecraft) || {}
+	const cfg = sv.spacecraft_config || {}
+	const ag = cfg.agency || {}
+	const ss = d.space_station || {}
+	return {
+		id: d.id ?? null,
+		docking: str(d.docking),
+		departure: str(d.departure),
+		vehicle: str(sv.name),
+		serial: str(sv.serial_number),
+		config: str(cfg.name),
+		agency: str(ag.abbrev || ag.name),
+		stationId: ss.id ?? null,
+		stationName: str(ss.name),
+		location: str(d.docking_location)
+	}
+}
+
 module.exports = {
 	slimLaunch,
 	slimEvent,
@@ -579,5 +707,8 @@ module.exports = {
 	slimCore,
 	slimAstronaut,
 	slimPad,
-	slimStatLaunch
+	slimStatLaunch,
+	slimStation,
+	slimExpedition,
+	slimDocking
 }

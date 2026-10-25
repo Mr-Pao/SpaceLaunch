@@ -36,6 +36,12 @@ on:
     - cron: '0 22 * * *'     # 发射工位库：每天 UTC 22:00 = 北京 06:00（1 个请求）
     - cron: '0 23 * * *'     # 芯级个体库：每天 UTC 23:00 = 北京 07:00（2 个请求，detailed）
     - cron: '10 23 * * *'    # 宇航员库：每天 UTC 23:10 = 北京 07:10（9 个请求，detailed，错开芯级）
+    # 空间站 / 远征队 / 对接事件：每天 UTC 04:25~04:45（北京 12:25~12:45）错峰抓取，
+    # 该时段原本只有 onthisday 的 03:45 已结束，单数据集请求数都远低于 15 限额，互不挤占。
+    # spacestations 仅 15 条（detailed）、expeditions 165 条分页 2 请求、dockings 分页按数据量。
+    - cron: '25 4 * * *'     # 空间站：每天 UTC 04:25 = 北京 12:25
+    - cron: '35 4 * * *'     # 远征队：每天 UTC 04:35 = 北京 12:35
+    - cron: '45 4 * * *'     # 对接事件：每天 UTC 04:45 = 北京 12:45
     - cron: '20 */3 * * *'   # 发射时间线：每 3 小时（每次 8 条单条详情）
     # 发射视频：每小时。只有 mode=detailed 才返回 vid_urls，一页 5 条约 12 秒，
     # 每轮 10 条 = 2 个请求。定在 40 分，避开其它任务的 0 / 15 / 20 / 30 分
@@ -71,6 +77,9 @@ on:
           - timeline
           - video
           - images
+          - spacestations
+          - expeditions
+          - dockings
           - all
 
 permissions:
@@ -113,6 +122,9 @@ jobs:
               "0 22 * * *")   DS="pads" ;;
               "0 23 * * *")   DS="cores" ;;
               "10 23 * * *")  DS="astronauts" ;;
+              "25 4 * * *")   DS="spacestations" ;;
+              "35 4 * * *")   DS="expeditions" ;;
+              "45 4 * * *")   DS="dockings" ;;
               "20 */3 * * *") DS="timeline" ;;
               "40 * * * *")   DS="video" ;;
               "50 1-23/2 * * *") DS="images" ;;

@@ -95,6 +95,24 @@
 			}
 		},
 		{
+			"path": "pages/stations/stations",
+			"style": {
+				"navigationBarTitleText": "空间站"
+			}
+		},
+		{
+			"path": "pages/station/station",
+			"style": {
+				"navigationBarTitleText": "空间站详情"
+			}
+		},
+		{
+			"path": "pages/expedition/expedition",
+			"style": {
+				"navigationBarTitleText": "远征队"
+			}
+		},
+		{
 			"path": "pages/version/version",
 			"style": {
 				"navigationBarTitleText": "版本记录"

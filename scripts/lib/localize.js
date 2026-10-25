@@ -176,6 +176,19 @@ function localizeAstronauts(list) {
 	)
 }
 
+/**
+ * 空间站简介中译：15 条，代价极小，且页面展示需要。
+ */
+function localizeStations(list) {
+	return fill(
+		list,
+		(x) => x.desc,
+		(x, zh) => {
+			x.descZh = zh
+		}
+	)
+}
+
 module.exports = {
 	localizeLaunches,
 	localizeLaunchNames,
@@ -184,5 +197,6 @@ module.exports = {
 	localizePads,
 	localizeLaunchers,
 	localizeCores,
-	localizeAstronauts
+	localizeAstronauts,
+	localizeStations
 }

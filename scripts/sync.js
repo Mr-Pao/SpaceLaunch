@@ -28,11 +28,14 @@ const { slimLaunch,
 	slimStatLaunch,
 	slimLauncher,
 	slimCore,
-	slimAstronaut } = require('./lib/slim')
+	slimAstronaut,
+	slimStation,
+	slimExpedition,
+	slimDocking } = require('./lib/slim')
 const { aggregateByYear } = require('./lib/aggregate')
 const { pickOnThisDay } = require('./lib/onthisday')
 const { upload } = require('./lib/cos')
-const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers, localizeCores, localizeAstronauts } = require('./lib/localize')
+const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers, localizeCores, localizeAstronauts, localizeStations } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
 // 发射快照本身不带火箭技术参数（normal 模式的 configuration 只有名字），
 // 同步时用型号库按 config id 内联进去，前端就不用为一张卡多拉 568KB
@@ -285,6 +288,65 @@ const DATASETS = {
 			}
 
 			return { count, list: all.map(slimAstronaut) }
+		}
+	},
+
+	// 空间站（/spacestation/，mode=detailed，仅 15 个，一页抓完）。
+	// active_expeditions 在 detailed 才有，含当前乘组；description 翻中文。
+	spacestations: {
+		file: 'spacestations.json',
+		cacheControl: 'public, max-age=86400',
+		images: ['img'],
+		localize: localizeStations,
+		async fetch() {
+			const j = await getJson('/spacestation/?limit=100&mode=detailed&format=json')
+			const all = j.results || []
+			return { count: all.length, list: all.map(slimStation) }
+		}
+	},
+
+	// 远征队（/expedition/，mode=detailed，165 条，2 页）。crew 已内联宇航员，详情页直接渲染。
+	expeditions: {
+		file: 'expeditions.json',
+		cacheControl: 'public, max-age=86400',
+		images: [],
+		async fetch() {
+			const all = []
+			let count = 0
+			for (let offset = 0; offset < 1200; offset += 100) {
+				const j = await getJson(
+					`/expedition/?limit=100&offset=${offset}&mode=detailed&format=json`
+				)
+				count = j.count
+				const results = j.results || []
+				all.push(...results)
+				if (!results.length || offset + results.length >= count) break
+			}
+			return { count, list: all.map(slimExpedition) }
+		}
+	},
+
+	// 对接事件（/docking_event/，mode=detailed）。每条是「飞船→空间站」一次对接，
+	// 详情页按 stationId 过滤展示某站的对接史。数量未知，上限 2000 防御。
+	// 分页可能较多，开启 429 退避重试：匿名限额按小时滚动，等 30s 常能救回下一页。
+	dockings: {
+		file: 'dockings.json',
+		cacheControl: 'public, max-age=86400',
+		images: [],
+		async fetch() {
+			const all = []
+			let count = 0
+			for (let offset = 0; offset < 2000; offset += 100) {
+				const j = await getJson(
+					`/docking_event/?limit=100&offset=${offset}&mode=detailed&format=json`,
+					{ retryOn429: true, backoffMs: 30000, retries: 1 }
+				)
+				count = j.count
+				const results = j.results || []
+				all.push(...results)
+				if (!results.length || offset + results.length >= count) break
+			}
+			return { count, list: all.map(slimDocking) }
 		}
 	},
 

@@ -57,8 +57,33 @@
 				</view>
 			</view>
 
-			<!-- 飞行任务：slim 阶段从 flights/landings 合并裁剪而来，
-			     每条都能点回对应发射的详情页（找不到归档时那边有空态兜底） -->
+		<!-- 所属空间站 / 参与远征队：与 station / expedition 页反向索引，
+		     构成「宇航员 ↔ 空间站 ↔ 远征队」闭环。在轨人员在这里能看到
+		     自己当前所在站，历史航天员能看到自己执行过的远征队。 -->
+		<view class="card" v-if="myStations.length">
+			<view class="card-title">所属空间站</view>
+			<view class="link-row" v-for="s in myStations" :key="s.id" @click="goStation(s)">
+				<view class="link-main">
+					<text class="link-name">{{ s.name }}</text>
+					<text class="link-sub" v-if="s.status">{{ stationStatusZh(s.status) }}</text>
+				</view>
+				<text class="arrow">›</text>
+			</view>
+		</view>
+
+		<view class="card" v-if="myExps.length">
+			<view class="card-title">参与远征队</view>
+			<view class="link-row" v-for="e in myExps" :key="e.id" @click="goExp(e)">
+				<view class="link-main">
+					<text class="link-name">{{ e.name }}</text>
+					<text class="link-sub">{{ expRangeText(e) }}</text>
+				</view>
+				<text class="arrow">›</text>
+			</view>
+		</view>
+
+		<!-- 飞行任务：slim 阶段从 flights/landings 合并裁剪而来，
+		     每条都能点回对应发射的详情页（找不到归档时那边有空态兜底） -->
 			<view class="card" v-if="missions.length">
 				<view class="card-title">飞行任务</view>
 				<view
@@ -152,7 +177,10 @@ export default {
 			a: {},
 			loading: true,
 			navSolid: false,
-			descExpanded: false
+			descExpanded: false,
+			// 反向索引用的全量列表（只本地内存过滤，不下发前端）
+			allStations: [],
+			allExps: []
 		}
 	},
 
@@ -216,6 +244,20 @@ export default {
 		evas() {
 			const list = (this.a && this.a.evas) || []
 			return list.map((e) => ({ ...e, startText: dayOf(e.start) }))
+		},
+
+		// 反向索引：本宇航员出现在哪几座空间站的当前乘组里
+		myStations() {
+			const id = String((this.a && this.a.id) ?? '')
+			if (!id || !this.allStations.length) return []
+			return this.allStations.filter((s) => (s.crew || []).some((m) => String(m.id) === id))
+		},
+
+		// 反向索引：本宇航员参与过哪些远征队
+		myExps() {
+			const id = String((this.a && this.a.id) ?? '')
+			if (!id || !this.allExps.length) return []
+			return this.allExps.filter((e) => (e.crew || []).some((m) => String(m.id) === id))
 		}
 	},
 
@@ -227,8 +269,14 @@ export default {
 	async onLoad(query) {
 		this.id = (query && query.id) || ''
 		try {
-			const found = this.id ? await spaceData.getById('astronauts', this.id) : null
+			const [found, sts, exps] = await Promise.all([
+				this.id ? spaceData.getById('astronauts', this.id) : Promise.resolve(null),
+				spaceData.load('spacestations'),
+				spaceData.load('expeditions')
+			])
 			if (found) this.a = found
+			this.allStations = (sts && sts.list) || []
+			this.allExps = (exps && exps.list) || []
 		} catch (e) {
 			console.warn('[astronaut] 获取失败', e)
 		}
@@ -259,6 +307,28 @@ export default {
 				data: url,
 				success: () => uni.showToast({ title: label + '链接已复制', icon: 'none' })
 			})
+		},
+
+		// 反向索引跳转：空间站 / 远征队 详情页
+		goStation(s) {
+			if (s && s.id != null) uni.navigateTo({ url: '/pages/station/station?id=' + s.id })
+		},
+
+		goExp(e) {
+			if (e && e.id != null) uni.navigateTo({ url: '/pages/expedition/expedition?id=' + e.id })
+		},
+
+		stationStatusZh(s) {
+			if (s === 'Active') return '在役'
+			if (s === 'Retired') return '退役'
+			if (s === 'Under Construction') return '建造中'
+			return s || ''
+		},
+
+		expRangeText(e) {
+			const s = dayOf(e.start)
+			const end = e.end ? dayOf(e.end) : '至今'
+			return (s ? s + ' — ' : '') + end
 		}
 	}
 }
@@ -591,6 +661,46 @@ function destZhOf(v) {
 
 .link-value {
 	color: #38bdf8;
+}
+
+/* 反向索引链接行：所属空间站 / 参与远征队，与飞行任务行同观感 */
+.link-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16rpx;
+	padding: 16rpx 0;
+	border-bottom: 1rpx solid rgba(255, 255, 255, 0.04);
+}
+
+.link-row:last-child {
+	border-bottom: none;
+	padding-bottom: 4rpx;
+}
+
+.link-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.link-name {
+	display: block;
+	color: #e2e8f0;
+	font-size: 27rpx;
+	line-height: 1.4;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.link-sub {
+	display: block;
+	margin-top: 4rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .footer-hint {
