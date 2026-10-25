@@ -44,8 +44,9 @@ function resolveReview(raw, override) {
 		version = String((info && info.miniProgram && info.miniProgram.version) || '').trim()
 	} catch (e) {}
 
-	// 开发版/体验版永远完整态
-	if (envVersion !== 'release') return false
+	// 只有开发者工具放行。审核员是 develop 环境（version 恒为空），
+	// 旧规则「非 release 一律完整态」会把审核员也放进去 —— 已实测证实，勿回退。
+	if (envVersion === 'devtools') return false
 
 	return matchVersionList(raw, version)
 }

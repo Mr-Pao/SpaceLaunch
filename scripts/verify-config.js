@@ -11,9 +11,9 @@
  *
  * 覆盖的关键场景：
  *   - 白名单命中/未命中
- *   - 正式版拿不到版本号（审核环境）
+ *   - 审核员 develop 环境（version 恒为空）→ 工具态
  *   - 旧布尔开关兼容
- *   - 开发版/体验版永远完整态
+ *   - 仅开发者工具放行；trial/develop 真机白名单非空即工具态
  */
 
 const path = require('path')
@@ -51,8 +51,11 @@ const CASES = [
 	['兼容旧格式 review:true', 'release', '3.0.9', { review: true }, true],
 	['兼容旧格式 review:false', 'release', '3.0.9', { review: false }, false],
 	['多版本白名单命中', 'release', '3.0.10', { reviewVersions: ['3.0.9', '3.0.10'] }, true],
-	['体验版永远完整态', 'trial', '3.0.10', { reviewVersions: ['3.0.10'] }, false],
-	['开发版永远完整态', 'develop', '3.0.10', { reviewVersions: ['3.0.10'] }, false],
+	['开发者工具永远完整态', 'devtools', '', { reviewVersions: ['3.0.10'] }, false],
+	// 实测：审核员是 develop 环境、version 为空（微信官方社区确认），
+	// trial 体验版同样没有 version —— 白名单非空时都进工具态
+	['体验版(trial)白名单非空 → 工具态', 'trial', '', { reviewVersions: ['3.0.10'] }, true],
+	['审核员(develop)白名单非空 → 工具态', 'develop', '', { reviewVersions: ['3.0.10'] }, true],
 
 	// 暗门：模拟版本号（开发版也能看审核员视角）
 	['模拟 3.1.0 命中白名单（开发版）', 'develop', '', { reviewVersions: ['3.1.0'] }, true, { version: '3.1.0' }],

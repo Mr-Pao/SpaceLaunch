@@ -4,20 +4,22 @@
  * COS 上放一份 app-config.json，**只有一个字段**：
  *   { "reviewVersions": [] }
  *
- * 语义：列在里面的版本号（= manifest 的 versionName，如 "3.0.10"）进工具态，
- * 其它版本一律完整展示。
+ * 实测口径（2026-10-25，微信开放社区官方确认 + 用户真机验证）：
+ *   审核员跑的是 develop 环境（开发版口径），version 字段为空——
+ *   不是 release！所以白名单匹配对审核员永远不命中，
+ *   真正起作用的是「白名单非空 + 拿不到版本号 → 工具态」这条兜底。
+ *   reviewVersions 实际语义 = 审核期总开关：非空 = 审核中，空 = 正常期。
  *
  * 提审流程（全程只改这一处）：
- *   提审 3.0.10 → { "reviewVersions": ["3.0.10"] }
+ *   提审前 → { "reviewVersions": ["3.1.8"] }（版本号随意，关键是不能为空）
  *   过审发布后 → { "reviewVersions": [] }
  *
- * 效果：
- *   - 提审期间：3.0.10（审核员跑的包）工具态，线上老版本用户完全不受影响
- *   - 过审后清空：3.0.10 用户也恢复完整态，**不用重新提审**
+ * 环境分派：
+ *   - devtools（开发者工具）→ 永远完整态，本机开发不受开关影响
+ *   - develop 真机（= 审核员）/ trial（体验版，version 也为空）→ 白名单非空即工具态
+ *   - release（正式版用户）→ 有版本号：按白名单匹配；白名单为空 → 完整态
  *
- * 审核员不会漏判，两条兜底：
- *   1. 审核环境返回版本号 3.0.10 → 命中白名单
- *   2. 审核环境拿不到版本号 → 正式版必有版本号，拿不到的只可能是审核环境，直接判工具态
+ * 真机预览想看完整态：用本机覆盖暗门 setOverride(false)。
  *
  * 工具态内容：隐藏活动 tab 与活动列表、收起详情页长文、列表卡片去大图。
  *
@@ -38,21 +40,20 @@ const RESOLVED_KEY = 'appReviewResolved'
 const TTL = 5 * 60 * 1000
 
 /**
- * 审核态只在正式版（release）生效。
- * 审核员跑的提审包、线上用户拿到的包都是 release；
- * 开发版（HBuilderX 运行/预览/开发者工具）与体验版一律完整态——
- * COS 上停着 review:true 也不影响本机开发与自测。
- * 基础库不支持该 API 时按非 release 处理（宁可审核态失效，不卡开发）。
+ * 当前运行环境。wx.getAccountInfoSync().miniProgram.envVersion：
+ *   devtools = 开发者工具；develop = 真机开发版（审核员就是这个）；
+ *   trial = 体验版（version 同样为空）；release = 正式版（version 有值）。
+ * 基础库不支持该 API 时返回 'unknown' —— 按「可能审核环境」从严处理。
  */
-function isReleaseBuild() {
+function envName() {
 	// #ifdef MP-WEIXIN
 	try {
-		return wx.getAccountInfoSync().miniProgram.envVersion === 'release'
+		return (wx.getAccountInfoSync().miniProgram || {}).envVersion || 'unknown'
 	} catch (e) {
-		// API 不存在或取不到：当非 release 处理
+		// API 不存在或取不到：当 unknown 处理
 	}
 	// #endif
-	return false
+	return 'unknown'
 }
 
 // 会话内存缓存：tabBar、首页、详情页多处调用共享一次请求
@@ -79,18 +80,18 @@ function runtimeVersion() {
  * 按远程配置算出这台设备该不该进工具态。
  *
  * 判定顺序：
- *   1. 非正式版且没指定模拟版本号 → 永远完整态（开发/体验不受远程开关影响）
+ *   1. 开发者工具且没指定模拟版本号 → 永远完整态（保护本机开发）
  *   2. 配了 reviewVersions 且当前版本在其中 → 工具态
  *   3. 配了 reviewVersions 但拿不到版本号 → 工具态
- *      （正式版一定有版本号，拿不到只可能是无版本号的审核环境，宁可保审核）
- *   4. 其它 → 全局布尔 review
+ *      （审核员是 develop 环境，version 恒为空 —— 就是这条兜底拦住审核员）
+ *   4. 其它（白名单为空）→ 完整态
  *
- * 注意第 3 条的代价：启用白名单后，若某天正式版异常拿不到版本号，
- * 用户会看到工具态。但这是「审核不过」与「体验降级」之间选，
- * 审核不过影响发版且要重走流程，体验降级可通过改配置立刻恢复，故选保审核。
+ * 注意第 3 条的代价：白名单非空期间，体验版（version 也为空）同样进工具态，
+ * 这是审核机制的合理代价；正式版异常拿不到版本号也会短暂降级，
+ * 改配置（清空白名单）立刻恢复，故选保审核。
  *
  * simulated：暗门里填的模拟版本号。给了它就走正式版口径（跳过环境判断），
- * 用这个假版本号代替真实版本号 —— 开发版/体验版也能看到审核员视角。
+ * 用这个假版本号代替真实版本号 —— 开发者工具也能看到审核员视角。
  */
 function applyVersionRule(raw, simulated) {
 	const cfg = raw || {}
@@ -98,7 +99,7 @@ function applyVersionRule(raw, simulated) {
 	const out = Object.assign({}, cfg)
 	const sim = typeof simulated === 'string' && simulated ? simulated : null
 
-	if (!sim && !isReleaseBuild()) {
+	if (!sim && envName() === 'devtools') {
 		out.review = false
 		return out
 	}
@@ -297,8 +298,8 @@ function resolveConfig() {
 		return Promise.resolve({ review: ov.review })
 	}
 
-	// 审核态只在正式版生效：开发版/体验版永远完整态，不读 COS
-	if (!isReleaseBuild()) return Promise.resolve({ review: false })
+	// 开发者工具：永远完整态。真机 develop（含审核员）/ trial / release 走白名单判定
+	if (envName() === 'devtools') return Promise.resolve({ review: false })
 
 	return loadRaw().then((raw) => applyVersionRule(raw))
 }
