@@ -54,6 +54,9 @@ const FILES = {
 	// 芯级个体库（196 枚真实第一级硬件）：编号 / 状态 / 已飞次数 / 回收次数。
 	// 只有 mode=detailed 才有 flights 与 launcher_config，CI 每天抓全量
 	cores: 'cores.json',
+	// 宇航员库（862 人，detailed）：in_space 筛「此刻在天上」，
+	// bio 只保留了在轨人员的（详情页入口只有这张卡片）
+	astronauts: 'astronauts.json',
 	// 发射工位库（251 个 pad，含地图图与累计发射数），pad 详情页用
 	pads: 'pads.json',
 	// 统计页数据：CI 侧按年预聚合好的结果，前端只负责展示与年度切换
@@ -82,6 +85,8 @@ const SOFT_TTL = {
 	launchers: 12 * 60 * 60 * 1000,
 	// 芯级库每天才刷一次，与 launchers 同待遇
 	cores: 12 * 60 * 60 * 1000,
+	// 宇航员库同上（在轨状态一天变一次足够）
+	astronauts: 12 * 60 * 60 * 1000,
 	pads: 12 * 60 * 60 * 1000,
 	stats: 12 * 60 * 60 * 1000,
 	// 时间线每 3 小时才补几条，TTL 给宽一点，别为了几条新记录反复拉
@@ -166,7 +171,7 @@ function readStorage(name) {
 
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
-const EVICT_ORDER = ['pads', 'cores', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous']
+const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous']
 
 function writeStorage(name, data) {
 	try {

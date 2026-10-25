@@ -180,6 +180,13 @@ async function testFormat() {
 	eq(f.coreStatus('').text, '未知', '芯级：空值安全返回')
 	eq(f.coreStatus({ name: 'active' }).text, '现役', '芯级：对象形态也能取到 name')
 
+	// nationZh：宇航员国籍查表（LL2 用 nationality_name / 缩写两种形态），未收录回退原文
+	eq(f.nationZh('France'), '法国', '国籍：France 法国')
+	eq(f.nationZh('USA'), '美国', '国籍：USA 缩写命中')
+	eq(f.nationZh('United States'), '美国', '国籍：全称命中')
+	eq(f.nationZh('Costa Rica'), 'Costa Rica', '国籍：未收录保留原文')
+	eq(f.nationZh(''), '', '国籍：空值安全返回')
+
 	// 视觉宽度：中文按双宽算，用来判断简介要不要折叠
 	eq(f.textUnits(''), 0, '视觉宽度：空值 0')
 	eq(f.textUnits('abc'), 3, '视觉宽度：纯英文按字母数')

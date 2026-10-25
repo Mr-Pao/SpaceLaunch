@@ -27,10 +27,11 @@ const { slimLaunch,
 	slimAgency,
 	slimStatLaunch,
 	slimLauncher,
-	slimCore } = require('./lib/slim')
+	slimCore,
+	slimAstronaut } = require('./lib/slim')
 const { aggregateByYear } = require('./lib/aggregate')
 const { upload } = require('./lib/cos')
-const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers, localizeCores } = require('./lib/localize')
+const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers, localizeCores, localizeAstronauts } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
 // 发射快照本身不带火箭技术参数（normal 模式的 configuration 只有名字），
 // 同步时用型号库按 config id 内联进去，前端就不用为一张卡多拉 568KB
@@ -252,6 +253,35 @@ const DATASETS = {
 			}
 
 			return { count, list: all.map(slimCore) }
+		}
+	},
+
+	astronauts: {
+		file: 'astronauts.json',
+		cacheControl: 'public, max-age=86400',
+		images: ['img'],
+		localize: localizeAstronauts,
+		/**
+		 * 宇航员库：862 人、limit=100 → 9 页。detailed 才有 in_space /
+		 * time_in_space / bio 这些字段。单页实测约 8 秒，每天一轮可接受。
+		 * 首页「此刻在天上」卡片筛 in_space=true； bio 只保留了在轨的
+		 * 十几个人，翻译量也可控。
+		 */
+		async fetch() {
+			const all = []
+			let count = 0
+
+			for (let offset = 0; offset < 1200; offset += 100) {
+				const j = await getJson(
+					`/astronauts/?limit=100&offset=${offset}&mode=detailed&format=json`
+				)
+				count = j.count
+				const results = j.results || []
+				all.push(...results)
+				if (!results.length || offset + results.length >= count) break
+			}
+
+			return { count, list: all.map(slimAstronaut) }
 		}
 	},
 

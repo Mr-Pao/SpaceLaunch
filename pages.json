@@ -73,6 +73,12 @@
 			}
 		},
 		{
+			"path": "pages/astronaut/astronaut",
+			"style": {
+				"navigationBarTitleText": "航天员"
+			}
+		},
+		{
 			"path": "pages/version/version",
 			"style": {
 				"navigationBarTitleText": "版本记录"

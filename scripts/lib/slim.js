@@ -444,12 +444,66 @@ function slimCore(l) {
 	}
 }
 
+/**
+ * ISO 8601 时长 → 天数（LL2 的 time_in_space 是 P396DT11H33M45S 这种形态，
+ * 前端不做解析，同步阶段一次算好）。解析失败返回 0。
+ */
+function isoDurationDays(s) {
+	if (typeof s !== 'string') return 0
+	const m = s.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?)?$/)
+	if (!m) return 0
+	const d = Number(m[1]) || 0
+	const h = Number(m[2]) || 0
+	const mi = Number(m[3]) || 0
+	const sec = Number(m[4]) || 0
+	return (d * 86400 + h * 3600 + mi * 60 + sec) / 86400
+}
+
+/**
+ * 宇航员（/astronauts/，mode=detailed）。
+ *
+ * in_space 是「此刻在不在天上」的布尔（首页在轨卡片就是筛它）；
+ * time_in_space / eva_time 是 ISO 时长， Slim 阶段换算成天 / 小时，
+ * 前端零解析。flights/landings/spacewalks 三个**数组**（detailed 才有，
+ * 每条都是完整 launch 对象）不保留——只留 count 字段，体积从 MB 级
+ * 压到 KB 级。bio 只保留在轨人员的：862 条 bio 全存要 1MB+，
+ * 而详情页入口只有「此刻在天上」这张卡片。
+ */
+function slimAstronaut(a) {
+	const nat = Array.isArray(a.nationality) && a.nationality[0]
+	const ag = a.agency || {}
+	const inSpace = Boolean(a.in_space)
+	const days = Math.floor(isoDurationDays(a.time_in_space))
+	const evaHours = Math.round(isoDurationDays(a.eva_time) * 24)
+
+	return {
+		id: a.id ?? null,
+		name: str(a.name),
+		status: str(a.status && a.status.name),
+		inSpace,
+		days,
+		evaHours,
+		age: num(a.age),
+		flights: num(a.flights_count),
+		spacewalks: num(a.spacewalks_count),
+		// 优先国名（France），nationality_name 是 French 这种形容词形态，
+		// 前端的映射表按国名组织、形容词做兜底
+		nation: str(nat && (nat.name || nat.nationality_name)),
+		agencyName: str(ag.abbrev) || str(ag.name),
+		img: thumbUrl(a.image),
+		credit: imageCredit(a.image),
+		bio: inSpace ? str(a.bio) : '',
+		bioZh: ''
+	}
+}
+
 module.exports = {
 	slimLaunch,
 	slimEvent,
 	slimAgency,
 	slimLauncher,
 	slimCore,
+	slimAstronaut,
 	slimPad,
 	slimStatLaunch
 }

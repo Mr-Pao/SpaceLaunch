@@ -160,6 +160,22 @@ function localizeCores(list) {
 	)
 }
 
+/**
+ * astronaut.bio → bioZh
+ *
+ * slim 阶段只保留了在轨人员的 bio（十几个人），所以这里天然只翻这几条，
+ * 历史宇航员的英文简介不进翻译池 —— 详情页入口只有「在轨」卡片。
+ */
+function localizeAstronauts(list) {
+	return fill(
+		list,
+		(x) => x.bio,
+		(x, zh) => {
+			x.bioZh = zh
+		}
+	)
+}
+
 module.exports = {
 	localizeLaunches,
 	localizeLaunchNames,
@@ -167,5 +183,6 @@ module.exports = {
 	localizeAgencies,
 	localizePads,
 	localizeLaunchers,
-	localizeCores
+	localizeCores,
+	localizeAstronauts
 }

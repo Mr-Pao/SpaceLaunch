@@ -65,6 +65,31 @@
 				</view>
 			</view>
 
+		<!-- 此刻在天上：在轨人员横滑卡。数据来自宇航员库（CI 每天全量抓，
+		     in_space 筛选），点人进详情。加载失败整块隐藏 -->
+		<view class="inspace" v-if="inSpace.length">
+			<view class="inspace-head">
+				<text class="inspace-title">此刻在天上</text>
+				<text class="inspace-count">{{ inSpace.length }} 人</text>
+			</view>
+			<scroll-view class="inspace-scroll" scroll-x>
+				<view class="inspace-row">
+					<view
+						class="acard"
+						v-for="a in inSpace"
+						:key="a.id"
+						hover-class="acard-hover"
+						@click="goAstronaut(a.id)"
+					>
+						<image v-if="a.img" class="acard-img" :src="a.img" mode="aspectFill" lazy-load></image>
+						<view v-else class="acard-img acard-ph"><text>🧑‍🚀</text></view>
+						<text class="acard-name">{{ a.name }}</text>
+						<text class="acard-days">在轨 {{ a.days }} 天</text>
+					</view>
+				</view>
+			</scroll-view>
+		</view>
+
 			<template v-if="viewMode === 'calendar'">
 				<!-- 日历模式：月网格打点 + 当日任务 -->
 				<launch-calendar :items="filteredList" @pick="onPickDay" />
@@ -233,11 +258,24 @@ export default {
 			// 搜索词：与 filters 一起作用于列表，实时生效
 			keyword: '',
 			// 各维度选中值；'' = 不筛选。两个 feed 共用一套，切 feed 时清空
-			filters: { country: '', agency: '', rocket: '' }
+			filters: { country: '', agency: '', rocket: '' },
+			// 宇航员库（astronauts.json）：只展示 in_space=true 的那几张卡
+			astronauts: []
 		}
 	},
 
 	computed: {
+		/**
+		 * 此刻在天上的人。在轨时间久的排前面 —— 老航天员是话题人物，
+		 * 新上来的（days 小）多数刚跟发射新闻对上号，两种排法都说得通，
+		 * 取「久」的更耐看。
+		 */
+		inSpace() {
+			return this.astronauts
+				.filter((x) => x && x.inSpace)
+				.sort((a, b) => (b.days || 0) - (a.days || 0))
+		},
+
 		/**
 		 * 最近一次（时间上最靠前且还没到）的发射。
 		 * 不能直接用 list[0]：收藏置顶会把顺序打乱，
@@ -392,6 +430,7 @@ export default {
 				return
 			}
 			this.getData()
+			this.loadAstronauts()
 		})
 	},
 
@@ -443,6 +482,24 @@ export default {
 	},
 
 	methods: {
+		/**
+		 * 宇航员库后台加载：失败静默（首页只是少了「此刻在天上」一行），
+		 * 不和 getData 抢并行度 —— 它是缓存命中的本地数据，不会阻塞首屏
+		 */
+		async loadAstronauts() {
+			try {
+				const d = await spaceData.load('astronauts')
+				this.astronauts = (d && d.list) || []
+			} catch (e) {
+				console.warn('[index] 宇航员库不可用', e)
+			}
+		},
+
+		goAstronaut(id) {
+			if (!id) return
+			uni.navigateTo({ url: '/pages/astronaut/astronaut?id=' + id })
+		},
+
 		goDetail(item) {
 			if (!item || !item.id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + item.id })
@@ -869,5 +926,85 @@ export default {
 	text-align: center;
 	box-sizing: border-box;
 	border: 1rpx solid rgba(255, 255, 255, 0.28);
+}
+
+/* ---- 此刻在天上 ---- */
+.inspace {
+	margin-bottom: 22rpx;
+}
+
+.inspace-head {
+	display: flex;
+	align-items: baseline;
+	margin-bottom: 14rpx;
+}
+
+.inspace-title {
+	color: #e2e8f0;
+	font-size: 28rpx;
+	font-weight: 600;
+}
+
+.inspace-count {
+	margin-left: 14rpx;
+	color: #38bdf8;
+	font-size: 22rpx;
+}
+
+.inspace-scroll {
+	width: 100%;
+	white-space: nowrap;
+}
+
+.inspace-row {
+	display: inline-flex;
+	gap: 16rpx;
+	padding: 2rpx;
+}
+
+.acard {
+	display: inline-block;
+	width: 152rpx;
+	overflow: hidden;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	border-radius: 16rpx;
+}
+
+.acard-hover {
+	opacity: 0.75;
+}
+
+.acard-img {
+	width: 150rpx;
+	height: 150rpx;
+	display: block;
+}
+
+.acard-ph {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #1b2333;
+	font-size: 56rpx;
+}
+
+.acard-name {
+	display: block;
+	max-width: 152rpx;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 10rpx 12rpx 0;
+	box-sizing: border-box;
+	color: #e2e8f0;
+	font-size: 22rpx;
+}
+
+.acard-days {
+	display: block;
+	padding: 2rpx 12rpx 12rpx;
+	color: #6b7891;
+	font-size: 20rpx;
 }
 </style>

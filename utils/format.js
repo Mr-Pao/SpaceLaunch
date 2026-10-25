@@ -113,6 +113,81 @@ export function coreStatus(status) {
 }
 
 /**
+ * 宇航员国籍中文化。LL2 的 nationality_name 是 France / USA / Russia
+ * 这类英文国名，只收航天员出过或常出的国家，未收录保留原文。
+ */
+const NATION_ZH = {
+	France: '法国',
+	USA: '美国',
+	'United States': '美国',
+	Russia: '俄罗斯',
+	China: '中国',
+	Japan: '日本',
+	Italy: '意大利',
+	Germany: '德国',
+	Canada: '加拿大',
+	'United Kingdom': '英国',
+	Sweden: '瑞典',
+	Netherlands: '荷兰',
+	Spain: '西班牙',
+	Belgium: '比利时',
+	Denmark: '丹麦',
+	Norway: '挪威',
+	Finland: '芬兰',
+	Poland: '波兰',
+	Czechia: '捷克',
+	Australia: '澳大利亚',
+	India: '印度',
+	Brazil: '巴西',
+	Israel: '以色列',
+	Kazakhstan: '哈萨克斯坦',
+	Ukraine: '乌克兰',
+	UAE: '阿联酋',
+	'Saudi Arabia': '沙特阿拉伯',
+	'South Korea': '韩国',
+	Vietnam: '越南',
+	Cuba: '古巴',
+	Mongolia: '蒙古',
+	Syria: '叙利亚',
+	Afghanistan: '阿富汗',
+	'South Africa': '南非',
+	Mexico: '墨西哥',
+	Switzerland: '瑞士',
+	Austria: '奥地利',
+	Bulgaria: '保加利亚',
+	Romania: '罗马尼亚',
+	Hungary: '匈牙利',
+	Slovakia: '斯洛伐克',
+	// 形容词兜底：LL2 的 nationality_name 是这一形态，slim 优先取国名，
+	// 但国名缺失或旧数据只有形容词时也能命中
+	American: '美国',
+	French: '法国',
+	Russian: '俄罗斯',
+	Chinese: '中国',
+	British: '英国',
+	Swiss: '瑞士',
+	Swedish: '瑞典',
+	Italian: '意大利',
+	German: '德国',
+	Japanese: '日本',
+	Canadian: '加拿大',
+	Spanish: '西班牙',
+	Dutch: '荷兰',
+	Belgian: '比利时',
+	Danish: '丹麦',
+	Norwegian: '挪威',
+	Finnish: '芬兰',
+	Polish: '波兰',
+	Australian: '澳大利亚',
+	'United States of America': '美国'
+}
+
+export function nationZh(nation) {
+	if (!nation) return ''
+	return NATION_ZH[nation] || nation
+}
+
+/**
  * 中国运载火箭的中文名。
  *
  * 只收「确定无疑」的型号：朱雀、谷神星、快舟。
