@@ -15,6 +15,26 @@
 const MAX_IMAGES = 60
 const MAX_VIDEOS = 40
 
+/**
+ * 由 COS 缩略图地址推导原图（full 预设）地址。
+ *
+ * COS key 规则（scripts/lib/image.js 的 keyOf）：
+ *   thumb = space-img/{hash}.{ext}          —— hash 是原始 URL 的 md5 前 16 位
+ *   full  = space-img/{hash}_2000.{ext}     —— 同一原始 URL 在 full 预设下的产物
+ * 两者共享同一个 hash，所以纯字符串互推，不需要任何 JSON 里多带一个字段。
+ *
+ * 只匹配「无宽度后缀」的缩略图：信息图（_1080）、工位地图（_750）没有
+ * full 预设，不匹配时返回空串，调用方回退用缩略图自己。
+ * 还没被 CI 全量补齐扫到的图，COS 上 404 —— previewImage 里会显示失败，
+ * 补齐完成后（约一周）自然消失，不值得为此加探测请求。
+ */
+export function fullImageOf(url) {
+	if (!url || typeof url !== 'string') return ''
+	const m = url.match(/space-img\/([0-9a-f]{16})\.(\w{3,4})(?:\?.*)?$/)
+	if (!m) return ''
+	return url.replace(/space-img\/([0-9a-f]{16})\.(\w{3,4})(\?.*)?$/, 'space-img/$1_2000.$2')
+}
+
 function uniqByUrl(list) {
 	const seen = {}
 	const out = []
@@ -44,6 +64,7 @@ export function collectMedia(configs, records) {
 	const configImages = cs.map((c) => ({
 		url: c.image || c.imageThumb || '',
 		thumb: c.imageThumb || c.image || '',
+		full: fullImageOf(c.imageThumb || c.image || ''),
 		credit: c.imageCredit || '',
 		caption: c.name || '',
 		kind: 'config',
@@ -56,6 +77,7 @@ export function collectMedia(configs, records) {
 	const launchImages = sorted.map((r) => ({
 		url: r.image || r.imageThumb || '',
 		thumb: r.imageThumb || r.image || '',
+		full: fullImageOf(r.imageThumb || r.image || ''),
 		credit: r.imageCredit || '',
 		caption: r.imageName || r.name || '',
 		kind: 'launch',
@@ -68,6 +90,7 @@ export function collectMedia(configs, records) {
 		return {
 			url: p.image || p.imageThumb || '',
 			thumb: p.imageThumb || p.image || '',
+			full: fullImageOf(p.imageThumb || p.image || ''),
 			credit: p.imageCredit || '',
 			caption: p.imageName || p.name || '',
 			kind: 'pad',

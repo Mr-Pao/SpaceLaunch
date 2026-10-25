@@ -36,6 +36,7 @@ const { mirrorImages } = require('./lib/image')
 const { enrichRockets } = require('./lib/enrich')
 const { runTimelines } = require('./timeline')
 const { runVideos } = require('./videos')
+const { runImages } = require('./images')
 const translate = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
@@ -400,14 +401,24 @@ async function runDataset(name) {
 		console.log('\n=== 同步 video ===')
 		const r = await runVideos()
 		console.log('\n=== 汇总 ===')
-		console.log(`  videos.json  本轮 ${r.got} 条 / 其中有视频 ${r.withVid} / 失败 ${r.failed} / 累计 ${r.total} 条`)
+		console.log(`  videos.json  本轮扫 ${r.got} / 新增有视频 ${r.withVid} / 失败 ${r.failed} / 累计 ${r.total} 条`)
+		return
+	}
+
+	// 原图全量补齐 + 图库聚合数据。与 video 一样靠游标循环慢慢扫全量，
+	// 独立 cron（每 2 小时）的原因见 sync.yml 头部的请求预算表
+	if (dataset === 'images') {
+		fs.mkdirSync(OUT_DIR, { recursive: true })
+		console.log('\n=== 同步 images（原图全量 + gallery） ===')
+		const im = await runImages()
+		console.log(`  gallery.json  本轮 ${im.rows} 张 / 累计 ${im.total} 张${im.rejected ? '（拒传）' : ''}`)
 		return
 	}
 
 	const targets = dataset === 'all' ? Object.keys(DATASETS) : [dataset]
 
 	if (targets.some((t) => !DATASETS[t])) {
-		console.error(`未知数据集: ${dataset}，可选 ${Object.keys(DATASETS).join(' / ')} / timeline / video / all`)
+		console.error(`未知数据集: ${dataset}，可选 ${Object.keys(DATASETS).join(' / ')} / timeline / video / images / all`)
 		process.exit(2)
 	}
 

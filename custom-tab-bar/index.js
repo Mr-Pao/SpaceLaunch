@@ -80,6 +80,12 @@ Component({
 				iconActive: '/static/image/tabbar/rocket2.png'
 			},
 			{
+				pagePath: 'pages/gallery/gallery',
+				text: '图库',
+				icon: '/static/image/tabbar/tuku1.png',
+				iconActive: '/static/image/tabbar/tuku2.png'
+			},
+			{
 				pagePath: 'pages/event/event',
 				text: '活动',
 				icon: '/static/image/tabbar/guanyu1.png',

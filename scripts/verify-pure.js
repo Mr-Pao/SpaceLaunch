@@ -361,6 +361,23 @@ async function testMedia() {
 	eq(m.collectMedia(null, null).images.length, 0, '入参为空安全返回')
 	eq(m.collectMedia([], []).videos.length, 0, '空数组安全返回')
 
+	// fullImageOf：由 COS 缩略图 hash 推导原图地址（2026-10-25 原图补齐）
+	eq(
+		m.fullImageOf('https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-img/ab12cd34ef567890.jpg'),
+		'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.com/space-img/ab12cd34ef567890_2000.jpg',
+		'原图：thumb 推导 _2000'
+	)
+	eq(
+		m.fullImageOf('https://x.cos.myqcloud.com/space-img/ab12cd34ef567890.png'),
+		'https://x.cos.myqcloud.com/space-img/ab12cd34ef567890_2000.png',
+		'原图：png 同样推导'
+	)
+	eq(m.fullImageOf('https://x.cos.myqcloud.com/space-img/ab12cd34ef567890_1080.jpg'), '', '原图：信息图(带宽度后缀)不推导')
+	eq(m.fullImageOf('https://x.cos.myqcloud.com/space-img/ab12cd34ef567890_750.jpg'), '', '原图：地图(带宽度后缀)不推导')
+	eq(m.fullImageOf('https://thespacedevs-prod.nyc3.digitaloceanspaces.com/media/x.jpg'), '', '原图：非 COS 地址不推导')
+	eq(m.fullImageOf(''), '', '原图：空值安全')
+	eq(m.fullImageOf(null), '', '原图：null 安全')
+
 	fs.unlinkSync(path.join(dir, 'sl-media.mjs'))
 }
 

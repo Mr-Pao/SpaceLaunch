@@ -37,7 +37,12 @@ const PRESETS = {
 	large: { maxWidth: 1080, maxBytes: 300 * 1024, qualities: [85, 78, 70, 60, 50], fallbackWidth: 720, fallbackQuality: 60 },
 	// 工位地图：要用来看清跑道、塔架和周边地形，480px 糊成一片；
 	// 但也不值得按 1080px 传 —— 750px 正好是 375pt 屏的 2 倍图
-	map: { maxWidth: 750, maxBytes: 120 * 1024, qualities: [78, 70, 62, 54], fallbackWidth: 600, fallbackQuality: 55 }
+	map: { maxWidth: 750, maxBytes: 120 * 1024, qualities: [78, 70, 62, 54], fallbackWidth: 600, fallbackQuality: 55 },
+	// 原图（full）：给「点击看大图」用。2000px 覆盖 LL2 绝大多数横图原始宽度
+	// （withoutEnlargement 不会放大小图），q85 起步、上限 1.2MB。
+	// 全量约 8000 条发射 × 60% 有图 × 去重后约 3-4 千张 × 500KB ≈ 2GB 存储，
+	// 按 0.1 元/GB/月完全无感；点击率低，下行流量也出不了几块钱
+	full: { maxWidth: 2000, maxBytes: 1.2 * 1024 * 1024, qualities: [85, 80, 75, 70, 62], fallbackWidth: 1280, fallbackQuality: 80 }
 }
 
 const MAX_WIDTH = PRESETS.thumb.maxWidth
@@ -66,6 +71,30 @@ function keyOf(url, ext, maxWidth) {
 	const h = crypto.createHash('md5').update(url).digest('hex').slice(0, 16)
 	const suffix = maxWidth === PRESETS.thumb.maxWidth ? '' : '_' + maxWidth
 	return `${PREFIX}/${h}${suffix}.${ext}`
+}
+
+/**
+ * 探测某 URL 在某预设下是否已经镜像过（COS 上按 hash 命中）。
+ *
+ * key 的 hash 只依赖原始 URL、后缀只依赖宽度，而 ext 取决于压缩结果
+ * （透明图 png、其余 jpg），所以探测时 jpg / png 各试一次。
+ * 命中就完全跳过「下载 2MB 原图 + 压缩」——全量补齐扫历史发射时，
+ * 绝大多数图早就传过（LL2 大量复用同一张图），没有这一步每轮都在白下载。
+ */
+async function probeExisting(url, preset) {
+	const base = cdnBase()
+	if (!base || !hasCosConfig()) return null
+	const h = crypto.createHash('md5').update(url).digest('hex').slice(0, 16)
+	const suffix = preset.maxWidth === PRESETS.thumb.maxWidth ? '' : '_' + preset.maxWidth
+	for (const ext of ['jpg', 'png']) {
+		const key = `${PREFIX}/${h}${suffix}.${ext}`
+		try {
+			if (await headObject(key)) return `${base}/${key}`
+		} catch (e) {
+			// 探测失败按没有处理，走正常镜像流程
+		}
+	}
+	return null
 }
 
 // 同一进程内同一个 URL 只处理一次（列表里经常多张图指向同一个地址）
@@ -151,6 +180,15 @@ async function mirrorOne(url, preset = PRESETS.thumb) {
 	if (url.startsWith(base)) {
 		memo.set(memoKey, url)
 		return url
+	}
+
+	// COS 上已经有这张图（同 hash 同宽度的历史产物）就直接复用，
+	// 省掉整趟「下载 + 压缩」——全量补齐模式靠它把每轮耗时压在分钟级
+	const probed = await probeExisting(url, preset)
+	if (probed) {
+		stats.reuse++
+		memo.set(memoKey, probed)
+		return probed
 	}
 
 	try {

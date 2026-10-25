@@ -10,8 +10,11 @@ name: sync-space-data
 #   previous    1 次/小时
 #   timeline    约 2 次/小时（每 3 小时 6 条单条详情，8 条会在 timeline 轮撞 15 次限额）
 #   video       2 次/小时（每轮 10 条发射，detailed 一页 5 条）
-#   合计        约 10 次/小时，timeline 轮峰值 14 次，均在 15 次以内
-#   agencies    每天 1 轮 4 个请求（唯一需要真翻页的数据集）
+#   images      1 次/小时（每 2 小时跑一轮 2 个请求：原图全量补齐 + gallery）
+#   合计        常规小时 10 次；含 timeline 的小时 14 次；
+#               agencies 那个小时会短暂到 18，每天一次、429 两三个请求无碍
+# 注意：images 放奇数小时的 50 分，错开 timeline（0,3,6…点的 20 分），
+# 否则 timeline 轮会被顶到 16 次撞限额。
 #
 # 注意：cron 用的是 UTC。北京时间 = UTC+8
 
@@ -29,6 +32,9 @@ on:
     # 发射视频：每小时。只有 mode=detailed 才返回 vid_urls，一页 5 条约 12 秒，
     # 每轮 10 条 = 2 个请求。定在 40 分，避开其它任务的 0 / 15 / 20 / 30 分
     - cron: '40 * * * *'
+    # 发射原图全量补齐 + 图库聚合：每 2 小时（奇数小时 50 分），每轮 2 个请求。
+    # 放奇数小时是为了错开 timeline 的 0,3,6…点 20 分 —— 同小时叠加会撞 15 次限额
+    - cron: '50 1-23/2 * * *'
   # 手动触发（含本机无 API 访问时）：改 scripts/sync-request.json 里的 dataset 再 push 即可。
   # GitHub App / 手机上也能改这个文件，是最省事的"跑一次某数据集"入口。
   push:
@@ -52,6 +58,7 @@ on:
           - stats
           - timeline
           - video
+          - images
           - all
 
 permissions:
@@ -93,6 +100,7 @@ jobs:
               "0 22 * * *")   DS="pads" ;;
               "20 */3 * * *") DS="timeline" ;;
               "40 * * * *")   DS="video" ;;
+              "50 1-23/2 * * *") DS="images" ;;
               *)              DS="upcoming" ;;
             esac
           fi
@@ -129,6 +137,8 @@ jobs:
           TIMELINE_PER_RUN: '6'
           # 视频每轮抓多少条发射：detailed 一页 5 条，10 条 = 2 个请求
           VIDEO_PER_RUN: '10'
+          # 原图全量补齐每轮扫多少条发射：normal 一页 50 条，100 条 = 2 个请求
+          IMAGE_PER_RUN: '100'
         run: node sync.js --dataset=${{ steps.pick.outputs.dataset }}
 
       # GitHub 规定：公开仓库连续 60 天无提交，定时任务会被自动停用。

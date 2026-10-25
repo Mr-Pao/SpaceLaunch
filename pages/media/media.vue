@@ -87,9 +87,9 @@
 </template>
 
 <script>
-import spaceData from '@/utils/data.js'
-import { seriesKey, seriesName, rocketName } from '@/utils/format.js'
-import { collectMedia } from '@/utils/media.js'
+	import spaceData from '@/utils/data.js'
+	import { seriesKey, seriesName, rocketName } from '@/utils/format.js'
+	import { collectMedia, fullImageOf } from '@/utils/media.js'
 
 export default {
 	data() {
@@ -196,10 +196,12 @@ export default {
 		},
 
 		preview(img) {
-			const urls = this.images.map((x) => x.url).filter(Boolean)
+			// 全屏看原图：COS 上同 hash 的 _2000 版本（CI 全量补齐后可用），
+			// 还没补到的图推导地址 404，回退缩略图
+			const urls = this.images.map((x) => x.full || fullImageOf(x.thumb) || x.url).filter(Boolean)
 			uni.previewImage({
 				urls,
-				current: img.url
+				current: img.full || fullImageOf(img.thumb) || img.url
 			})
 		},
 

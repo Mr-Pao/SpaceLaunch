@@ -38,10 +38,9 @@ const KEY = 'space-data/videos.json'
 const PER_RUN = Number(process.env.VIDEO_PER_RUN || 10)
 const PAGE = 5
 
-// 文件保留上限。previous 一圈只有 100 条左右，多留几圈是为了
-// 「发射被挤出快照后，已抓的视频不立刻丢」——媒体页读的是同一份快照，
-// 太旧的行前端也匹配不到，留着只是浪费体积
-const KEEP = 400
+// 文件保留上限。全量扫完后「有视频的发射」约 1000-1500 条（远古发射没有
+// webcast），按 net 倒序留最近的 1200 条，约 500KB。太老的前端也几乎不翻。
+const KEEP = 1200
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v))
 const cut = (s, n) => {
@@ -84,11 +83,6 @@ function slimVids(raw) {
 	return out
 }
 
-async function loadSnapshot(file) {
-	const d = await readCosJson('space-data/' + file)
-	return (d && d.list) || []
-}
-
 async function runVideos() {
 	if (!hasCosConfig()) {
 		console.log('  · 未配置 COS 密钥，视频只写本地 dist，不上传')
@@ -108,33 +102,35 @@ async function runVideos() {
 	old = old || { list: [] }
 
 	const byId = new Map()
+	let vidsBefore = 0
 	for (const x of old.list || []) {
-		if (x && x.id) byId.set(String(x.id), x)
-	}
-	const before = byId.size
-
-	const snap = await loadSnapshot('launches-previous.json')
-	const total = snap.length
-	if (!total) {
-		console.warn('  ! 发射快照为空，无法确定抓取目标')
-		return { got: 0, withVid: 0, failed: 0, total: before }
+		if (!x || !x.id) continue
+		// 只保留有视频的行：游标本身就是「扫到哪了」的状态，
+		// 没有视频的发射不需要占 JSON 体积，扫到它们时直接丢弃
+		if ((x.vids || []).length) {
+			byId.set(String(x.id), x)
+			vidsBefore++
+		}
 	}
 
-	// 游标跟着快照长度走，不写死 100 —— previous 的条数以后可能会调
+	// 全量游标：直接对着 LL2 previous 端点扫，不依赖本地快照的长度。
+	// 快照只留最新 100 条，按它当界只会永远在头部打转；
+	// 全量 7654 条靠 count 校正，扫完一圈归零重扫（顺带补新发射和漏网的）
 	let cursor = Number(old.cursor) || 0
-	if (!(cursor >= 0) || cursor >= total) cursor = 0
+	if (!(cursor >= 0)) cursor = 0
 
 	// 从 cursor 起取 PER_RUN 条，按 PAGE 切成分页请求
 	const jobs = []
-	for (let i = 0; i < PER_RUN && cursor + i < total; i += PAGE) {
-		jobs.push({ offset: cursor + i, limit: Math.min(PAGE, PER_RUN - i, total - cursor - i) })
+	for (let i = 0; i < PER_RUN && cursor + i < (old.total || Infinity); i += PAGE) {
+		jobs.push({ offset: cursor + i, limit: Math.min(PAGE, PER_RUN - i) })
 	}
 
-	console.log(`  视频: 快照 ${total} 条 / 已存 ${before} 条 / 游标 ${cursor} / 本轮 ${jobs.length} 个请求`)
+	console.log(`  视频: 已存 ${vidsBefore} 条有视频 / 游标 ${cursor} / 本轮 ${jobs.length} 个请求`)
 
 	let got = 0
 	let withVid = 0
 	let failed = 0
+	let total = Number(old.total) || 0
 	const fresh = []
 
 	for (const j of jobs) {
@@ -143,9 +139,12 @@ async function runVideos() {
 				`/launches/previous/?mode=detailed&limit=${j.limit}&offset=${j.offset}&format=json`,
 				{ retries: 0 }
 			)
+			if (d.count) total = d.count
 			for (const r of d.results || []) {
 				if (!r || !r.id) continue
 				const vids = slimVids(r.vid_urls)
+				got++
+				if (!vids.length) continue
 				const row = {
 					id: str(r.id),
 					name: str(r.name),
@@ -155,8 +154,7 @@ async function runVideos() {
 				}
 				byId.set(row.id, row)
 				fresh.push(row)
-				got++
-				if (vids.length) withVid++
+				withVid++
 			}
 			// detailed 很吃后端，两个请求之间喘一口气
 			await new Promise((res) => setTimeout(res, 1200))
@@ -172,7 +170,7 @@ async function runVideos() {
 	const need = fresh.filter((r) => (r.vids || []).some((v) => v.cover))
 	if (need.length) await mirrorImages(need, [{ path: 'vids.*.cover', preset: 'thumb' }])
 
-	const next = cursor + PER_RUN
+	const next = total ? (cursor + PER_RUN >= total ? 0 : cursor + PER_RUN) : cursor + PER_RUN
 	const list = [...byId.values()]
 		.sort((a, b) => new Date(b.net || b.at || 0) - new Date(a.net || a.at || 0))
 		.slice(0, KEEP)
@@ -183,8 +181,9 @@ async function runVideos() {
 		generatedAt: new Date().toISOString(),
 		count: list.length,
 		served: list.length,
-		// 游标：已扫到快照的第几条。扫完一圈归零，从头再刷新一遍
-		cursor: next >= total ? 0 : next,
+		// 游标：全量 offset。扫到尽头归零，从头再刷新一遍
+		cursor: next,
+		total,
 		list
 	}
 
@@ -192,13 +191,15 @@ async function runVideos() {
 	fs.writeFileSync(filePath, JSON.stringify(payload), 'utf8')
 	const kb = (fs.statSync(filePath).size / 1024).toFixed(1)
 	console.log(
-		`  → ${FILE}  ${list.length} 条 / ${kb} KB（本轮 ${got} 条、其中有视频 ${withVid}、失败 ${failed}）`
+		`  → ${FILE}  ${list.length} 条 / ${kb} KB（本轮扫 ${got}、新增有视频 ${withVid}、失败 ${failed}、total=${total}）`
 	)
 
-	// 第二层保险（P1-1）：产出比存量缩水太多时宁可这轮不更新
-	if (before > 20 && list.length < Math.floor(before * 0.3)) {
-		console.error(`  ! 产出 ${list.length} 条远小于存量 ${before} 条，疑似数据丢失，拒传（线上旧数据保留）`)
-		return { got, withVid, failed, total: before, rejected: true }
+	// 第二层保险（P1-1）：**有视频条目**比存量缩水太多时宁可这轮不更新。
+	// 比较对象必须是「有视频条数」而不是总条数——本版起无视频的行不再入库，
+	// 总数天然下降，按总数比会误触发拒传
+	if (vidsBefore > 20 && list.length < Math.floor(vidsBefore * 0.3)) {
+		console.error(`  ! 产出 ${list.length} 条远小于存量 ${vidsBefore} 条，疑似数据丢失，拒传（线上旧数据保留）`)
+		return { got, withVid, failed, total: vidsBefore, rejected: true }
 	}
 
 	await upload(filePath, KEY, 'public, max-age=1800')

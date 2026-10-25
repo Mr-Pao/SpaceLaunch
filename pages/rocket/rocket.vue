@@ -14,20 +14,38 @@
 		</view>
 
 		<block v-else>
-			<!-- 头图顶到屏幕最上方，型号信息压在渐变遮罩上 -->
+			<!-- 头图顶到屏幕最上方，型号信息压在渐变遮罩上。
+			     轮播源 = 该系列的构型图 + 最近几次发射的现场图 -->
 			<view class="hero">
-				<image
-					v-if="heroImage"
-					class="hero-img"
-					:src="heroImage"
-					mode="aspectFill"
-					@click="preview(heroImage)"
-				></image>
+				<swiper
+					v-if="heroSlides.length"
+					class="hero-swiper"
+					circular
+					autoplay
+					:interval="5200"
+					:duration="600"
+					@change="onSlide"
+				>
+					<swiper-item v-for="(s, i) in heroSlides" :key="i">
+						<image class="hero-img" :src="s.thumb" mode="aspectFill" @click="previewHero(i)"></image>
+					</swiper-item>
+				</swiper>
 				<view v-else class="hero-img hero-placeholder">
 					<text class="hero-placeholder-icon">🚀</text>
 				</view>
 
 				<view class="hero-mask"></view>
+
+				<!-- 轮播指示点：右上角，与制造方面包屑同高对称；
+				     必须放在渐变遮罩之后渲染，否则会被压暗到看不见 -->
+				<view class="hero-dots" v-if="heroSlides.length > 1" :style="{ top: statusBarH + 56 + 'px' }">
+					<view
+						class="hero-dot"
+						v-for="(s, i) in heroSlides"
+						:key="'d' + i"
+						:class="{ on: i === slide }"
+					></view>
+				</view>
 
 				<!-- 制造方面包屑：压在图片左上角，点了去机构详情 -->
 				<view
@@ -292,7 +310,9 @@ export default {
 			// 发射列表默认折叠到 FOLD 条，点「展开全部」再看完整列表
 			FOLD,
 			upcomingOpen: false,
-			historyOpen: false
+			historyOpen: false,
+			// hero 轮播当前页
+			slide: 0
 		}
 	},
 
@@ -302,6 +322,19 @@ export default {
 			if (!c) return ''
 			// 目前只有现役型号镜像了图片，退役型号走占位
 			return c.image || ''
+		},
+
+		/** 轮播源：collectMedia 已把构型图排最前、发射实拍按时间倒序，取前 5 张 */
+		heroSlides() {
+			return this.media.images
+				.slice(0, 5)
+				.map((x) => ({ thumb: x.thumb || x.url, full: x.full || x.url }))
+		},
+
+		/** 媒体聚合只算一次，mediaStats / heroSlides 共用 */
+		media() {
+			const configs = this.siblings.length ? this.siblings : this.config ? [this.config] : []
+			return collectMedia(configs, this.records)
 		},
 
 		maker() {
@@ -500,8 +533,7 @@ export default {
 		 * 入口写 39 张、点进去只有 20 张是最容易让人怀疑数据出错的细节。
 		 */
 		mediaStats() {
-			const configs = this.siblings.length ? this.siblings : this.config ? [this.config] : []
-			const m = collectMedia(configs, this.records)
+			const m = this.media
 			return {
 				images: m.images.length,
 				videos: m.videos.length,
@@ -633,6 +665,18 @@ export default {
 			uni.previewImage({ urls: [url], current: url })
 		},
 
+		onSlide(e) {
+			this.slide = (e && e.detail && e.detail.current) || 0
+		},
+
+		/** 轮播图全屏预览：优先原图（COS _2000），没补到的回退缩略图 */
+		previewHero(i) {
+			const s = this.heroSlides[i]
+			if (!s) return
+			const urls = this.heroSlides.map((x) => x.full)
+			uni.previewImage({ urls, current: s.full })
+		},
+
 		goDetail(item) {
 			if (!item || !item.id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + item.id })
@@ -726,6 +770,34 @@ function byNetDesc(a, b) {
 	position: relative;
 	width: 100%;
 	height: 560rpx;
+}
+
+/* 轮播撑满 hero；swiper 默认高度 150px，必须显式给满 */
+.hero-swiper {
+	width: 100%;
+	height: 560rpx;
+}
+
+/* 指示点：细长条，当前项拉长变亮。top 由模板按状态栏动态给 */
+.hero-dots {
+	position: absolute;
+	right: 32rpx;
+	display: flex;
+	align-items: center;
+	gap: 10rpx;
+}
+
+.hero-dot {
+	width: 10rpx;
+	height: 10rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.38);
+	transition: all 0.3s ease;
+}
+
+.hero-dot.on {
+	width: 26rpx;
+	background: rgba(255, 255, 255, 0.95);
 }
 
 .hero-img {

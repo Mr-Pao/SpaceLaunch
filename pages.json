@@ -36,6 +36,13 @@
 			}
 		},
 		{
+			"path": "pages/gallery/gallery",
+			"style": {
+				"navigationBarTitleText": "图库",
+				"backgroundTextStyle": "light"
+			}
+		},
+		{
 			"path": "pages/launch/launchInfo",
 			"style": {
 				"navigationBarTitleText": "发射任务详情"
@@ -96,6 +103,12 @@
 				"pagePath": "pages/rockets/rockets",
 				"iconPath": "static/image/tabbar/rocket1.png",
 				"selectedIconPath": "static/image/tabbar/rocket2.png"
+			},
+			{
+				"text": "图库",
+				"pagePath": "pages/gallery/gallery",
+				"iconPath": "static/image/tabbar/tuku1.png",
+				"selectedIconPath": "static/image/tabbar/tuku2.png"
 			},
 			{
 				"text": "活动",

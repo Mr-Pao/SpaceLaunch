@@ -60,7 +60,10 @@ const FILES = {
 	timelines: 'timelines.json',
 	// 发射视频（官方直播 / 回放 / 第三方转播）。只有 mode=detailed 才返回
 	// vid_urls，CI 每小时抓 10 条发射，按 id 索引；媒体页拿它补记录上的 vid
-	videos: 'videos.json'
+	videos: 'videos.json',
+	// 图库聚合页：CI 侧从发射列表顺路压好的「有图的发射」清单（缩略图 +
+	// 署名 + 时间），按 net 倒序。聚合页一个请求出瀑布流，不用拼多个数据集
+	gallery: 'gallery.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"
@@ -79,7 +82,9 @@ const SOFT_TTL = {
 	// 时间线每 3 小时才补几条，TTL 给宽一点，别为了几条新记录反复拉
 	timelines: 3 * 60 * 60 * 1000,
 	// 视频每小时补 10 条，历史发射的 webcast 基本不会变，同样给宽
-	videos: 6 * 60 * 60 * 1000
+	videos: 6 * 60 * 60 * 1000,
+	// 图库每 2 小时补 100 条发射，给宽一点别反复拉
+	gallery: 6 * 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。
@@ -97,7 +102,8 @@ const HARD_TTL = {
 	pads: 3 * 24 * 60 * 60 * 1000,
 	// 评审 P2-5 补：这两个新增数据集单份 200KB+，不设硬 TTL 会永久驻留
 	timelines: 2 * 24 * 60 * 60 * 1000,
-	videos: 2 * 24 * 60 * 60 * 1000
+	videos: 2 * 24 * 60 * 60 * 1000,
+	gallery: 3 * 24 * 60 * 60 * 1000
 }
 
 function hardTtl(name) {
@@ -154,7 +160,7 @@ function readStorage(name) {
 
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
-const EVICT_ORDER = ['pads', 'launchers', 'agencies', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous']
+const EVICT_ORDER = ['pads', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous']
 
 function writeStorage(name, data) {
 	try {
