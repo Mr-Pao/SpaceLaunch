@@ -159,6 +159,14 @@ async function runImages() {
 	const kb = (fs.statSync(filePath).size / 1024).toFixed(1)
 	console.log(`  → gallery.json  ${list.length} 张 / ${kb} KB`)
 
+	// 游标状态也要落盘。CI 是干净环境，dist 里不会有历史文件，
+	// 忘了写这行、只在上传时引用，就会 ENOENT 崩掉（v3.1.9 首跑实测）
+	fs.writeFileSync(
+		path.join(OUT_DIR, 'state-images.json'),
+		JSON.stringify({ v: 1, cursor: payload.cursor, total, at: payload.generatedAt }),
+		'utf8'
+	)
+
 	// 产出缩水保险（与 videos.js 同思路）：存量 >20 时骤减按事故处理，拒传
 	if (before > 20 && list.length < Math.floor(before * 0.3)) {
 		console.error(`  ! gallery 产出 ${list.length} 远小于存量 ${before}，疑似丢失，拒传`)
