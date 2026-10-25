@@ -95,6 +95,19 @@
 						<text class="card-note" v-if="variants.length > 1">{{ variants.length }} 个构型</text>
 					</view>
 
+					<!-- 发射机构：从该系列全部发射记录聚合，单机构可点进机构页。
+					     3.1.3 系列视角重构时把旧版的这一行弄丢了，用户找不到 -->
+					<view
+						class="agency-row"
+						v-if="agencyNames"
+						hover-class="agency-row-hover"
+						@click="goAgency(agencyNames.split('、')[0])"
+					>
+						<text class="agency-label">发射机构</text>
+						<text class="agency-name">{{ agencyNames }}</text>
+						<view class="agency-arrow"></view>
+					</view>
+
 					<view class="stat-grid">
 						<view class="stat-cell" v-for="s in stats" :key="s.label">
 							<view class="stat-label-row">
@@ -353,6 +366,18 @@ export default {
 			]
 			// 全 0 的格子没意义（早期型号常常只有一两个数字）
 			return out.filter((s) => s.value !== '0' && s.value !== '—')
+		},
+
+		/** 发射机构：该系列全部发射记录里出现过的机构，去重拼接。
+		 *  注意 slimLaunch 里没有顶层 agency（那是统计裁剪 slimStatLaunch 的
+		 *  字段），launches 快照带的是 launch_service_provider 对象 */
+		agencyNames() {
+			const set = new Set()
+			for (const x of this.records) {
+				const n = x && x.launch_service_provider && x.launch_service_provider.name
+				if (n) set.add(n)
+			}
+			return [...set].join('、')
 		},
 
 		/** 构型卡片：名称、首飞、六格参数、底行战绩 */
@@ -895,6 +920,45 @@ function byNetDesc(a, b) {
 .card-note {
 	color: #6b7891;
 	font-size: 22rpx;
+}
+
+/* ---- 发射机构行 ---- */
+.agency-row {
+	display: flex;
+	align-items: center;
+	margin-bottom: 18rpx;
+	padding: 14rpx 18rpx;
+	border-radius: 12rpx;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.agency-row-hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.agency-label {
+	flex-shrink: 0;
+	color: #6b7891;
+	font-size: 23rpx;
+}
+
+.agency-name {
+	flex: 1;
+	margin: 0 10rpx;
+	color: #cbd5e0;
+	font-size: 25rpx;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.agency-arrow {
+	flex-shrink: 0;
+	width: 12rpx;
+	height: 12rpx;
+	border-top: 2rpx solid #6b7891;
+	border-right: 2rpx solid #6b7891;
+	transform: rotate(45deg);
 }
 
 /* ---- 简介 ---- */
