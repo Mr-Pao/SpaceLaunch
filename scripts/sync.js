@@ -55,7 +55,7 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v11: launch 增加 rocketBrief（火箭技术参数内联）、pad.map_image、机构累计发射数
 // v12: gallery 改为全量分片（索引带 chunks / chunkSize / launchTotal），
 //      images 轮从 2 小时 100 条提到每小时 150 条，两天扫全历史发射
-const DATA_VERSION = 12
+const DATA_VERSION = 13
 
 /** 读 COS 上已生成的 JSON。桶是公有读，直接走 CDN 地址 */
 async function readCosJson(key) {

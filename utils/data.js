@@ -42,7 +42,8 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 // v9: gallery 改为全量分片（索引带 chunks / chunkSize / launchTotal），
 //     并新增按需拉分片的 galleryChunk()。不升版本的话，
 //     老用户手里的单文件缓存 6 小时内不会刷新，全量页只翻得动第 0 片
-const DATA_VERSION = 12
+// v13: 宇航员 slim 新增 missions/evas/生卒/外链（3.1.15），旧缓存 key 失效强制重拉
+const DATA_VERSION = 13
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {

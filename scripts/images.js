@@ -63,7 +63,7 @@ const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v))
 
 // 必须与 utils/data.js 和 scripts/sync.js 的 DATA_VERSION 一致。
 // gallery 单独产出，不走 sync.js 的写文件路径，容易漏改 —— verify-pure 有对拍
-const DATA_VERSION = 12
+const DATA_VERSION = 13
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex').slice(0, 12)
 
