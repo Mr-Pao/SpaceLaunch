@@ -1,7 +1,7 @@
 <template>
 	<view class="pv" v-if="visible">
 		<!-- 图片区：横滑切换。
-		     不用 swiper 是因为纵向的上拉手势会被原生组件吞掉，
+		     不用 swiper 是因为纵向的手势会被原生组件吞掉，
 		     自绘 transform 才能同时拿到横纵两组位移。 -->
 		<view
 			class="pv-stage"
@@ -30,9 +30,7 @@
 			</view>
 		</view>
 
-		<!-- 信息条：任务名 + 拍摄方 + 「上拉看详情」。
-		     原来这里是两个按钮（查看这次发射 / 看这枚火箭），
-		     现在上拉就能看到整条任务详情，按钮就不必再占一块 -->
+		<!-- 信息条：任务名 + 拍摄方 + 「上拉看详情」 -->
 		<view class="pv-bar">
 			<view class="pv-bar-main">
 				<text class="pv-title">{{ title }}</text>
@@ -49,39 +47,38 @@
 			<text class="pv-count-text">{{ cur + 1 }} / {{ list.length }}</text>
 		</view>
 
-		<!-- 详情面板：上拉或点「上拉看详情」升起，点顶部横条收起 -->
-		<view class="pv-sheet" :class="{ open: sheetOpen }" @touchmove.stop>
-			<view class="pv-sheet-handle" @click="closeSheet">
+		<!-- 详情抽屉：整屏升起，里面就是 pages/launch/launchInfo 用的那个组件本身，
+		     不是另画一版摘要。手指往上推它就跟手上移，松手过阈值再补完剩下的行程 -->
+		<view class="pv-sheet" :style="sheetStyle">
+			<view
+				class="pv-sheet-top"
+				:style="{ paddingTop: statusBarH + 'px' }"
+				@touchstart.stop="onSheetStart"
+				@touchmove.stop.prevent="onSheetMove"
+				@touchend.stop="onSheetEnd"
+				@touchcancel.stop="onSheetEnd"
+			>
+				<view class="pv-sheet-back" @click="closeSheet">‹</view>
 				<view class="pv-handle-bar"></view>
+				<text class="pv-sheet-cap">发射任务</text>
 			</view>
 
+			<!-- scroll-view 必须拿到确定高度才滚得动：flex:1 + height:0 是万能写法 -->
 			<scroll-view class="pv-sheet-body" scroll-y>
-				<view class="dt-head">
-					<text class="dt-title">{{ dtTitle }}</text>
-					<text class="dt-sub" v-if="dtSub">{{ dtSub }}</text>
-				</view>
-
-				<view class="dt-rows">
-					<view class="dt-row" v-for="r in dtRows" :key="r.k">
-						<text class="dt-k">{{ r.k }}</text>
-						<text class="dt-v">{{ r.v }}</text>
-					</view>
-				</view>
-
-				<text class="dt-desc" v-if="dtDesc">{{ dtDesc }}</text>
-
-				<text class="dt-hint" v-if="sheetOpen && !detail && !dtFail">正在读取任务详情...</text>
-				<text class="dt-hint" v-if="dtFail">这条发射太早，完整档案还没归档到这里</text>
-
-				<view class="dt-more" v-if="curItem" hover-class="dt-more-hover" @click="goLaunch">
-					<text class="dt-more-text">打开完整详情页</text>
-					<text class="dt-more-arrow">›</text>
-				</view>
+				<launch-detail v-if="sheetOn" :id="sheetId" :net="sheetNet" :sheet="true" />
 			</scroll-view>
 		</view>
 
-		<!-- 关闭键放右上，与微信胶囊同一水平带，拇指够得到 -->
-		<view class="pv-close" :style="{ top: closeTop }" hover-class="pv-close-hover" @click="close">✕</view>
+		<!-- 关闭键放右上，与微信胶囊同一水平带，拇指够得到。
+		     抽屉展开后它会盖在详情页首图上，所以抽屉一开就隐起来，
+		     那一步的「退」交给抽屉顶部的 ‹ 和下拉手势 -->
+		<view
+			class="pv-close"
+			v-if="!sheetOpen"
+			:style="{ top: closeTop }"
+			hover-class="pv-close-hover"
+			@click="close"
+		>✕</view>
 	</view>
 </template>
 
@@ -92,11 +89,12 @@
  * 为什么不用 uni.previewImage：系统看图只能左右滑，图上什么信息都没有 ——
  * 看完一张火箭特写，用户最想知道「这是哪次发射、什么火箭」，系统看图给不了。
  *
- * 交互最终定成两条手势：
+ * 两条手势：
  *   · 左右滑 —— 在同一个列表里翻图，不必退出再点
- *   · 上拉   —— 升起任务详情面板
- * 原来那两个「查看这次发射 / 看这枚火箭」按钮去掉了：上拉出来的详情里
- * 已经有任务名、火箭、发射场、机构、轨道、载荷，跳完整页留了一行文字链。
+ *   · 上拉   —— 把整条发射详情从底下升起来
+ *
+ * 上拉拉起的是 components/launch-detail 本身，和点列表进 pages/launch/launchInfo
+ * 看到的是同一份内容，不是另画一版摘要 —— 所以滑到顶继续翻，就是那个页面。
  *
  * 为什么不直接上 swiper：swiper 是原生组件，纵向的 touch 事件拿不到，
  * 上拉手势会和横滑抢。自己用 touch + transform 才能区分横纵方向。
@@ -112,13 +110,13 @@
 import { formatDateTime, rocketName } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
 import { setTabBarHidden } from '@/utils/tabbar.js'
-import spaceData from '@/utils/data.js'
-import { findById as findArchiveById } from '@/utils/history.js'
 
 // 判定「是横滑还是上拉」的最小位移，太小会把点击误判成滑动
 const DIR_LOCK = 8
-// 上拉多少算触发详情面板
-const UP_THRESHOLD = 56
+// 手指推满多少屏高算「抽屉完全拉开」：留一点阻尼感，不用真拉一整屏
+const SHEET_TRAVEL = 0.55
+// 松手时超过这个进度就补完剩下的行程
+const SHEET_COMMIT = 0.3
 
 export default {
 	name: 'photo-view',
@@ -129,7 +127,7 @@ export default {
 		list: { type: Array, default: () => [] },
 		// 从哪一张开始
 		index: { type: Number, default: 0 },
-		// 状态栏高度（px），用来给关闭键定位
+		// 状态栏高度（px），用来给关闭键与抽屉顶条定位
 		statusBarH: { type: Number, default: 20 }
 	},
 
@@ -139,6 +137,7 @@ export default {
 		return {
 			cur: 0,
 			winW: 375,
+			winH: 667,
 			// 横向跟手位移
 			dx: 0,
 			dragging: false,
@@ -153,9 +152,15 @@ export default {
 			moveEndAt: 0,
 			// 原图 404 的下标集合：退回缩略图，至少还能看到图
 			broken: {},
-			sheetOpen: false,
-			detail: null,
-			dtFail: false
+			// 抽屉行程 0（收起）→ 1（全开）。跟手时直接写它
+			sheetP: 0,
+			// 跟手期间关掉过渡，否则每一帧都会被 CSS 追一次，手感和果冻一样
+			sheetFollow: false,
+			// 抽屉里的详情组件只在真正拉开过之后才挂载：
+			// 否则每滑一张图都会触发一次详情加载
+			sheetOn: false,
+			// 抽屉顶条上的下拉手势
+			sStartY: 0
 		}
 	},
 
@@ -193,61 +198,26 @@ export default {
 			return Math.max(12, this.statusBarH + 8) + 'px'
 		},
 
-		// ---- 详情面板 ----
-		dtTitle() {
-			const d = this.detail
-			const m = (d && d.mission) || {}
-			return m.nameZh || m.name || this.title
+		sheetId() {
+			return this.curItem && this.curItem.id != null ? String(this.curItem.id) : ''
 		},
 
-		dtSub() {
-			const d = this.detail
-			if (!d) return ''
-			const st = (d.status && (d.status.nameZh || d.status.name)) || ''
-			const when = formatDateTime(d.net)
-			return [when, st].filter(Boolean).join(' · ')
+		sheetNet() {
+			return (this.curItem && this.curItem.net) || ''
 		},
 
-		dtDesc() {
-			const d = this.detail
-			const m = (d && d.mission) || {}
-			return m.descriptionZh || m.description || ''
+		// 抽屉开没开：只要露出一截就算开，✕ 就该让位
+		sheetOpen() {
+			return this.sheetP > 0.02
 		},
 
-		dtRows() {
-			const d = this.detail
-			const it = this.curItem || {}
-			const rows = []
-
-			// 还没读到完整档案时，先用图库记录里现成的字段顶上，面板不留空
-			const net = (d && d.net) || it.net
-			if (net) rows.push({ k: '发射时间', v: formatDateTime(net) })
-
-			const rk =
-				(d && d.rocket && d.rocket.configuration && d.rocket.configuration.name) ||
-				it.cname
-			if (rk) rows.push({ k: '运载火箭', v: rocketName({ name: rk }) })
-
-			if (d) {
-				const loc = d.pad && d.pad.location && d.pad.location.name
-				const pad = d.pad && d.pad.name
-				const site = [loc, pad].filter(Boolean).join(' · ')
-				if (site) rows.push({ k: '发射场', v: site })
-
-				const lsp = d.launch_service_provider && d.launch_service_provider.name
-				if (lsp) rows.push({ k: '发射机构', v: lsp })
-
-				const orbit = d.mission && d.mission.orbit && d.mission.orbit.name
-				if (orbit) rows.push({ k: '目标轨道', v: orbit })
-
-				const pay = (d.mission && (d.mission.nameZh || d.mission.name)) || ''
-				if (pay) rows.push({ k: '载荷', v: pay })
-			}
-
-			const credit = (d && d.imageCredit) || it.credit
-			if (credit) rows.push({ k: '图片来源', v: credit })
-
-			return rows
+		sheetStyle() {
+			const p = Math.max(0, Math.min(1, this.sheetP || 0))
+			const y = (1 - p) * 100
+			const tr = this.sheetFollow
+				? 'none'
+				: 'transform .3s cubic-bezier(.2,.8,.3,1)'
+			return `transform:translateY(${y}%);transition:${tr}`
 		}
 	},
 
@@ -256,12 +226,13 @@ export default {
 			if (v) {
 				this.cur = Math.max(0, Math.min(this.index, this.list.length - 1))
 				this.dx = 0
+				this.dy = 0
 				this.dragging = false
 				this.dir = ''
 				this.broken = {}
-				this.sheetOpen = false
-				this.detail = null
-				this.dtFail = false
+				this.sheetP = 0
+				this.sheetFollow = false
+				this.sheetOn = false
 			}
 			// 弹层盖不住自定义 tabBar，只能主动藏
 			setTabBarHidden(v)
@@ -278,8 +249,9 @@ export default {
 		try {
 			const info = uni.getSystemInfoSync()
 			this.winW = info.windowWidth || 375
+			this.winH = info.windowHeight || 667
 		} catch (e) {
-			// 取不到就用 375，绝大多数机型在这个值附近
+			// 取不到就用 375×667，绝大多数机型在这个值附近
 		}
 	},
 
@@ -312,7 +284,7 @@ export default {
 			return `width:${this.winW}px;left:0;transform:translateX(${x}px);transition:${tr}`
 		},
 
-		// ---- 手势 ----
+		// ---- 图片区手势 ----
 		onTouchStart(e) {
 			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
 			if (!t) return
@@ -340,14 +312,18 @@ export default {
 				else return
 			}
 
+			this.moved = true
+
 			if (this.dir === 'v') {
-				// 纵向只记位移，松手时才判要不要升面板
 				this.dy = my
-				this.moved = true
+				// 抽屉已经全开时再往上推没意义，也不再跟手
+				if (!this.sheetOn) {
+					const travel = this.winH * SHEET_TRAVEL
+					this.sheetFollow = true
+					this.sheetP = Math.max(0, Math.min(1, -my / travel))
+				}
 				return
 			}
-
-			this.moved = true
 
 			// 首尾越界给阻尼：手指还在动，但图几乎不动，一眼就知道到头了
 			let x = mx
@@ -359,7 +335,6 @@ export default {
 
 		onTouchEnd() {
 			const dx = this.dx
-			const dy = this.dy
 			const dir = this.dir
 			const moved = this.moved
 
@@ -368,8 +343,10 @@ export default {
 			if (moved) this.moveEndAt = Date.now()
 
 			if (dir === 'v') {
-				// 上拉开详情：只看纵向位移够不够，横滑的 dx 不参与
-				if (moved && dy <= -UP_THRESHOLD && !this.sheetOpen) this.openSheet()
+				this.sheetFollow = false
+				// 推到 30% 就补完剩下的行程，回弹也是同一套过渡
+				if (!this.sheetOn && this.sheetP > SHEET_COMMIT) this.openSheet()
+				else if (!this.sheetOn) this.sheetP = 0
 				this.dx = 0
 				this.dy = 0
 				return
@@ -391,9 +368,6 @@ export default {
 				// 新图位移从 (target-cur)*W + dx 变成 0，正好接住手指松开的位置
 				this.cur = target
 				this.dx = 0
-				this.detail = null
-				this.dtFail = false
-				if (this.sheetOpen) this.loadDetail()
 			} else {
 				this.dx = 0
 			}
@@ -402,7 +376,7 @@ export default {
 		onStageTap() {
 			// 拖动结束后系统可能补一个 click，滑完一张就把弹层关了 —— 挡掉
 			if (this.moveEndAt && Date.now() - this.moveEndAt < 400) return
-			// 面板开着时点图区先收面板，符合「先退一层」的直觉
+			// 抽屉露出一截时点图区先收抽屉，符合「先退一层」的直觉
 			if (this.sheetOpen) {
 				this.closeSheet()
 				return
@@ -410,64 +384,45 @@ export default {
 			this.close()
 		},
 
-		// ---- 详情面板 ----
+		// ---- 详情抽屉 ----
 		openSheet() {
 			if (!this.curItem) return
-			this.sheetOpen = true
-			if (!this.detail && !this.dtFail) this.loadDetail()
+			this.sheetOn = true
+			this.sheetFollow = false
+			this.sheetP = 1
 		},
 
 		closeSheet() {
-			this.sheetOpen = false
+			this.sheetFollow = false
+			this.sheetP = 0
+			// 等收起动画走完再卸载，否则内容会先消失、抽屉空着往上缩
+			const at = this.sheetP
+			setTimeout(() => {
+				if (this.sheetP === at) this.sheetOn = false
+			}, 320)
 		},
 
-		/**
-		 * 补齐任务详情
-		 *
-		 * 图库记录里只有任务名 / 时间 / 型号名 / 署名，场地、机构、轨道、
-		 * 载荷这些都在完整档案里。先查快照（最近 100 条，命中率最高），
-		 * 再按 net 直接定位历史归档分片 —— 不传 net 会从最新一片逐片翻，
-		 * 老任务可能白下十几片。
-		 */
-		async loadDetail() {
-			const it = this.curItem
-			if (!it || it.id == null) {
-				this.dtFail = true
-				return
-			}
-
-			const id = String(it.id)
-			let d = null
-
-			try {
-				d = await spaceData.findLaunchById(id)
-			} catch (e) {
-				d = null
-			}
-
-			if (!d) {
-				try {
-					d = await findArchiveById(id, it.net)
-				} catch (e) {
-					d = null
-				}
-			}
-
-			// 等待期间可能已经滑到别的图了，别把上一张的档案贴过来
-			if (!this.curItem || String(this.curItem.id) !== id) return
-
-			this.detail = d || null
-			this.dtFail = !d
+		// 抽屉顶条：下拉收起。滚动交给下面的 scroll-view，
+		// 手势只挂在这根条上，才不会和列表滚动抢
+		onSheetStart(e) {
+			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+			if (!t) return
+			this.sStartY = t.clientY
+			this.sheetFollow = true
 		},
 
-		goLaunch() {
-			const it = this.curItem
-			if (!it || !it.id) return
-			const net = it.net || ''
-			// net 只作提示：详情页拿它跳过逐片翻找，直接定位到归档分片
-			const q = net ? '&net=' + encodeURIComponent(net) : ''
-			this.close()
-			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + it.id + q })
+		onSheetMove(e) {
+			const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+			if (!t) return
+			const dy = t.clientY - this.sStartY
+			const travel = this.winH * 0.4
+			this.sheetP = Math.max(0, Math.min(1, 1 - dy / travel))
+		},
+
+		onSheetEnd() {
+			this.sheetFollow = false
+			if (this.sheetP < 0.65) this.closeSheet()
+			else this.sheetP = 1
 		}
 	}
 }
@@ -620,33 +575,37 @@ export default {
 	line-height: 1.3;
 }
 
-/* ---- 详情面板 ---- */
+/* ---- 详情抽屉 ---- */
 .pv-sheet {
 	position: absolute;
 	left: 0;
 	right: 0;
+	top: 0;
 	bottom: 0;
-	height: 74vh;
+	z-index: 5;
 	display: flex;
 	flex-direction: column;
-	border-radius: 28rpx 28rpx 0 0;
-	background: #0e1420;
-	border-top: 1rpx solid #1d2a3c;
-	transform: translateY(102%);
-	transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.3, 1);
-	z-index: 5;
+	/* 和详情页同一个底色，抽屉升到底时看不出接缝 */
+	background: #0a0e17;
+	/* 位移与过渡都走 inline style（sheetStyle），跟手时要临时关掉过渡 */
+	transform: translateY(100%);
+	will-change: transform;
 }
 
-.pv-sheet.open {
-	transform: translateY(0);
-}
-
-.pv-sheet-handle {
+/* 顶条：‹ 收起 + 拖动条 + 「发射任务」。
+   手势只挂这一条，下面 scroll-view 该滚就滚，互不打扰 */
+.pv-sheet-top {
+	position: relative;
 	display: flex;
-	justify-content: center;
+	flex-direction: column;
 	align-items: center;
-	height: 52rpx;
+	justify-content: flex-end;
 	flex-shrink: 0;
+	height: 88rpx;
+	padding-bottom: 10rpx;
+	box-sizing: content-box;
+	background: #0e1420;
+	border-bottom: 1rpx solid #16203020;
 }
 
 .pv-handle-bar {
@@ -656,102 +615,33 @@ export default {
 	background: #2b3a4f;
 }
 
-.pv-sheet-body {
-	flex: 1;
-	min-height: 0;
-	padding: 0 36rpx;
-	box-sizing: border-box;
-	/* 底部兜底值见 .pv-bar 的说明 */
-	padding-bottom: 40rpx;
-	padding-bottom: calc(40rpx + constant(safe-area-inset-bottom));
-	padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
-}
-
-.dt-head {
-	padding-bottom: 22rpx;
-	border-bottom: 1rpx solid #182233;
-}
-
-.dt-title {
-	display: block;
-	color: #ffffff;
-	font-size: 32rpx;
-	font-weight: 600;
-	line-height: 1.4;
-}
-
-.dt-sub {
-	display: block;
+.pv-sheet-cap {
 	margin-top: 8rpx;
-	color: #6b7891;
-	font-size: 22rpx;
-}
-
-.dt-rows {
-	padding: 18rpx 0 6rpx;
-}
-
-.dt-row {
-	display: flex;
-	align-items: flex-start;
-	padding: 10rpx 0;
-}
-
-.dt-k {
-	flex-shrink: 0;
-	width: 140rpx;
 	color: #55637a;
-	font-size: 23rpx;
-	line-height: 1.5;
+	font-size: 20rpx;
+	line-height: 1.2;
 }
 
-.dt-v {
-	flex: 1;
-	color: #c9d4e6;
-	font-size: 24rpx;
-	line-height: 1.5;
-}
-
-.dt-desc {
-	display: block;
-	margin-top: 12rpx;
-	padding-top: 20rpx;
-	border-top: 1rpx solid #182233;
-	color: #8b95a8;
-	font-size: 23rpx;
-	line-height: 1.7;
-}
-
-.dt-hint {
-	display: block;
-	margin-top: 16rpx;
-	color: #4d5a6e;
-	font-size: 21rpx;
-	line-height: 1.6;
-}
-
-.dt-more {
+.pv-sheet-back {
+	position: absolute;
+	left: 16rpx;
+	bottom: 14rpx;
+	width: 56rpx;
+	height: 56rpx;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	margin-top: 28rpx;
-	padding: 18rpx 0;
-}
-
-.dt-more-hover {
-	opacity: 0.6;
-}
-
-.dt-more-text {
-	color: #38bdf8;
-	font-size: 24rpx;
-}
-
-.dt-more-arrow {
-	margin-left: 6rpx;
-	color: #38bdf8;
-	font-size: 26rpx;
+	color: #c9d4e6;
+	font-size: 40rpx;
 	line-height: 1;
+}
+
+/* scroll-view 要拿到确定高度才滚得动：flex:1 + height:0 是万能写法 */
+.pv-sheet-body {
+	flex: 1;
+	height: 0;
+	min-height: 0;
+	background: #0a0e17;
 }
 
 /* ---- 关闭键 ---- */
