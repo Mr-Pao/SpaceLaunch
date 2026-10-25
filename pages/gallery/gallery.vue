@@ -66,11 +66,11 @@
 			<text class="empty-sub">历史图片正在由后台逐批补齐，过几个小时再来看看</text>
 		</view>
 
-		<!-- 大图弹层：点任意一张打开，图下带任务名与两个出口 -->
+		<!-- 大图弹层：点任意一张打开，同一行内可左右滑动切换 -->
 		<photo-view
 			:visible="photoVisible"
-			:item="photoItem"
-			:rocket-id="photoRocketId"
+			:list="photoList"
+			:index="photoIndex"
 			@close="photoVisible = false"
 		/>
 	</view>
@@ -93,7 +93,6 @@
  * 看着像「三个相框」而不是「墙」。4 行、行高交替，才真的密不透风。
  */
 import spaceData from '@/utils/data.js'
-import { rocketIdOf } from '@/utils/rocket-lookup.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 
 // 每行取多少张（复制后翻倍就是这个数 ×2 的节点数）
@@ -111,10 +110,10 @@ export default {
 			total: 0,
 			// 四行各自的原始图（渲染时再拼一份副本）
 			raw: [[], [], [], []],
-			// 大图弹层
+			// 大图弹层：list + 起始下标，弹层内部自己管左右滑
 			photoVisible: false,
-			photoItem: null,
-			photoRocketId: ''
+			photoList: [],
+			photoIndex: 0
 		}
 	},
 
@@ -168,23 +167,16 @@ export default {
 		 * 点开看大图。
 		 * 传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
 		 *
-		 * 型号 id 在打开之后异步反查：反查要加载型号库（532 条），
-		 * 不该让用户对着黑屏等它 —— 图先出来，按钮晚半秒出现无感。
+		 * 把整行交给弹层，而不是单张：同一行里左右滑就能继续看，
+		 * 不用退出来再点下一张。
 		 */
-		async preview(row, i) {
+		preview(row, i) {
 			const list = this.raw[row]
 			if (!list.length) return
 
-			const item = list[i % list.length]
-			if (!item) return
-
-			this.photoItem = item
-			this.photoRocketId = ''
+			this.photoList = list
+			this.photoIndex = i % list.length
 			this.photoVisible = true
-
-			const rid = await rocketIdOf(item.cname)
-			// 等待期间可能已经关掉或换了另一张，别把 id 塞给错的那张
-			if (this.photoItem === item && this.photoVisible) this.photoRocketId = rid
 		}
 	}
 }

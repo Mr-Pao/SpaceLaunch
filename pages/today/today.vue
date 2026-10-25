@@ -144,8 +144,8 @@
 		<!-- 大图弹层：点每日一图打开。放在 block 外，审核态没有数据也就不会触发 -->
 		<photo-view
 			:visible="photoVisible"
-			:item="photoItem"
-			:rocket-id="photoRocketId"
+			:list="photoList"
+			:index="0"
 			:status-bar-h="statusBarH"
 			@close="photoVisible = false"
 		/>
@@ -170,7 +170,6 @@ import { syncTabBar } from '@/utils/tabbar.js'
 // 导入改名：模板只能访问实例上的东西，想直接调就得在 methods 里挂一层
 import { formatDateTime, rocketName, astroName as astroNameOf } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
-import { rocketIdOf } from '@/utils/rocket-lookup.js'
 import { pickDaily } from '@/utils/daily.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -213,11 +212,9 @@ export default {
 			astroLeft: 0,
 			// 滑过之后提示就没意义了，收掉
 			astroMoved: false,
-			// 大图弹层
+			// 大图弹层：每日一图只有一张，list 给单元素
 			photoVisible: false,
-			photoItem: null,
-			// 型号库 id，点开图之后异步反查（型号库 532 条，不该压在首屏）
-			photoRocketId: '',
+			photoList: [],
 			// 倒计时组件的 net 需要「未来」的那条，用时钟兜住页面长时间不动的场景
 			nowTick: Date.now()
 		}
@@ -357,18 +354,13 @@ export default {
 		},
 
 		/**
-		 * 看大图。图先出，型号 id 后到 —— 反查要加载型号库（532 条），
-		 * 压在大图上等它等于让用户对着黑屏等，晚半秒出现「看这枚火箭」按钮就行。
+		 * 看大图。每日一图只有一张，交给弹层的 list 就是单元素 ——
+		 * 同一套组件，左右滑自然滑不动（首尾都是它自己）。
 		 */
-		async openPhoto(item) {
+		openPhoto(item) {
 			if (!item) return
-			this.photoItem = item
-			this.photoRocketId = ''
+			this.photoList = [item]
 			this.photoVisible = true
-
-			const rid = await rocketIdOf(item.cname)
-			// 等待期间可能已经关掉或换了另一张，别把 id 塞给错的那张
-			if (this.photoItem === item && this.photoVisible) this.photoRocketId = rid
 		},
 
 		/** 横滑列表滑过之后，右侧的「还有内容」提示就该消失 */

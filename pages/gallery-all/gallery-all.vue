@@ -10,7 +10,7 @@
 					v-for="(c, i) in col"
 					:key="c.it.id + '_' + i"
 					:style="{ height: c.h + 'rpx' }"
-					@click="preview(c.it)"
+					@click="preview(c.gi)"
 				>
 					<image class="cell-img" :src="c.it.thumb" mode="aspectFill" lazy-load></image>
 				</view>
@@ -36,8 +36,8 @@
 
 		<photo-view
 			:visible="photoVisible"
-			:item="photoItem"
-			:rocket-id="photoRocketId"
+			:list="items"
+			:index="photoIndex"
 			@close="photoVisible = false"
 		/>
 	</view>
@@ -64,7 +64,6 @@
  *   看起来依然是参差的。
  */
 import spaceData from '@/utils/data.js'
-import { rocketIdOf } from '@/utils/rocket-lookup.js'
 
 // 三档高度（rpx）。差得够开才看得出参差，又不能差到一屏只放两张
 const HEIGHTS = [360, 440, 520]
@@ -91,8 +90,7 @@ export default {
 			chunks: 1,
 			total: 0,
 			photoVisible: false,
-			photoItem: null,
-			photoRocketId: ''
+			photoIndex: 0
 		}
 	},
 
@@ -102,13 +100,15 @@ export default {
 			const R = []
 			let hl = 0
 			let hr = 0
-			for (const it of this.items) {
+			for (let gi = 0; gi < this.items.length; gi++) {
+				const it = this.items[gi]
 				const h = heightOf(it.id)
+				// gi 是全局下标，弹层要拿它定位到 items 里的位置
 				if (hl <= hr) {
-					L.push({ it, h })
+					L.push({ it, h, gi })
 					hl += h
 				} else {
-					R.push({ it, h })
+					R.push({ it, h, gi })
 					hr += h
 				}
 			}
@@ -158,16 +158,11 @@ export default {
 			}
 		},
 
-		async preview(item) {
-			if (!item) return
-
-			this.photoItem = item
-			this.photoRocketId = ''
+		preview(gi) {
+			const n = this.items.length
+			if (!n) return
+			this.photoIndex = Math.max(0, Math.min(Number(gi) || 0, n - 1))
 			this.photoVisible = true
-
-			const rid = await rocketIdOf(item.cname)
-			// 等待期间可能已经关掉或换了另一张，别把 id 塞给错的那张
-			if (this.photoItem === item && this.photoVisible) this.photoRocketId = rid
 		}
 	}
 }
