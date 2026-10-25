@@ -36,6 +36,46 @@ function eq(actual, expected, label) {
 	}
 }
 
+// ---------- 版本号一致性 ----------
+//
+// DATA_VERSION 写在前端（utils/data.js）和两个产出脚本（sync.js / images.js）里，
+// 三处必须完全一致：不一致时前端缓存 key 与线上数据版本对不上，
+// 表现是"改了数据但用户看到的还是旧的"，且只在真机上才看得出来。
+// 版本名还有一条硬约束：manifest.json 的 versionName 必须等于 CHANGELOG 最后一条 ——
+// 提审填的版本号与更新说明对不上，审核会打回。
+
+console.log('[version] 版本号一致性')
+
+function readText(rel) {
+	return fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8')
+}
+
+function pickVersionIn(text) {
+	const m = text.match(/const\s+DATA_VERSION\s*=\s*(\d+)/)
+	return m ? Number(m[1]) : null
+}
+
+const vFront = pickVersionIn(readText('utils/data.js'))
+const vSync = pickVersionIn(readText('scripts/sync.js'))
+const vImages = pickVersionIn(readText('scripts/images.js'))
+
+eq(vFront === vSync && vSync === vImages, true, `DATA_VERSION 三处一致（${vFront} / ${vSync} / ${vImages}）`)
+
+const manifest = readText('manifest.json')
+const mName = (manifest.match(/"versionName"\s*:\s*"([^"]+)"/) || [])[1] || ''
+const mCode = (manifest.match(/"versionCode"\s*:\s*"([^"]+)"/) || [])[1] || ''
+
+// CHANGELOG 旧的在前、新的在末尾，最后一条就是当前版本
+const changelog = readText('utils/changelog.js')
+const allVers = [...changelog.matchAll(/version:\s*'([\d.]+)'/g)].map((m) => m[1])
+const lastVer = allVers.length ? allVers[allVers.length - 1] : ''
+
+eq(mName, lastVer, `manifest versionName 与 CHANGELOG 末条一致（${mName}）`)
+
+const parts = mName.split('.').map(Number)
+const expectCode = parts.length === 3 ? parts[0] * 10000 + parts[1] * 100 + parts[2] : null
+eq(mCode, expectCode == null ? mCode : String(expectCode), `versionCode = X*10000+Y*100+Z（${mCode}）`)
+
 // ---------- aggregateByYear ----------
 
 console.log('[aggregate] aggregateByYear')
