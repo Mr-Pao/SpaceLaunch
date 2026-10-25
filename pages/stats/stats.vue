@@ -2,6 +2,7 @@
 	<view class="page">
 		<star-field />
 		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
+			<view class="nav-back" @click="goBack"><text class="nav-arrow">‹</text></view>
 			<text class="nav-title">数据统计</text>
 		</view>
 		<block v-if="!reviewMode">
@@ -173,7 +174,6 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -330,10 +330,6 @@ export default {
 		})
 	},
 
-	onShow() {
-		syncTabBar(4)
-	},
-
 	onPullDownRefresh() {
 		if (this.reviewMode) {
 			uni.stopPullDownRefresh()
@@ -343,6 +339,16 @@ export default {
 	},
 
 	methods: {
+		goBack() {
+			const pages = getCurrentPages()
+			if (pages.length > 1) {
+				uni.navigateBack()
+			} else {
+				// 分享卡片 / 朋友圈单页模式直接进来，栈里只有自己
+				uni.switchTab({ url: '/pages/index/index' })
+			}
+		},
+
 		async getData(force) {
 			this.loading = true
 			try {
@@ -394,13 +400,39 @@ function countryOf(agency) {
 
 .page {
 	min-height: 100vh;
-	padding-bottom: 200rpx;
+	/* 原来是 tab 页，底部要给 tabBar 让位留了 200rpx；
+	   现在降级成发射页点进来的二级页，没有 tabBar 了 */
+	padding-bottom: 60rpx;
 	box-sizing: border-box;
 }
 
 /* 本页 .page 无横向留白，导航行单独补上，与内容区 24rpx 对齐 */
 .nav-row {
 	padding: 0 24rpx;
+}
+
+/* 二级页得自己画返回箭头（全局 navigationStyle: custom，没有原生导航栏） */
+.nav-back {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 60rpx;
+	height: 60rpx;
+	margin-left: -10rpx;
+}
+
+.nav-arrow {
+	color: #ffffff;
+	font-size: 54rpx;
+	font-weight: 300;
+	line-height: 1;
+	margin-top: -6rpx;
+}
+
+/* 二级页标题比 tab 页小一档，否则和返回箭头同排太挤 */
+.nav-title {
+	font-size: 36rpx;
+	padding-right: 160rpx;
 }
 
 .head {

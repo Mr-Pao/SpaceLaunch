@@ -589,6 +589,95 @@ function testVideo() {
 	eq(slotsOf({ vids: 'not-an-array' }, 'vids.*.cover').length, 0, '镜像路径：该是数组却是字符串，跳过')
 }
 
+// ---------- 往年今日 ----------
+
+function testOnThisDay() {
+	console.log('[onthisday] 往年今日筛选')
+	const { pickOnThisDay, bjParts } = require('./lib/onthisday')
+
+	// 北京时间 2026-10-25 12:00（UTC 04:00）——「今天」是 10 月 25 日
+	const NOW = Date.UTC(2026, 9, 25, 4, 0, 0)
+
+	const slim = (over) =>
+		Object.assign(
+			{
+				id: 'x',
+				name: 'Falcon 9 | Starlink',
+				net: '2021-10-25T10:00:00Z',
+				status: { abbrev: 'Success', name: 'Launch Successful' },
+				rocket: { configuration: { name: 'Falcon 9' } },
+				launch_service_provider: { name: 'SpaceX' },
+				pad: { location: { name: 'Cape Canaveral' } },
+				image: 'https://example.com/a.jpg',
+				imageCredit: 'SpaceX'
+			},
+			over
+		)
+
+	// 北京时间换算：UTC 20:00 已经是北京次日 04:00，不能按 UTC 算日期
+	eq(bjParts('2026-10-24T20:00:00Z'), { md: '10-25', y: 2026 }, '北京时区：UTC 前一天 20 点算作次日')
+	eq(bjParts('2026-10-24T15:59:00Z'), { md: '10-24', y: 2026 }, '北京时区：UTC 15:59 仍是当天')
+	eq(bjParts('不是时间'), null, '非法时间返回 null')
+
+	const r1 = pickOnThisDay([slim({ id: 'a' })], NOW)
+	eq(r1.md, '10-25', '今天的月-日')
+	eq(r1.list.length, 1, '往年同月同日命中 1 条')
+	eq(r1.list[0].y, 2021, '年份来自 net')
+	eq(r1.list[0].rocket, 'Falcon 9', '火箭名取 configuration.name')
+	eq(r1.list[0].agency, 'SpaceX', '机构名取 launch_service_provider.name')
+
+	// 今年的不算「往年」
+	eq(pickOnThisDay([slim({ net: '2026-10-25T02:00:00Z' })], NOW).list.length, 0, '今年的今天不算往年')
+
+	// 不同月日直接跳过
+	eq(pickOnThisDay([slim({ net: '2021-10-24T10:00:00Z' })], NOW).list.length, 0, '不同日期不命中')
+
+	// 年份降序：最近的排前面
+	const sorted = pickOnThisDay(
+		[
+			slim({ id: 'old', net: '1968-10-25T10:00:00Z' }),
+			slim({ id: 'new', net: '2023-10-25T10:00:00Z' }),
+			slim({ id: 'mid', net: '2010-10-25T10:00:00Z' })
+		],
+		NOW
+	).list
+	eq(sorted.map((x) => x.y), [2023, 2010, 1968], '按年份降序')
+
+	// 快照与归档重叠时按 id 去重
+	const dup = pickOnThisDay([slim({ id: 'same' }), slim({ id: 'same' })], NOW)
+	eq(dup.list.length, 1, '同一 id 只留一条')
+
+	// 历史分片里混过的 slimStatLaunch 形态（status/rocket 是字符串、site 直接给）
+	const stat = pickOnThisDay(
+		[
+			{
+				id: 's1',
+				name: 'Soyuz | Progress',
+				net: '2019-10-25T08:00:00Z',
+				status: 'Success',
+				rocket: 'Soyuz 2.1a',
+				site: 'Baikonur',
+				agency: 'Roscosmos'
+			}
+		],
+		NOW
+	).list[0]
+	eq(stat.status, 'Success', '字符串 status 也能取')
+	eq(stat.rocket, 'Soyuz 2.1a', '字符串 rocket 也能取')
+	eq(stat.site, 'Baikonur', 'site 直接给的也能取')
+
+	// 脏数据不能把整轮带崩
+	eq(pickOnThisDay([null, {}, { net: 'oops' }], NOW).list.length, 0, '脏数据跳过不炸')
+	eq(pickOnThisDay(null, NOW).list.length, 0, 'items 为 null 不炸')
+
+	// 上限：一天最多 40 条（年份要从 1970 起，否则一堆落在今年之后被剔掉）
+	const many = []
+	for (let i = 0; i < 60; i++) {
+		many.push(slim({ id: 'm' + i, net: 1970 + i + '-10-25T10:00:00Z' }))
+	}
+	eq(pickOnThisDay(many, NOW).list.length, 40, '超过上限截到 40 条')
+}
+
 ;(async () => {
 	await testFormat()
 	await testSearchMatch()
@@ -596,6 +685,7 @@ function testVideo() {
 	await testTimeline()
 	await testCraft()
 	testVideo()
+	testOnThisDay()
 })()
 	.catch((e) => {
 		failed++

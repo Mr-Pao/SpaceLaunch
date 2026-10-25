@@ -2,129 +2,118 @@
 	<view class="page">
 		<nav-bar :solid="true" title="图库" placeholder />
 
+		<!-- 四行横向缓慢漂流：方向交替、四行速度错开。
+		     图库从「瀑布流」改成这样，是为了打开就有动静 ——
+		     静止的网格再密也只是墙，会动的才像窗。 -->
+		<view class="stage" v-if="!loading && rowsA.length">
+			<view class="bands">
+				<view class="band">
+					<view class="track t1">
+						<view class="cell wide" v-for="(img, i) in row1" :key="'a' + i" @click="preview(0, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+						</view>
+					</view>
+				</view>
+
+				<view class="band">
+					<view class="track t2">
+						<view class="cell tall" v-for="(img, i) in row2" :key="'b' + i" @click="preview(1, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+						</view>
+					</view>
+				</view>
+
+				<view class="band">
+					<view class="track t3">
+						<view class="cell wide" v-for="(img, i) in row3" :key="'c' + i" @click="preview(2, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+						</view>
+					</view>
+				</view>
+
+				<view class="band">
+					<view class="track t4">
+						<view class="cell tall" v-for="(img, i) in row4" :key="'d' + i" @click="preview(3, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+						</view>
+					</view>
+				</view>
+
+				<!-- 左右边缘渐隐：图从两侧淡入淡出，比硬切好看，也暗示「还在滚」 -->
+				<view class="edge left"></view>
+				<view class="edge right"></view>
+			</view>
+
+			<view class="foot">
+				<text class="foot-count"><text class="foot-num">{{ images.length }}</text> 张在漂流</text>
+				<text class="foot-tip">点任意一张看大图</text>
+			</view>
+		</view>
+
 		<view class="loading" v-if="loading">
 			<text class="hint-text">加载中...</text>
 		</view>
 
-		<block v-else>
-			<!-- 顶部 tab：与型号图片库同款样式 -->
-			<view class="tabs">
-				<view class="tab" @click="tab = 'image'">
-					<text class="tab-text" :class="{ on: tab === 'image' }">图片</text>
-					<view class="tab-ink" v-if="tab === 'image'"></view>
-				</view>
-				<view class="tab" @click="tab = 'video'">
-					<text class="tab-text" :class="{ on: tab === 'video' }">视频</text>
-					<view class="tab-ink" v-if="tab === 'video'"></view>
-				</view>
-			</view>
-
-			<!-- 图片瀑布流：本地分页，每次往下追加一批，避免一次渲染 800 张 -->
-			<view class="grid" v-if="tab === 'image'">
-				<block v-if="shown.length">
-					<view class="col">
-						<view class="shot" v-for="(img, i) in colLeft" :key="'l' + i" @click="preview(img)">
-							<image class="shot-img" :src="img.thumb" mode="widthFix" lazy-load></image>
-							<text class="shot-credit" v-if="img.credit">@{{ img.credit }}</text>
-						</view>
-					</view>
-					<view class="col">
-						<view class="shot" v-for="(img, i) in colRight" :key="'r' + i" @click="preview(img)">
-							<image class="shot-img" :src="img.thumb" mode="widthFix" lazy-load></image>
-							<text class="shot-credit" v-if="img.credit">@{{ img.credit }}</text>
-						</view>
-					</view>
-				</block>
-				<view class="empty-box" v-else>
-					<text class="empty-icon">🛰️</text>
-					<text class="empty-text">还没有图片</text>
-					<text class="empty-sub">历史图片正在由后台逐批补齐，过几个小时再来看看</text>
-				</view>
-			</view>
-
-			<!-- 视频瀑布流：videos.json 里每条发射的 webcast 摊平 -->
-			<view class="grid" v-else>
-				<block v-if="videos.length">
-					<view class="col">
-						<view class="vcard" v-for="(v, i) in vcolLeft" :key="'vl' + i" @click="openVideo(v)">
-							<view class="vcover">
-								<image class="vcover-img" :src="v.cover" mode="aspectFill" lazy-load></image>
-								<view class="vplay"></view>
-								<text class="vtag" v-if="v.official">官方</text>
-								<text class="vdur" v-if="v.mins">{{ v.mins }} 分钟</text>
-							</view>
-							<text class="vtitle">{{ v.title }}</text>
-							<text class="vmeta" v-if="v.publisher">@{{ v.publisher }}</text>
-						</view>
-					</view>
-					<view class="col">
-						<view class="vcard" v-for="(v, i) in vcolRight" :key="'vr' + i" @click="openVideo(v)">
-							<view class="vcover">
-								<image class="vcover-img" :src="v.cover" mode="aspectFill" lazy-load></image>
-								<view class="vplay"></view>
-								<text class="vtag" v-if="v.official">官方</text>
-								<text class="vdur" v-if="v.mins">{{ v.mins }} 分钟</text>
-							</view>
-							<text class="vtitle">{{ v.title }}</text>
-							<text class="vmeta" v-if="v.publisher">@{{ v.publisher }}</text>
-						</view>
-					</view>
-				</block>
-				<view class="empty-box" v-else>
-					<text class="empty-icon">📺</text>
-					<text class="empty-text">还没有视频</text>
-					<text class="empty-sub">数据源只收录部分任务的直播回放，抓取在持续进行</text>
-				</view>
-			</view>
-
-			<view class="tail" v-if="tab === 'image' && shown.length < images.length">
-				<text class="tail-text">上拉加载更多（{{ shown.length }}/{{ images.length }}）</text>
-			</view>
-			<view class="tail" v-else-if="tab === 'image' && images.length">
-				<text class="tail-text">已经到底啦</text>
-			</view>
-		</block>
+		<view class="empty-box" v-else-if="!images.length">
+			<text class="empty-icon">🛰️</text>
+			<text class="empty-text">还没有图片</text>
+			<text class="empty-sub">历史图片正在由后台逐批补齐，过几个小时再来看看</text>
+		</view>
 	</view>
 </template>
 
 <script>
+/**
+ * 图库
+ *
+ * 交互只有一件事：看着它们慢慢飘，喜欢就点开看原图。
+ * 没有分类、没有搜索、没有视频 tab —— 视频在小程序里本来就播不了
+ * （web-view 要配业务域名），与其给个「复制链接」的劝退按钮，不如不做。
+ *
+ * 为什么每行只放 12 张再复制一份：
+ *   无缝循环靠 track 复制内容 + translateX(-50%)。如果 800 张全塞进去，
+ *   首屏要渲染 1600 个 image 节点，滑动直接卡死。12 × 4 行 = 48 张原图
+ *   （渲染 96 个节点）已经能把屏幕铺满，看起来是「看不完的墙」。
+ *
+ * 为什么是 4 行而不是 3 行：三行 132px 高的大图铺不满一屏，上下各留一大块空白，
+ * 看着像「三个相框」而不是「墙」。4 行、行高交替，才真的密不透风。
+ */
 import spaceData from '@/utils/data.js'
 import { fullImageOf } from '@/utils/media.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 
-// 本地分页步长：一次渲染 40 张，翻到底再追加，首屏只下图片不渲染 DOM
-const PAGE_STEP = 40
+// 每行取多少张（复制后翻倍就是这个数 ×2 的节点数）
+const PER_ROW = 12
+// 行数：4 行铺满一屏
+const ROWS = 4
 
 export default {
 	data() {
 		return {
-			tab: 'image',
 			loading: true,
 			images: [],
-			videos: [],
-			shownCount: PAGE_STEP
+			// 四行各自的原始图（渲染时再拼一份副本）
+			raw: [[], [], [], []]
 		}
 	},
 
 	computed: {
-		shown() {
-			return this.images.slice(0, this.shownCount)
+		// concat 副本：x + x 后动画走 -50% 正好回到起点，看不出接缝
+		row1() {
+			return this.raw[0].concat(this.raw[0])
 		},
-
-		colLeft() {
-			return this.shown.filter((_, i) => i % 2 === 0)
+		row2() {
+			return this.raw[1].concat(this.raw[1])
 		},
-
-		colRight() {
-			return this.shown.filter((_, i) => i % 2 === 1)
+		row3() {
+			return this.raw[2].concat(this.raw[2])
 		},
-
-		vcolLeft() {
-			return this.videos.filter((_, i) => i % 2 === 0)
+		row4() {
+			return this.raw[3].concat(this.raw[3])
 		},
-
-		vcolRight() {
-			return this.videos.filter((_, i) => i % 2 === 1)
+		// 模板里判断有没有内容，随便挑一行看
+		rowsA() {
+			return this.raw[0]
 		}
 	},
 
@@ -132,249 +121,212 @@ export default {
 		syncTabBar(2)
 	},
 
-	onReachBottom() {
-		if (this.shownCount < this.images.length) {
-			this.shownCount += PAGE_STEP
-		}
-	},
-
 	async onLoad() {
-		// gallery 与 videos 互相独立，一个失败不影响另一个
-		const [g, v] = await Promise.all([
-			spaceData.load('gallery').catch(() => null),
-			spaceData.load('videos').catch(() => null)
-		])
+		const g = await spaceData.load('gallery').catch(() => null)
+		const list = ((g && g.list) || []).filter((x) => x && x.thumb)
 
-		this.images = ((g && g.list) || []).filter((x) => x && x.thumb)
-		this.videos = flattenVideos((v && v.list) || [])
+		this.images = list
+
+		// 四行交错分配：i % 4，这样同一场发射的相邻图不会挤在同一行
+		const buckets = [[], [], [], []]
+		list.slice(0, PER_ROW * ROWS).forEach((x, i) => {
+			buckets[i % ROWS].push(x)
+		})
+		this.raw = buckets
+
 		this.loading = false
 	},
 
 	methods: {
-		preview(img) {
-			// 全屏看原图：COS 上同 hash 的 _2000 版本，还没补齐到的回退缩略图
-			const full = fullImageOf(img.thumb)
-			const urls = this.shown.map((x) => fullImageOf(x.thumb) || x.thumb)
+		/**
+		 * 点开看原图。
+		 * 传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
+		 */
+		preview(row, i) {
+			const list = this.raw[row]
+			if (!list.length) return
+			const idx = i % list.length
+
+			// COS 上同 hash 的 _2000 版本；还没补齐到的回退缩略图
+			const urls = list.map((x) => fullImageOf(x.thumb) || x.thumb)
 			uni.previewImage({
 				urls,
-				current: full || img.thumb
-			})
-		},
-
-		/**
-		 * 小程序里放不了 YouTube（web-view 也要配业务域名），
-		 * 复制链接让用户去浏览器看 —— 与型号视频库同一套交互
-		 */
-		openVideo(v) {
-			uni.setClipboardData({
-				data: v.url,
-				success: () => {
-					uni.showToast({ title: '链接已复制，可到浏览器打开', icon: 'none' })
-				}
+				current: urls[idx]
 			})
 		}
 	}
-}
-
-/** videos.json 的行是「一条发射一组 vids」，摊平成单张卡片列表 */
-function flattenVideos(rows) {
-	const out = []
-	const seen = {}
-	for (const row of rows) {
-		if (!row || !Array.isArray(row.vids)) continue
-		for (const v of row.vids) {
-			if (!v || !v.url || !v.cover || seen[v.url]) continue
-			seen[v.url] = 1
-			out.push({
-				url: v.url,
-				title: v.title || row.name || '',
-				publisher: v.publisher || '',
-				official: v.tid === 1 || v.kind === 'Official Webcast',
-				cover: v.cover,
-				mins: v.mins || 0
-			})
-		}
-	}
-	return out
 }
 </script>
 
 <style lang="scss" scoped>
-@import '../../styles/list.scss';
-
 .page {
 	min-height: 100vh;
 	background: #0a0e17;
-}
-
-/* ---- 顶部 tab ---- */
-.tabs {
 	display: flex;
-	align-items: center;
-	padding: 8rpx 0 12rpx;
+	flex-direction: column;
+	/* 底部给悬浮胶囊 tabBar 让位 */
+	padding-bottom: 200rpx;
+	box-sizing: border-box;
 }
 
-.tab {
+.stage {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
-	align-items: center;
+	justify-content: center;
 }
 
-.tab-text {
-	color: #7d8ba0;
-	font-size: 28rpx;
-	line-height: 40rpx;
-}
-
-.tab-text.on {
-	color: #ffffff;
-	font-weight: 600;
-}
-
-.tab-ink {
-	width: 40rpx;
-	height: 4rpx;
-	margin-top: 8rpx;
-	border-radius: 2rpx;
-	background: #38bdf8;
-}
-
-/* 两列瀑布流 */
-.grid {
-	display: flex;
-	align-items: flex-start;
-	padding: 0 8rpx;
-}
-
-.col {
-	flex: 1;
-	min-width: 0;
-	padding: 0 4rpx;
-}
-
-.shot {
+/* ---- 三行横滚 ---- */
+.bands {
 	position: relative;
-	margin-bottom: 10rpx;
-	border-radius: 8rpx;
+	overflow: hidden;
+	padding: 20rpx 0;
+}
+
+.band {
+	overflow: hidden;
+	margin-bottom: 14rpx;
+}
+
+.band:last-child {
+	margin-bottom: 0;
+}
+
+.track {
+	display: inline-flex;
+	/* max-content 不认的老内核靠 inline-flex 的 shrink-to-fit 兜底，
+	   两种写法都能让 track 宽度 = 内容宽度，动画的 -50% 才有意义 */
+	width: max-content;
+	will-change: transform;
+}
+
+/* 四行速度与方向都错开：同一速度会像一整块在平移，不像各自漂流 */
+.t1 {
+	animation: marqueeL 52s linear infinite;
+}
+
+.t2 {
+	animation: marqueeR 44s linear infinite;
+}
+
+.t3 {
+	animation: marqueeL 62s linear infinite;
+}
+
+.t4 {
+	animation: marqueeR 48s linear infinite;
+}
+
+@keyframes marqueeL {
+	from {
+		transform: translateX(0);
+	}
+	to {
+		transform: translateX(-50%);
+	}
+}
+
+@keyframes marqueeR {
+	from {
+		transform: translateX(-50%);
+	}
+	to {
+		transform: translateX(0);
+	}
+}
+
+.cell {
+	flex-shrink: 0;
+	margin-right: 14rpx;
+	border-radius: 12rpx;
 	overflow: hidden;
 	background: #131a26;
 }
 
-.shot-img {
-	display: block;
-	width: 100%;
+/* 行高交替：两「宽」两「矮」，四行叠起来才有层次；
+   宽高固定 + aspectFill，图被裁一点但整面墙是齐的 */
+.wide {
+	width: 304rpx;
+	height: 216rpx;
 }
 
-.shot-credit {
-	position: absolute;
-	left: 0;
-	right: 0;
-	bottom: 8rpx;
-	color: rgba(255, 255, 255, 0.92);
-	font-size: 19rpx;
-	line-height: 26rpx;
-	text-align: center;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	text-shadow: 0 1rpx 5rpx rgba(0, 0, 0, 0.9);
+.tall {
+	width: 248rpx;
+	height: 176rpx;
 }
 
-/* ---- 视频卡片 ---- */
-.vcard {
-	margin-bottom: 10rpx;
-	border-radius: 8rpx;
-	overflow: hidden;
-	background: #131a26;
-}
-
-.vcover {
-	position: relative;
-	width: 100%;
-	height: 220rpx;
-}
-
-.vcover-img {
+.cell-img {
 	display: block;
 	width: 100%;
 	height: 100%;
 }
 
-.vplay {
+/* 左右渐隐：80rpx 刚好盖住一格的三分之一，看得到「有图进来」但读不出细节 */
+.edge {
 	position: absolute;
-	left: 50%;
-	top: 50%;
-	width: 64rpx;
-	height: 64rpx;
-	margin: -32rpx 0 0 -32rpx;
-	border-radius: 50%;
-	background: rgba(0, 0, 0, 0.45);
+	top: 0;
+	bottom: 0;
+	width: 90rpx;
+	z-index: 5;
+	pointer-events: none;
 }
 
-.vplay::after {
-	content: '';
-	position: absolute;
-	left: 24rpx;
-	top: 20rpx;
-	width: 0;
-	height: 0;
-	border-left: 20rpx solid rgba(255, 255, 255, 0.95);
-	border-top: 12rpx solid transparent;
-	border-bottom: 12rpx solid transparent;
+.edge.left {
+	left: 0;
+	background: linear-gradient(to right, #0a0e17, rgba(10, 14, 23, 0));
 }
 
-.vtag {
-	position: absolute;
-	left: 10rpx;
-	top: 10rpx;
-	padding: 2rpx 10rpx;
-	border-radius: 4rpx;
-	background: rgba(0, 0, 0, 0.55);
-	color: #ffffff;
-	font-size: 18rpx;
-	line-height: 26rpx;
+.edge.right {
+	right: 0;
+	background: linear-gradient(to left, #0a0e17, rgba(10, 14, 23, 0));
 }
 
-.vdur {
-	position: absolute;
-	right: 10rpx;
-	bottom: 10rpx;
-	padding: 2rpx 10rpx;
-	border-radius: 4rpx;
-	background: rgba(0, 0, 0, 0.55);
-	color: #ffffff;
-	font-size: 18rpx;
-	line-height: 26rpx;
+/* ---- 底部说明 ---- */
+.foot {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	padding: 30rpx 40rpx 0;
 }
 
-.vtitle {
-	display: block;
-	padding: 12rpx 12rpx 0;
-	color: #e2e8f0;
-	font-size: 23rpx;
-	line-height: 32rpx;
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	overflow: hidden;
+.foot-count {
+	color: #55637a;
+	font-size: 22rpx;
 }
 
-.vmeta {
-	display: block;
-	padding: 4rpx 12rpx 12rpx;
+.foot-num {
+	color: #38bdf8;
+	font-size: 26rpx;
+	font-weight: 600;
+}
+
+.foot-tip {
 	color: #7d8ba0;
-	font-size: 20rpx;
-	line-height: 28rpx;
+	font-size: 21rpx;
 }
 
-/* ---- 空态 / 尾部 ---- */
+/* ---- 空态 / 加载 ---- */
+.loading {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* .hint-text 原来来自 styles/list.scss，这一页不再引入那份公共样式
+   （瀑布流整套都用不上了），单独补一条 */
+.hint-text {
+	color: #6b7891;
+	font-size: 26rpx;
+}
+
 .empty-box {
-	width: 100%;
+	flex: 1;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	padding: 120rpx 0;
+	justify-content: center;
+	padding: 0 60rpx;
 }
 
 .empty-icon {
@@ -391,18 +343,7 @@ function flattenVideos(rows) {
 	margin-top: 10rpx;
 	color: #4d5a6e;
 	font-size: 22rpx;
-	padding: 0 60rpx;
 	text-align: center;
-}
-
-.tail {
-	display: flex;
-	justify-content: center;
-	padding: 20rpx 0 40rpx;
-}
-
-.tail-text {
-	color: #4d5a6e;
-	font-size: 22rpx;
+	line-height: 1.6;
 }
 </style>

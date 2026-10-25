@@ -61,6 +61,9 @@ const FILES = {
 	pads: 'pads.json',
 	// 统计页数据：CI 侧按年预聚合好的结果，前端只负责展示与年度切换
 	stats: 'stats-years.json',
+	// 往年今日：CI 侧按「月-日」筛好的历史发射（今天这一天，最多 40 条）。
+	// 全量 7656 条在前端筛要 2MB 起步，而页面一天只需要二十来条
+	onthisday: 'onthisday.json',
 	// 发射时间线（T- 序列）。LL2 只有单条详情才有，CI 每 3 小时抓 8 条，
 	// 覆盖率靠时间累积；没抓到的任务详情页整块不显示
 	timelines: 'timelines.json',
@@ -89,6 +92,9 @@ const SOFT_TTL = {
 	astronauts: 12 * 60 * 60 * 1000,
 	pads: 12 * 60 * 60 * 1000,
 	stats: 12 * 60 * 60 * 1000,
+	// 往年今日：北京时间过 0 点就换一天，不能等 12 小时。
+	// 1 小时既能及时换日，也不至于每次进页都重拉（3KB 一份）
+	onthisday: 60 * 60 * 1000,
 	// 时间线每 3 小时才补几条，TTL 给宽一点，别为了几条新记录反复拉
 	timelines: 3 * 60 * 60 * 1000,
 	// 视频每小时补 10 条，历史发射的 webcast 基本不会变，同样给宽
@@ -114,7 +120,9 @@ const HARD_TTL = {
 	// 评审 P2-5 补：这两个新增数据集单份 200KB+，不设硬 TTL 会永久驻留
 	timelines: 2 * 24 * 60 * 60 * 1000,
 	videos: 2 * 24 * 60 * 60 * 1000,
-	gallery: 3 * 24 * 60 * 60 * 1000
+	gallery: 3 * 24 * 60 * 60 * 1000,
+	// 往年今日一天换一次，昨天的副本没有价值
+	onthisday: 12 * 60 * 60 * 1000
 }
 
 function hardTtl(name) {
@@ -171,7 +179,8 @@ function readStorage(name) {
 
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
-const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous']
+// onthisday 排在最后丢：它只有几 KB，首页首屏要用，丢了反而要等网络
+const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday']
 
 function writeStorage(name, data) {
 	try {

@@ -13,6 +13,7 @@ name: sync-space-data
 #   images      1 次/小时（每 2 小时跑一轮 2 个请求：原图全量补齐 + gallery）
 #   cores       每天 1 轮 2 个请求（detailed，UTC 23:00 = 北京 07:00）
 #   astronauts  每天 1 轮 9 个请求（detailed，UTC 23:10 = 北京 07:10）
+#   onthisday   0 次 LL2（只读自家 COS 上的快照 + 归档分片），UTC 03:45 = 北京 11:45
 #   合计        常规小时 10 次；含 timeline 的小时 14 次；
 #               agencies / astronauts 那个小时会短暂到 18，每天一次、429 两三个请求无碍
 # 注意：images 放奇数小时的 50 分，错开 timeline（0,3,6…点的 20 分），
@@ -27,6 +28,7 @@ on:
     - cron: '0 * * * *'      # 历史发射：每小时
     - cron: '0 3 * * *'      # 机构：每天 UTC 03:00 = 北京 11:00
     - cron: '30 3 * * *'     # 统计：每天 UTC 03:30 = 北京 11:30（错开机构，避免抢配额）
+    - cron: '45 3 * * *'     # 往年今日：每天 UTC 03:45 = 北京 11:45（只读自家 COS，不耗 LL2 配额）
     - cron: '0 20 * * *'     # 即将发射后续排期：每天 UTC 20:00 = 北京 04:00（要 4 个请求）
     - cron: '0 21 * * *'     # 火箭型号库：每天 UTC 21:00 = 北京 05:00（要 6 个请求）
     - cron: '0 22 * * *'     # 发射工位库：每天 UTC 22:00 = 北京 06:00（1 个请求）
@@ -62,6 +64,7 @@ on:
           - astronauts
           - pads
           - stats
+          - onthisday
           - timeline
           - video
           - images
@@ -101,6 +104,7 @@ jobs:
               "0 * * * *")    DS="previous" ;;
               "0 3 * * *")    DS="agencies" ;;
               "30 3 * * *")   DS="stats" ;;
+              "45 3 * * *")   DS="onthisday" ;;
               "0 20 * * *")   DS="upcomingMore" ;;
               "0 21 * * *")   DS="launchers" ;;
               "0 22 * * *")   DS="pads" ;;

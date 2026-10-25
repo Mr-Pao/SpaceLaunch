@@ -63,21 +63,22 @@ Component({
 		// 临时隐藏（抽屉打开时）：页面里的遮罩盖不住这个独立渲染层，
 		// 只能让 tabBar 自己消失
 		hidden: false,
-		// 默认选中「发射」（索引 1），与小程序启动页一致
-		selected: 1,
+		// 默认选中「今日」（索引 0），与小程序启动页一致
+		selected: 0,
 		list: [
 			{
-				// 「待发射 / 已发射」合并成一页，放第一个：它是打开小程序就落地的页面
+				// 每日一图 / 此刻在天上 / 下次发射 / 往年今日，四块都在这一页
+				pagePath: 'pages/today/today',
+				text: '今日',
+				icon: '/static/image/tabbar/today1.png',
+				iconActive: '/static/image/tabbar/today2.png'
+			},
+			{
+				// 「待发射 / 已发射」合并成一页
 				pagePath: 'pages/index/index',
 				text: '发射',
 				icon: '/static/image/tabbar/huojian1.png',
 				iconActive: '/static/image/tabbar/huojian2.png'
-			},
-			{
-				pagePath: 'pages/rockets/rockets',
-				text: '火箭',
-				icon: '/static/image/tabbar/rocket1.png',
-				iconActive: '/static/image/tabbar/rocket2.png'
 			},
 			{
 				pagePath: 'pages/gallery/gallery',
@@ -86,16 +87,17 @@ Component({
 				iconActive: '/static/image/tabbar/tuku2.png'
 			},
 			{
+				pagePath: 'pages/rockets/rockets',
+				text: '火箭',
+				icon: '/static/image/tabbar/rocket1.png',
+				iconActive: '/static/image/tabbar/rocket2.png'
+			},
+			{
+				// 统计已降级为发射页上的按钮，不再占 tab 位（微信上限就是 5 个）
 				pagePath: 'pages/event/event',
 				text: '活动',
 				icon: '/static/image/tabbar/guanyu1.png',
 				iconActive: '/static/image/tabbar/guanyu2.png'
-			},
-			{
-				pagePath: 'pages/stats/stats',
-				text: '统计',
-				icon: '/static/image/tabbar/tongji1.png',
-				iconActive: '/static/image/tabbar/tongji2.png'
 			}
 		]
 	},

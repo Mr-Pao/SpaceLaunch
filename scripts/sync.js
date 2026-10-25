@@ -30,6 +30,7 @@ const { slimLaunch,
 	slimCore,
 	slimAstronaut } = require('./lib/slim')
 const { aggregateByYear } = require('./lib/aggregate')
+const { pickOnThisDay } = require('./lib/onthisday')
 const { upload } = require('./lib/cos')
 const { localizeLaunches, localizeLaunchNames, localizeEvents, localizeAgencies, localizePads, localizeLaunchers, localizeCores, localizeAstronauts } = require('./lib/localize')
 const { mirrorImages } = require('./lib/image')
@@ -321,6 +322,51 @@ const DATASETS = {
 			// list 装的是年份统计行，validate 只检查里面有没有 undefined，能通过
 			return { count: all.length, list: years }
 		}
+	},
+
+	/**
+	 * 往年今日（今日页第 4 块）
+	 *
+	 * 数据源与 stats 完全一致：最新快照 + 历史归档分片。
+	 * 那边要按年聚合，这边要按「月-日」筛今天 —— 同一个代价（读一遍全部归档），
+	 * 所以每天的 cron 紧跟在 stats 后面（UTC 03:45 / 北京 11:45）。
+	 *
+	 * 不消耗 LL2 配额：只读自家 COS 上的两个已有数据集。
+	 * 归档每小时在往前补，所以「50 年前的今天」会随着归档推进自己冒出来，
+	 * 代码不用改。
+	 */
+	onthisday: {
+		file: 'onthisday.json',
+		// 一天只变一次，但跨小时后前端可能还拿着昨天的（北京时间 0 点换日），
+		// 给 1 小时，比 6 小时更能及时换到新的一天
+		cacheControl: 'public, max-age=3600',
+		// 归档里的图是原图地址，真机加载不出来，和发射快照一样统一镜像成 COS 缩略图
+		images: ['img'],
+		async fetch() {
+			let recent = []
+			try {
+				const p = await readCosJson('space-data/launches-previous.json')
+				recent = p.list || []
+			} catch (e) {
+				console.warn('  ! 读取最新快照失败，只用归档数据: ' + e.message)
+			}
+
+			let archived = []
+			try {
+				const idx = await readCosJson('space-data/history/index.json')
+				for (const page of idx.pages || []) {
+					const d = await readCosJson('space-data/history/' + page.file)
+					archived = archived.concat(d.list || [])
+				}
+			} catch (e) {
+				console.warn('  ! 读取归档分片失败，只用最新快照: ' + e.message)
+			}
+
+			const { md, list } = pickOnThisDay(recent.concat(archived), Date.now())
+			console.log(`  往年今日: ${md} · 来源 ${recent.length + archived.length} 条 · 命中 ${list.length} 条`)
+
+			return { count: list.length, list }
+		}
 	}
 }
 
@@ -351,8 +397,13 @@ function findUndefined(value, prefix, bag) {
 	}
 }
 
+// 允许空结果的数据集。onthisday 是「往年今日」，归档还没补到 365 天全覆盖时
+// 某些日期确实可能一条都没有 —— 那是正常结果，不是抓取失败。
+const ALLOW_EMPTY = new Set(['onthisday'])
+
 function validate(name, list) {
 	if (!Array.isArray(list) || list.length === 0) {
+		if (ALLOW_EMPTY.has(name)) return
 		throw new Error(`${name}: list 为空，抓取可能失败`)
 	}
 
