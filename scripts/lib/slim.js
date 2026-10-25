@@ -465,16 +465,81 @@ function isoDurationDays(s) {
  * in_space 是「此刻在不在天上」的布尔（首页在轨卡片就是筛它）；
  * time_in_space / eva_time 是 ISO 时长， Slim 阶段换算成天 / 小时，
  * 前端零解析。flights/landings/spacewalks 三个**数组**（detailed 才有，
- * 每条都是完整 launch 对象）不保留——只留 count 字段，体积从 MB 级
- * 压到 KB 级。bio 只保留在轨人员的：862 条 bio 全存要 1MB+，
- * 而详情页入口只有「此刻在天上」这张卡片。
+ * 每条都是大对象）必须在这里裁成一行任务/一次出舱的形状——
+ * 原样带回去一张 astronauts.json 要涨好几 MB。
+ * bio 只保留在轨人员的：862 条 bio 全存要 1MB+，翻译量也可控。
  */
+/**
+ * 出舱时长 → 小时。LL2 的 Spacewalk.duration 文档上没有钉死类型，
+ * 实测见过秒数，也防一手 ISO 时长（PT6H30M），两种都兜住。解析失败返回 0。
+ */
+function evaHoursOf(v) {
+	if (typeof v === 'number' && isFinite(v)) return Math.round((v / 3600) * 10) / 10
+	if (typeof v === 'string') {
+		const m = v.match(/^P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:([\d.]+)S)?$/)
+		if (m) {
+			const h = Number(m[1]) || 0
+			const mi = Number(m[2]) || 0
+			const s = Number(m[3]) || 0
+			return Math.round((h + mi / 60 + s / 3600) * 10) / 10
+		}
+	}
+	return 0
+}
+
+/**
+ * 乘组飞行（flights/landings 数组的元素，spacecraftflight 结构）→ 一行任务。
+ *
+ * 两数组元素同构：destination + spacecraft + launch。对详情页而言重要的是
+ * 「坐什么火箭、哪天、去哪」——launch 只留 id/name/net/状态缩写和火箭短名。
+ * landings 里偶有 launch 为 null 的（占位记录），整条丢弃。
+ * missions ≤ 10：一般人也到不了，个别人（俄罗斯老将）飞行次数多，
+ * 多的按时间倒序截断 —— 详情页展示用，不是档案库。
+ */
+function astroMission(f) {
+	const l = (f && f.launch) || null
+	if (!l || !l.id) return null
+	const parts = String(l.name || '').split('|')
+	const task = parts.length > 1 ? parts[1].trim() : String(l.name || '').trim()
+	return {
+		id: String(l.id),
+		net: l.net || '',
+		st: (l.status && l.status.abbrev) || '',
+		name: task || l.name || '',
+		rk: ((l.rocket && l.rocket.configuration) || {}).full_name || ((l.rocket && l.rocket.configuration) || {}).name || '',
+		dest: str(f.destination)
+	}
+}
+
 function slimAstronaut(a) {
 	const nat = Array.isArray(a.nationality) && a.nationality[0]
 	const ag = a.agency || {}
 	const inSpace = Boolean(a.in_space)
 	const days = Math.floor(isoDurationDays(a.time_in_space))
 	const evaHours = Math.round(isoDurationDays(a.eva_time) * 24)
+
+	// 飞行任务：flights（计划/在飞）+ landings（已返回）合并去重，新→旧排序
+	const seen = {}
+	const missions = []
+	for (const f of [].concat(a.flights || [], a.landings || [])) {
+		const m = astroMission(f)
+		if (!m || seen[m.id]) continue
+		seen[m.id] = true
+		missions.push(m)
+	}
+	missions.sort((x, y) => (y.net || '').localeCompare(x.net || ''))
+
+	// 出舱记录：LL2 给的就是「这一舱走了几次」的日志，按时间倒序留前 8 条
+	const evas = (a.spacewalks || [])
+		.filter((s) => s && (s.name || s.start))
+		.map((s) => ({
+			name: str(s.name),
+			start: str(s.start),
+			h: evaHoursOf(s.duration),
+			loc: str(s.location)
+		}))
+		.sort((x, y) => y.start.localeCompare(x.start))
+		.slice(0, 8)
 
 	return {
 		id: a.id ?? null,
@@ -493,7 +558,16 @@ function slimAstronaut(a) {
 		img: thumbUrl(a.image),
 		credit: imageCredit(a.image),
 		bio: inSpace ? str(a.bio) : '',
-		bioZh: ''
+		bioZh: '',
+		// ---- 详情页增补（2026-10-26）：生日/纪念、外链、任务与出舱 ----
+		dob: str(a.date_of_birth),
+		dod: str(a.date_of_death),
+		wiki: str(a.wiki),
+		twitter: str(a.twitter),
+		instagram: str(a.instagram),
+		// 体积守门：空数组不落字段，862 人里大半是没飞过/没出过舱的
+		...(missions.length ? { missions: missions.slice(0, 10) } : {}),
+		...(evas.length ? { evas } : {})
 	}
 }
 

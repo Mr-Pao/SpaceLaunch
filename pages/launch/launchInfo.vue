@@ -31,13 +31,18 @@ export default {
 	// 滚过首图后导航栏切成实色，否则图片上的文字看不清
 	onPageScroll(e) {
 		const top = (e && e.scrollTop) || 0
+		const d = this.$refs.detail
 
-		const solid = top > 200
+		// 图片优先态：形变期间（图片还在收缩）导航必须保持透明，
+		// 标题一出来就压在半程的图上，和列表进来的沉浸观感不一致；
+		// 形变走完（滚满 range，比普通页的 200 深得多）才允许切实色。
+		// 此刻视觉上正好是「滚到普通详情页首图之下」，两边状态一致
+		const threshold = d && d.photoOn ? Math.max(200, d.range) : 200
+		const solid = top >= threshold
 		if (solid !== this.navSolid) this.navSolid = solid
 
 		// 图片优先态的形变完全由滚动量驱动：滚多少，首图缩多少。
 		// 转发给组件，它自己决定要不要理（普通详情页直接返回）
-		const d = this.$refs.detail
 		if (d && d.setScroll) d.setScroll(top)
 	},
 
