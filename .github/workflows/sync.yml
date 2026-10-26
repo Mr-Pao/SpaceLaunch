@@ -127,7 +127,7 @@ jobs:
               "45 4 * * *")   DS="dockings" ;;
               "20 */3 * * *") DS="timeline" ;;
               "40 * * * *")   DS="video" ;;
-              "50 1-23/2 * * *") DS="images" ;;
+              "50 * * * *")   DS="images" ;;
               *)              DS="upcoming" ;;
             esac
           fi
