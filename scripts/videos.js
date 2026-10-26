@@ -176,7 +176,7 @@ async function runVideos() {
 		.slice(0, KEEP)
 
 	const payload = {
-		v: 1,
+		v: 13,
 		dataset: 'video',
 		generatedAt: new Date().toISOString(),
 		count: list.length,

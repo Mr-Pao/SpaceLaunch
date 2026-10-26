@@ -592,7 +592,7 @@ function slimCrewMember(c) {
 }
 
 /**
- * 空间站（/spacestation/，mode=detailed，仅 15 个）。
+ * 空间站（/spacestations/，mode=detailed，仅 15 个）。
  *
  * 关键字段：active_expeditions（当前远征队，detailed 才有，自带 crew）——直接内联，
  * 详情页就不必跨数据集查乘组了。owners 是完整 agency 数组（含长 description），
@@ -653,7 +653,7 @@ function slimStation(s) {
 }
 
 /**
- * 远征队（/expedition/，mode=detailed，165 条）。
+ * 远征队（/expeditions/，mode=detailed，165 条）。
  *
  * crew 元素含 role + astronaut 完整对象；station 是 {id,name} 或直接 null（老数据）。
  * mission_patches 是徽章图数组，只留 image_url。详情页乘组卡点宇航员 id 跳详情；
@@ -674,7 +674,7 @@ function slimExpedition(e) {
 }
 
 /**
- * 对接事件（/docking_event/，mode=detailed）。
+ * 对接事件（/docking_events/，mode=detailed）。
  *
  * 字段干净：docking/departure 时间、flight_vehicle.spacecraft（飞船本体，
  * 含 serial + spacecraft_config 型号 + agency）、space_station 目标站。

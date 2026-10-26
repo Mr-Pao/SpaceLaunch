@@ -210,7 +210,7 @@ async function runTimelines() {
 	const payload = {
 		// v2: 每行多了 craft（航天器）。前端按字段有无降级，不需要版本判断，
 		// 这里只是留个记号方便排查数据是哪一版抓的
-		v: 2,
+		v: 13,
 		dataset: 'timeline',
 		generatedAt: new Date().toISOString(),
 		count: list.length,

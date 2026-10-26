@@ -291,7 +291,7 @@ const DATASETS = {
 		}
 	},
 
-	// 空间站（/spacestation/，mode=detailed，仅 15 个，一页抓完）。
+	// 空间站（/spacestations/，mode=detailed，仅 15 个，一页抓完）。
 	// active_expeditions 在 detailed 才有，含当前乘组；description 翻中文。
 	spacestations: {
 		file: 'spacestations.json',
@@ -299,13 +299,13 @@ const DATASETS = {
 		images: ['img'],
 		localize: localizeStations,
 		async fetch() {
-			const j = await getJson('/spacestation/?limit=100&mode=detailed&format=json')
+			const j = await getJson('/spacestations/?limit=100&mode=detailed&format=json')
 			const all = j.results || []
 			return { count: all.length, list: all.map(slimStation) }
 		}
 	},
 
-	// 远征队（/expedition/，mode=detailed，165 条，2 页）。crew 已内联宇航员，详情页直接渲染。
+	// 远征队（/expeditions/，mode=detailed，165 条，2 页）。crew 已内联宇航员，详情页直接渲染。
 	expeditions: {
 		file: 'expeditions.json',
 		cacheControl: 'public, max-age=86400',
@@ -315,7 +315,7 @@ const DATASETS = {
 			let count = 0
 			for (let offset = 0; offset < 1200; offset += 100) {
 				const j = await getJson(
-					`/expedition/?limit=100&offset=${offset}&mode=detailed&format=json`
+					`/expeditions/?limit=100&offset=${offset}&mode=detailed&format=json`
 				)
 				count = j.count
 				const results = j.results || []
@@ -326,7 +326,7 @@ const DATASETS = {
 		}
 	},
 
-	// 对接事件（/docking_event/，mode=detailed）。每条是「飞船→空间站」一次对接，
+	// 对接事件（/docking_events/，mode=detailed）。每条是「飞船→空间站」一次对接，
 	// 详情页按 stationId 过滤展示某站的对接史。数量未知，上限 2000 防御。
 	// 分页可能较多，开启 429 退避重试：匿名限额按小时滚动，等 30s 常能救回下一页。
 	dockings: {
@@ -338,7 +338,7 @@ const DATASETS = {
 			let count = 0
 			for (let offset = 0; offset < 2000; offset += 100) {
 				const j = await getJson(
-					`/docking_event/?limit=100&offset=${offset}&mode=detailed&format=json`,
+					`/docking_events/?limit=100&offset=${offset}&mode=detailed&format=json`,
 					{ retryOn429: true, backoffMs: 30000, retries: 1 }
 				)
 				count = j.count

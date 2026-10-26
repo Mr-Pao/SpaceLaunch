@@ -134,22 +134,28 @@ export default {
 
 	async onLoad(query) {
 		const id = (query && query.id) || ''
+		// 空间站本体是主线；对接记录只是附加叙事，dockings 还没同步上 COS
+		// （404）时不能拖累整个空间站页，分开抓取各自兜底。
+		let stations = null
+		let docks = null
 		try {
-			const [stations, docks] = await Promise.all([
-				spaceData.load('spacestations'),
-				spaceData.load('dockings')
-			])
-			const list = (stations && stations.list) || []
-			const found = list.find((s) => String(s.id) === String(id)) || {}
-			this.station = found
-			const ds = (docks && docks.list) || []
-			this.dockings = ds
-				.filter((d) => String(d.stationId) === String(id))
-				.sort((a, b) => String(b.docking).localeCompare(String(a.docking)))
-				.slice(0, 30)
+			stations = await spaceData.load('spacestations')
 		} catch (e) {
-			console.warn('[station] 加载失败', e)
+			console.warn('[station] 空间站数据缺失', e)
 		}
+		try {
+			docks = await spaceData.load('dockings')
+		} catch (e) {
+			console.warn('[station] 对接记录缺失（该模块暂不显示）', e)
+		}
+		const list = (stations && stations.list) || []
+		const found = list.find((s) => String(s.id) === String(id)) || {}
+		this.station = found
+		const ds = (docks && docks.list) || []
+		this.dockings = ds
+			.filter((d) => String(d.stationId) === String(id))
+			.sort((a, b) => String(b.docking).localeCompare(String(a.docking)))
+			.slice(0, 30)
 		this.loading = false
 	},
 

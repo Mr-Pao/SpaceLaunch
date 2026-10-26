@@ -328,7 +328,10 @@ export const CHANGELOG = [
 			'新增远征队详情页：起止、在轨状态、乘组卡（点回宇航员）、任务徽章',
 			'对接事件并入空间站详情页，按 stationId 反查过滤，近 30 次',
 			'宇航员详情页反向索引「所属空间站」「参与远征队」，与 station/expedition 页闭环',
-			'三套数据集（spacestations / expeditions / dockings）接入同步与前端数据层'
+			'三套数据集（spacestations / expeditions / dockings）接入同步与前端数据层',
+			'修 CI 同步三个新数据集一直 404：LL2 2.3.0 端点已改复数（/spacestations/、/expeditions/、/docking_events/），单数路径抓取失败不上传',
+			'宇航员 / 空间站详情页改为各数据集独立兜底：某个缺失（404）只隐藏对应模块，不再整页崩溃',
+			'timeline / videos 数据版本号对齐到 13，消除「数据版本不一致」告警'
 		]
 	}
 ]

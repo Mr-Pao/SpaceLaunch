@@ -268,17 +268,25 @@ export default {
 
 	async onLoad(query) {
 		this.id = (query && query.id) || ''
+		// 宇航员本体是主线，必须拿到；空间站/远征队仅用于反向索引，
+		// 数据还没同步上 COS 时（404）不能拖累主流程，分开 try 各自兜底。
 		try {
-			const [found, sts, exps] = await Promise.all([
-				this.id ? spaceData.getById('astronauts', this.id) : Promise.resolve(null),
-				spaceData.load('spacestations'),
-				spaceData.load('expeditions')
-			])
+			const found = this.id ? await spaceData.getById('astronauts', this.id) : null
 			if (found) this.a = found
-			this.allStations = (sts && sts.list) || []
-			this.allExps = (exps && exps.list) || []
 		} catch (e) {
 			console.warn('[astronaut] 获取失败', e)
+		}
+		try {
+			const sts = await spaceData.load('spacestations')
+			this.allStations = (sts && sts.list) || []
+		} catch (e) {
+			console.warn('[astronaut] 空间站数据缺失（反向索引暂不显示）', e)
+		}
+		try {
+			const exps = await spaceData.load('expeditions')
+			this.allExps = (exps && exps.list) || []
+		} catch (e) {
+			console.warn('[astronaut] 远征队数据缺失（反向索引暂不显示）', e)
 		}
 		this.loading = false
 	},
