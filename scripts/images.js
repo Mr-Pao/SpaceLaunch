@@ -226,6 +226,29 @@ async function runImages() {
 		])
 	}
 
+	// ---- 历史遗留回填 ----
+	// mirrorImages 早年有个 bug：同一张原图同时喂给 thumb 和 full 两个预设时，
+	// 后一个会把前一个覆盖掉（那时用 URL 当去重 key）。结果只有 full 真跑过，
+	// thumb 静默失败，累积库里存下一批指向 LL2 海外域名的原始地址 ——
+	// 国内一张 100KB+ 从纽约拉，这就是图库一直"加载好久"的根因。
+	//
+	// 这些老记录不会被游标重新扫到（一圈 25 小时），所以每轮顺带修一批。
+	// 判断依据用 /space-img/：那是镜像产物的固定前缀，比比对域名稳。
+	const MIRROR_TAG = '/space-img/'
+	const pending = []
+	for (const x of byId.values()) {
+		if (x && x.thumb && x.thumb.indexOf(MIRROR_TAG) === -1) pending.push(x)
+	}
+	if (pending.length) {
+		// 一次全修完：这批一共百来条，比拖着好几轮更省事；
+		// 真要上千条时它也只是每轮多花几十秒
+		const batch = pending.slice(0, 400)
+		console.log(`  历史回填: 待修 ${pending.length} 条，本轮处理 ${batch.length} 条`)
+		await mirrorImages(batch, [{ path: 'thumb', preset: 'thumb' }])
+		const fixed = batch.filter((x) => x.thumb && x.thumb.indexOf(MIRROR_TAG) > -1).length
+		console.log(`  历史回填: ${fixed}/${batch.length} 张已转 COS（剩 ${pending.length - fixed} 张）`)
+	}
+
 	// ---- 合并进累积库 ----
 	for (const r of rawRows) {
 		if (!r.image) continue // 原始图镜像失败时 image 保持原地址，仍可进 gallery

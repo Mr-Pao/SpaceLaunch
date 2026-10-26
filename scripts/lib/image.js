@@ -264,18 +264,26 @@ async function mirrorImages(list, fields) {
 		return { path: f.path, preset: PRESETS[f.preset] || PRESETS.thumb }
 	})
 
-	// 先把所有待处理的 URL 收齐去重，避免同一张图被并发处理多次
+	// 先把所有待处理的 URL 收齐去重，避免同一张图被并发处理多次。
+	//
+	// key 必须带预设宽度，不能只用 URL：同一张原图可能同时喂给两个预设
+	// （images.js 的 image 与 imageFull 铺的是同一个原始地址，只是产出宽度不同）。
+	// 早先用 URL 当 key，后一个预设会把前一个覆盖掉 —— 结果只有 full 真跑过，
+	// thumb 那一路在 memo 里查不到结果，回填时静默跳过，gallery 里的图
+	// 全部留在 LL2 的海外原始域名上（国内一张 100KB+ 从纽约拉，图库因此一直很慢）。
 	const urls = new Map()
 	for (const item of list) {
 		for (const s of specs) {
 			for (const sl of slotsOf(item, s.path)) {
 				const v = sl.obj[sl.key]
-				if (typeof v === 'string' && /^https?:\/\//.test(v)) urls.set(v, s.preset)
+				if (typeof v === 'string' && /^https?:\/\//.test(v)) {
+					urls.set(v + '|' + s.preset.maxWidth, { url: v, preset: s.preset })
+				}
 			}
 		}
 	}
 
-	const all = [...urls]
+	const all = [...urls.values()]
 	if (!all.length) return
 
 	console.log(`  图片: ${all.length} 个地址待处理`)
@@ -283,7 +291,7 @@ async function mirrorImages(list, fields) {
 	let idx = 0
 	const worker = async () => {
 		while (idx < all.length) {
-			const [url, preset] = all[idx++]
+			const { url, preset } = all[idx++]
 			await mirrorOne(url, preset)
 		}
 	}
