@@ -291,7 +291,8 @@ const DATASETS = {
 		}
 	},
 
-	// 空间站（/spacestations/，mode=detailed，仅 15 个，一页抓完）。
+	// 空间站（/space_stations/，mode=detailed，仅 15 个，一页抓完）。
+	// 注意 LL2 2.3.0 的端点名是 space_stations（带下划线），不是 spacestations（404）。
 	// active_expeditions 在 detailed 才有，含当前乘组；description 翻中文。
 	spacestations: {
 		file: 'spacestations.json',
@@ -299,7 +300,7 @@ const DATASETS = {
 		images: ['img'],
 		localize: localizeStations,
 		async fetch() {
-			const j = await getJson('/spacestations/?limit=100&mode=detailed&format=json')
+			const j = await getJson('/space_stations/?limit=100&mode=detailed&format=json')
 			const all = j.results || []
 			return { count: all.length, list: all.map(slimStation) }
 		}

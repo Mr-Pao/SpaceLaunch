@@ -592,7 +592,7 @@ function slimCrewMember(c) {
 }
 
 /**
- * 空间站（/spacestations/，mode=detailed，仅 15 个）。
+ * 空间站（/space_stations/，mode=detailed，仅 15 个）。
  *
  * 关键字段：active_expeditions（当前远征队，detailed 才有，自带 crew）——直接内联，
  * 详情页就不必跨数据集查乘组了。owners 是完整 agency 数组（含长 description），
