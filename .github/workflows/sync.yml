@@ -86,8 +86,11 @@ permissions:
   contents: write
 
 concurrency:
-  # 同一数据集不并发，避免两次抓取同时写同一个文件
-  group: sync-${{ github.event.schedule || inputs.dataset || 'push' }}
+  # schedule/dispatch 用数据集名做组，保证同一数据集不并发，避免两次抓取同时写同一个文件。
+  # push 手动触发（改 sync-request.json 重跑某数据集）用 commit sha 做组：每次 push 都唯一，
+  # 这样连续重跑多个数据集时不会被合并到同一个 sync-push 组里互相取消（踩过坑：三个数据集连推，
+  # 中间那个被 concurrency 的"只留最新排队"规则吃掉）。
+  group: sync-${{ github.event.schedule || inputs.dataset || github.sha }}
   cancel-in-progress: false
 
 jobs:
