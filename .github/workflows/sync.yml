@@ -8,18 +8,22 @@ name: sync-space-data
 #   upcoming    4 次/小时
 #   events      1 次/小时
 #   previous    1 次/小时
-#   timeline    约 2 次/小时（每 3 小时 6 条单条详情，8 条会在 timeline 轮撞 15 次限额）
+#   timeline    约 1 次/小时（每 6 小时 6 条单条详情，8 条会在 timeline 轮撞 15 次限额）
 #   video       2 次/小时（每轮 10 条发射，detailed 一页 5 条）
-#   images      4 次/小时（每轮 4 个请求：1 页最新 + 游标 3 页，原图补齐 + 图库分片）
+#   images      7 次/小时（每轮 7 个请求：1 页最新 + 游标 6 页，原图补齐 + 图库分片）
 #   cores       每天 1 轮 2 个请求（detailed，UTC 23:00 = 北京 07:00）
 #   astronauts  每天 1 轮 9 个请求（detailed，UTC 23:10 = 北京 07:10）
 #   onthisday   0 次 LL2（只读自家 COS 上的快照 + 归档分片），UTC 03:45 = 北京 11:45
-#   合计        常规小时 13 次；含 timeline 的小时 17 次；
-#               agencies / astronauts 那个小时会短暂到 21，每天一次、429 两三个请求无碍
-#               （images 与 timeline 撞在 0/9/12… 点的那一小时，多出的请求会被 429 挡掉，
-#                 images 单页失败只跳过该页，下一圈补，不影响已有数据）
-# 注意：images 放每小时的 50 分，错开 timeline（0,3,6…点的 20 分）
+#   合计        常规小时 16 次；含 timeline 的小时 21 次；
+#               agencies / astronauts 那个小时会短暂到 24，每天一次、429 两三个请求无碍
+#               （images 与 timeline 撞在 0/6/12/18 点的那一小时，多出的请求会被 429 挡掉。
+#                 images 的游标页失败**不再跳过**：停在最后一个成功位置，下轮重扫，
+#                 所以撞配额只会让进度慢一点，不会留下永远扫不到的空洞）
+# 注意：images 放每小时的 50 分，错开 timeline（0,6,12,18 点的 20 分）
 # 与 video（40 分），尽量不在同一分钟内挤。
+#
+# images 的额度是刻意倾斜的：图库是用户直接看的东西，150 条/轮要 51 小时才扫完一圈，
+# 换成 300 条/轮后约 26 小时。timeline 只是详情页的一小块，放到 6 小时不影响观感。
 #
 # 注意：cron 用的是 UTC。北京时间 = UTC+8
 
@@ -42,7 +46,7 @@ on:
     - cron: '25 4 * * *'     # 空间站：每天 UTC 04:25 = 北京 12:25
     - cron: '35 4 * * *'     # 远征队：每天 UTC 04:35 = 北京 12:35
     - cron: '45 4 * * *'     # 对接事件：每天 UTC 04:45 = 北京 12:45
-    - cron: '20 */3 * * *'   # 发射时间线：每 3 小时（每次 8 条单条详情）
+    - cron: '20 */6 * * *'   # 发射时间线：每 6 小时（每次 8 条单条详情）
     # 发射视频：每小时。只有 mode=detailed 才返回 vid_urls，一页 5 条约 12 秒，
     # 每轮 10 条 = 2 个请求。定在 40 分，避开其它任务的 0 / 15 / 20 / 30 分
     - cron: '40 * * * *'
@@ -128,7 +132,7 @@ jobs:
               "25 4 * * *")   DS="spacestations" ;;
               "35 4 * * *")   DS="expeditions" ;;
               "45 4 * * *")   DS="dockings" ;;
-              "20 */3 * * *") DS="timeline" ;;
+              "20 */6 * * *") DS="timeline" ;;
               "40 * * * *")   DS="video" ;;
               "50 * * * *")   DS="images" ;;
               *)              DS="upcoming" ;;
@@ -161,14 +165,15 @@ jobs:
           # 描述中文化：CI 在海外节点，Google 免费端点可直连且不限量，
           # auto 表示 Google 挂了自动降级到 MyMemory，两条都挂就保留英文
           TRANSLATE_PROVIDER: auto
-          # 时间线每轮抓多少条：sync 自身约用 6 次/小时，这里留 8 条，
-          # timeline 轮 = upcoming 4 + events 1 + previous 1 + 单条详情 6 = 12 次，
-          # 留 3 次余量；8 条时峰值 16 > 15 会被 429 打断整轮（评审 P1-2）
+          # 时间线每轮抓多少条：timeline 轮 = upcoming 4 + events 1 + previous 1
+          # + 单条详情 6 = 12 次；8 条时峰值 16 > 15 会被 429 打断整轮（评审 P1-2）
           TIMELINE_PER_RUN: '6'
           # 视频每轮抓多少条发射：detailed 一页 5 条，10 条 = 2 个请求
           VIDEO_PER_RUN: '10'
-          # 原图全量补齐每轮扫多少条发射：normal 一页 50 条，100 条 = 2 个请求
-          IMAGE_PER_RUN: '150'
+          # 原图全量补齐每轮扫多少条发射：normal 一页 50 条，300 条 = 6 个游标请求
+          # + 1 个「补最新」页 = 7 次。这里会覆盖 scripts/images.js 里的默认值，
+          # 两处要一起改，否则实际跑的是这里的数字
+          IMAGE_PER_RUN: '300'
         run: node sync.js --dataset=${{ steps.pick.outputs.dataset }}
 
       # GitHub 规定：公开仓库连续 60 天无提交，定时任务会被自动停用。

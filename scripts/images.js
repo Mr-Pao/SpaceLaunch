@@ -53,8 +53,12 @@ const INDEX_KEY = 'space-data/gallery.json'
 const ALL_KEY = 'space-data/gallery-all.json'
 const chunkKey = (i) => 'space-data/gallery/' + i + '.json'
 
-// 每轮扫多少条发射 = 3 个请求（limit 50 × 3）
-const PER_RUN = Number(process.env.IMAGE_PER_RUN || 150)
+// 每轮扫多少条发射 = 6 个请求（limit 50 × 6）+ 1 个「补最新」请求。
+// 原先是 150（4 个请求），但 7659 条全量要扫 51 小时，图库一直是几百张的量级。
+// 15 次/小时的匿名配额挤不下更多，所以 sync.yml 里把 timeline 从每 3 小时放到每 6 小时，
+// 腾出的额度换到这边 —— 图库是用户能直接看到的东西，优先给它。
+// 需要临时猛灌时用 IMAGE_PER_RUN=750 node images.js（本地有密钥时）。
+const PER_RUN = Number(process.env.IMAGE_PER_RUN || 300)
 const PAGE = 50
 // 每个分片多少条。500 × ~280B ≈ 140KB，一次拉一片对小程序来说刚好
 const CHUNK = 500
@@ -171,6 +175,14 @@ async function runImages() {
 	addOff(0)
 	for (let off = cursor; off < cursor + PER_RUN; off += PAGE) addOff(off)
 
+	// 游标页失败时不能无条件推进 cursor。
+	// 425/429 撞在 images 上是常态（15 次/小时的匿名配额里要挤 4 个请求），
+	// 以前这里只 continue 跳过、游标照旧 +PER_RUN，那 150 条发射就永远不会再被扫到 ——
+	// 图库一直长不大的真正原因不是"扫得慢"，是"扫过的地方留了洞"。
+	// 现在记下最后一个成功页的结束位置，本轮有失败就停在原地重试，宁可慢也不漏。
+	let maxOk = cursor
+	let cursorPageFailed = false
+
 	for (const off of offsets) {
 		let d
 		try {
@@ -179,8 +191,9 @@ async function runImages() {
 				{ retries: 1 }
 			)
 		} catch (e) {
-			// 单页失败不影响整轮：游标照常推进，下一圈补上
+			// 单页失败不影响整轮：已抓到的照常入库，游标只推进到成功的位置
 			console.warn(`  ! offset=${off} 抓取失败: ${e.message}`)
+			if (off >= cursor) cursorPageFailed = true
 			continue
 		}
 		if (!total && d.count) total = d.count
@@ -197,6 +210,8 @@ async function runImages() {
 				cname: str(r.rocket && r.rocket.configuration && r.rocket.configuration.name)
 			})
 		}
+		// offset=0 那页是"补最新"的额外请求，不参与游标推进
+		if (off >= cursor) maxOk = off + results.length
 		if (results.length < PAGE) break
 	}
 
@@ -304,7 +319,11 @@ async function runImages() {
 	})
 	fs.writeFileSync(allFile, allText, 'utf8')
 
-	const next = cursor + PER_RUN
+	// 有游标页失败就停在最后一个成功位置，那段下轮重来；全部成功才整段推进
+	const next = cursorPageFailed ? maxOk : cursor + PER_RUN
+	if (cursorPageFailed) {
+		console.warn(`  ! 游标页有失败，游标只推进到 ${next}（原计划 ${cursor + PER_RUN}），下轮补扫`)
+	}
 	const payloadCursor = total ? (next >= total ? 0 : next) : next
 
 	fs.writeFileSync(
