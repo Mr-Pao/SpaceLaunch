@@ -58,7 +58,7 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 // v11: launch 增加 rocketBrief（火箭技术参数内联）、pad.map_image、机构累计发射数
 // v12: gallery 改为全量分片（索引带 chunks / chunkSize / launchTotal），
 //      images 轮从 2 小时 100 条提到每小时 150 条，两天扫全历史发射
-const DATA_VERSION = 13
+const DATA_VERSION = 14
 
 /** 读 COS 上已生成的 JSON。桶是公有读，直接走 CDN 地址 */
 async function readCosJson(key) {
@@ -108,8 +108,19 @@ const DATASETS = {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',
 		localize: localizeLaunches,
-		// pad.map_image 是详情页「发射场地」卡的地图，按 750px 单独一档压
-		images: ['image', { path: 'infographic', preset: 'large' }, { path: 'pad.map_image', preset: 'map' }],
+		// pad.map_image 是详情页「发射场地」卡的地图，按 750px 单独一档压。
+		// imageThumb / pad.image / pad.imageThumb 三个字段以前没列进来，
+		// 结果一直指向 LL2 海外域名 —— 而媒体聚合（火箭页轮播、媒体页、发射页
+		// 轮播的补充图）首选的就是 imageThumb，等于那些图全是跨洋加载。
+		// 它们与 image 同源同值，memo 按「URL+预设」命中同一份产物，不额外占空间。
+		images: [
+			'image',
+			'imageThumb',
+			'pad.image',
+			'pad.imageThumb',
+			{ path: 'infographic', preset: 'large' },
+			{ path: 'pad.map_image', preset: 'map' }
+		],
 		enrich: true,
 		async fetch() {
 			// limit=100 仍然是 1 个请求，和原来的 limit=50 同价，首屏条数直接翻倍
@@ -130,7 +141,10 @@ const DATASETS = {
 		cacheControl: 'public, max-age=21600',
 		// 只翻任务名：400 条连描述一起翻会顶破 CI 的 15 分钟上限
 		localize: localizeLaunchNames,
-		images: ['image', { path: 'infographic', preset: 'large' }],
+		// 这个数据集只用于「翻到底加载后续排期」的列表，卡片只显示 image；
+		// imageThumb 一起镜像（同源同产物，零额外成本），pad 的两个字段仍不碰 ——
+		// 376 条里 160 张工位图，为列表页看不到的东西白烧流量不值
+		images: ['image', 'imageThumb', { path: 'infographic', preset: 'large' }],
 		async fetch() {
 			const all = []
 			let count = 0
@@ -152,7 +166,14 @@ const DATASETS = {
 		file: 'launches-previous.json',
 		cacheControl: 'public, max-age=3600',
 		localize: localizeLaunches,
-		images: ['image', { path: 'infographic', preset: 'large' }, { path: 'pad.map_image', preset: 'map' }],
+		images: [
+			'image',
+			'imageThumb',
+			'pad.image',
+			'pad.imageThumb',
+			{ path: 'infographic', preset: 'large' },
+			{ path: 'pad.map_image', preset: 'map' }
+		],
 		enrich: true,
 		async fetch() {
 			// limit=100 仍是 1 个请求，和 limit=50 同价：已发射页首屏翻倍，

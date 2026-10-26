@@ -43,7 +43,17 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 //     并新增按需拉分片的 galleryChunk()。不升版本的话，
 //     老用户手里的单文件缓存 6 小时内不会刷新，全量页只翻得动第 0 片
 // v13: 宇航员 slim 新增 missions/evas/生卒/外链（3.1.15），旧缓存 key 失效强制重拉
-const DATA_VERSION = 13
+const DATA_VERSION = 14
+
+/**
+ * 图库自己的缓存版本戳。
+ *
+ * 图库和其它数据集不一样：它每天都在往上涨（CI 每小时补一批发射的照片），
+ * 而 DATA_VERSION 只在「slim 结构变了」时才升。结果就是数据天天变、缓存里的
+ * 那份旧快照却要挂满 TTL —— 用户看到「200 张」，服务端其实早就是别的数字了。
+ * 拆一个独立后缀出来：以后图库数据有大变化只动这里，不用牵动全部数据集的缓存。
+ */
+const GALLERY_V = 1
 
 // 各数据集对应的文件名，必须与 scripts/sync.js 里的 file 一致
 const FILES = {
@@ -113,8 +123,9 @@ const SOFT_TTL = {
 	timelines: 3 * 60 * 60 * 1000,
 	// 视频每小时补 10 条，历史发射的 webcast 基本不会变，同样给宽
 	videos: 6 * 60 * 60 * 1000,
-	// 图库每 2 小时补 100 条发射，给宽一点别反复拉
-	gallery: 6 * 60 * 60 * 1000
+	// 图库每小时都在补图，6 小时太久 —— 一份索引才几十 KB，
+	// 超过 1 小时就顺手在后台换一次，页面不至于长期显示旧张数
+	gallery: 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。
@@ -158,7 +169,9 @@ const inflight = {}
 // ============ 缓存读写 ============
 
 function cacheKey(name) {
-	return 'sl_data_' + name + '_v' + DATA_VERSION
+	// 图库带自己的小版本（v13.1），其它数据集仍只有 DATA_VERSION
+	const v = name === 'gallery' ? DATA_VERSION + '.' + GALLERY_V : DATA_VERSION
+	return 'sl_data_' + name + '_v' + v
 }
 
 function readStorage(name) {

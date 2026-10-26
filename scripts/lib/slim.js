@@ -143,7 +143,13 @@ function slimLaunch(l) {
 		net: str(l.net),
 		image: imageUrl(l.image),
 		// 图片库用的三个附加字段：缩略图省流量、署名当水印、图片名当图注
-		imageThumb: thumbUrl(l.image),
+		//
+		// imageThumb 刻意**不用** LL2 的 thumbnail_url：那个域名
+		// （thespacedevs-prod.nyc3.digitaloceanspaces.com）国内拉一张要好几秒，
+		// 而 sync.js 的镜像只改写配置里列出的字段，imageThumb 不在其中就等于永远漏网。
+		// 让它和 image 同源同值 —— 镜像时 memo 按「URL + 预设」命中同一份产物，
+		// 只上传一次，两个字段指向同一个 COS 地址。
+		imageThumb: imageUrl(l.image),
 		imageCredit: imageCredit(l.image),
 		imageName: str(l.image && l.image.name),
 		// 任务信息图（一张竖版长图）。LL2 里是 URL 字符串，也可能为 null
@@ -179,7 +185,9 @@ function slimLaunch(l) {
 			// 工位照片：图片库里「更多火箭照片」的主力来源之一，
 			// 而且很多是 CCTV / Xinhua 这类现场实拍，正好带 credit 署名
 			image: imageUrl(l.pad && l.pad.image),
-			imageThumb: thumbUrl(l.pad && l.pad.image),
+			// 同上：不用 LL2 的 thumbnail_url，与 image 同源同值，
+			// 镜像时命中同一份 COS 产物（见 slimLaunch 里的说明）
+			imageThumb: imageUrl(l.pad && l.pad.image),
 			imageCredit: imageCredit(l.pad && l.pad.image),
 			imageName: str(l.pad && l.pad.image && l.pad.image.name),
 			// 工位地图（卫星示意图）。详情页「发射场地」卡需要它 ——
@@ -699,6 +707,76 @@ function slimDocking(d) {
 	}
 }
 
+/**
+ * 航天器型号（/spacecraft_configurations/，mode=detailed，仅 46 条，一页抓完）。
+ *
+ * 坑一：端点名。型号库是 spacecraft_configurations（复数 + 下划线），
+ * 而 /spacecraft/ 是「个体飞船」610 条（Soyuz MS-28 这种带编号的实物），
+ * 两者完全不是一回事，写错了会拿到一堆单艘飞船。
+ *
+ * 坑二：normal 模式只给 name / type / agency / family / in_use / image，
+ * 高度、直径、载员、运力、成功率全在 detailed 里 —— 不带宽高参数，
+ * 「型号库」就退化成一张名字清单，必须带 mode=detailed。
+ *
+ * 坑三：family 是从宽到窄的数组（Dragon → Dragon 2），取最后一层才是具体系列；
+ * 21 条型号压根没有 family，这时留空串，前端按「无系列」处理。
+ */
+function slimSpacecraft(c) {
+	const ag = c.agency || {}
+	const country = Array.isArray(ag.country) ? ag.country[0] || {} : {}
+	const fam = Array.isArray(c.family) ? c.family : []
+	const img = c.image || {}
+
+	// history 常常是 details 的开头一段（Apollo 那条完全一样），
+	// 详情页会把两段连着排，这里把重复的前缀从 details 里切掉，省一半正文
+	const history = str(c.history)
+	let details = str(c.details)
+	if (history && details.indexOf(history) === 0) details = details.slice(history.length).trim()
+
+	return {
+		id: c.id ?? null,
+		name: str(c.name),
+		type: str(c.type && c.type.name),
+		// abbrev 是 SpX / RFSA 这种，全名留在 agencyFull 给详情页用
+		agency: str(ag.abbrev || ag.name),
+		agencyFull: str(ag.name),
+		country: str(country.name),
+		cc: str(country.alpha_2_code),
+		family: fam.length ? str(fam[fam.length - 1].name) : '',
+		inUse: !!c.in_use,
+		img: str(img.image_url),
+		// 尺寸：米；crew 人；payload 千克。null 表示该型号不适用
+		//（货运飞船没有 crew_capacity，载人飞船没有 payload_capacity 的情况都有）
+		height: num(c.height),
+		diameter: num(c.diameter),
+		crew: num(c.crew_capacity),
+		humanRated: !!c.human_rated,
+		payload: num(c.payload_capacity),
+		payloadBack: num(c.payload_return_capacity),
+		life: str(c.flight_life),
+		maiden: str(c.maiden_flight),
+		capability: str(c.capability),
+		history,
+		details,
+		// 统计：46 条全有，详情页直接算成功率，前端不做除零
+		flown: num(c.spacecraft_flown),
+		launches: num(c.total_launch_count),
+		ok: num(c.successful_launches),
+		fail: num(c.failed_launches),
+		landings: num(c.attempted_landings),
+		landOk: num(c.successful_landings),
+		landFail: num(c.failed_landings),
+		turnaround: str(c.fastest_turnaround),
+		wiki: str(c.wiki_link),
+		info: str(c.info_link),
+		// 以下由 localize 回填
+		capZh: '',
+		historyZh: '',
+		detailsZh: '',
+		lifeZh: ''
+	}
+}
+
 module.exports = {
 	slimLaunch,
 	slimEvent,
@@ -710,5 +788,6 @@ module.exports = {
 	slimStatLaunch,
 	slimStation,
 	slimExpedition,
-	slimDocking
+	slimDocking,
+	slimSpacecraft
 }
