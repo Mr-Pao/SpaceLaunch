@@ -313,9 +313,22 @@ export default {
 	onLoad() {
 		this.today = todayText()
 
+		// 审核态：今日页是**启动页**，光把内容藏起来不够 —— 审核员打开小程序
+		// 第一眼会停在一片空白上。这里和发射页用同一套：先 switchTab 去火箭大全，
+		// 失败再 reLaunch 兜底（页面栈未就绪时 switchTab 会偶发失败）。
+		// tabBar 在审核态是隐藏的，所以跳过去就回不来，不会又落回空页面。
 		getConfig().then((c) => {
 			this.reviewMode = Boolean(c && c.review)
-			if (!this.reviewMode) this.loadAll()
+			if (this.reviewMode) {
+				uni.switchTab({
+					url: '/pages/rockets/rockets',
+					fail: () => {
+						uni.reLaunch({ url: '/pages/rockets/rockets' })
+					}
+				})
+				return
+			}
+			this.loadAll()
 		})
 	},
 
