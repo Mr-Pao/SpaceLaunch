@@ -374,6 +374,14 @@ export default {
 		},
 
 		/** 轮播源：collectMedia 已把构型图排最前、发射实拍按时间倒序，取前 5 张 */
+		/**
+		 * 首图轮播的图源：同系列聚合结果（型号图 + 该型号的发射实拍 + 工位图）。
+		 *
+		 * 上限 5 张，与发射详情页保持一致 —— 再多首屏就要同时拉好几张大图，
+		 * 而首图区只是「扫一眼」，想看全的走图片库入口。
+		 * 信息图故意留在列表里而不是过滤掉：这个页面可用的实拍本来就少，
+		 * 少了它们有些型号会退化成只剩一张图，那才是真的「滑不动」。
+		 */
 		heroSlides() {
 			return this.media.images
 				.slice(0, 5)
@@ -882,6 +890,8 @@ function byNetDesc(a, b) {
 .hero-dots {
 	position: absolute;
 	right: 32rpx;
+	/* 纯指示，不接事件 —— 否则右上角那一小条会截走滑动 */
+	pointer-events: none;
 	display: flex;
 	align-items: center;
 	gap: 10rpx;
@@ -918,6 +928,10 @@ function byNetDesc(a, b) {
 	opacity: 0.18;
 }
 
+/* 底部压暗渐变：纯装饰，必须让事件穿透。
+   它高 400rpx，而 .hero 只有 560rpx —— 相当于盖住首图下半部 71%，
+   不加 pointer-events: none 的话在中间滑动会被它整块吃掉，
+   表现就是「自动轮播在动，手动怎么滑都不动」 */
 .hero-mask {
 	position: absolute;
 	left: 0;
@@ -925,6 +939,7 @@ function byNetDesc(a, b) {
 	bottom: 0;
 	height: 400rpx;
 	background: linear-gradient(to bottom, rgba(10, 14, 23, 0) 0%, rgba(10, 14, 23, 0.8) 50%, #0a0e17 100%);
+	pointer-events: none;
 }
 
 /* 制造方面包屑 */
@@ -956,12 +971,15 @@ function byNetDesc(a, b) {
 	transform: rotate(45deg);
 }
 
+/* 标题/标签/入口这一层也压在图下半部，同样不能让它在空白处截走滑动；
+   里面真正要点的「图片库」入口单独放开事件 */
 .hero-body {
 	position: absolute;
 	left: 0;
 	right: 0;
 	bottom: 0;
 	padding: 0 32rpx 34rpx;
+	pointer-events: none;
 }
 
 .hero-name {
@@ -1007,6 +1025,8 @@ function byNetDesc(a, b) {
 	backdrop-filter: blur(20rpx) saturate(150%);
 	border: 1rpx solid rgba(255, 255, 255, 0.22);
 	box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.18);
+	/* 父级 .hero-body 已放开事件拦截，这里把它单独收回来 —— 它是真要点的 */
+	pointer-events: auto;
 }
 
 .hero-media-hover {

@@ -579,6 +579,37 @@ export function craftStatusName(value) {
 	return CRAFT_STATUS_ZH[s.toLowerCase()] || s
 }
 
+/**
+ * 活动类型中文名（events.json 里的 type.name）。
+ *
+ * 实测 27 条活动只有 9 种类型，全是「航天器正在做什么」这类描述：
+ * Orbital Insertion / Spacecraft Berthing / Flyby —— 直接摆英文，
+ * 中文用户读不出重点。命中不到就回英文原串，不硬归成「其他」。
+ */
+const EVENT_TYPE_ZH = {
+	eva: '舱外活动',
+	flyby: '飞掠',
+	docking: '对接',
+	undocking: '分离',
+	landing: '着陆',
+	launch: '发射',
+	'orbital insertion': '轨道插入',
+	'spacecraft landing': '航天器着陆',
+	'spacecraft docking': '航天器对接',
+	'spacecraft undocking': '航天器分离',
+	'spacecraft berthing': '航天器停靠',
+	'spacecraft release': '航天器释放',
+	'spacecraft event': '航天器事件',
+	'deep space maneuver': '深空机动',
+	'trajectory correction maneuver': '轨道修正'
+}
+
+export function eventTypeName(value) {
+	const s = zhValue(value)
+	if (!s) return ''
+	return EVENT_TYPE_ZH[s.toLowerCase()] || s
+}
+
 /** 目的地：先查航天器专用表（ISS / 月球这类不是轨道），再回退轨道表 */
 export function destName(value) {
 	const s = zhValue(value)

@@ -1,5 +1,7 @@
 <template>
-	<view class="acts">
+	<!-- 没数据就整块不渲染：否则今日页的空态判断会被这一块「有节点但没内容」的
+	     空壳带偏，出现「空态提示 + 一个空标题」并排 -->
+	<view class="acts" v-if="loading || visible.length">
 		<view class="acts-head">
 			<text class="acts-title">近期活动</text>
 			<view class="acts-more" hover-class="acts-more-hover" @click="goAll">
@@ -9,33 +11,57 @@
 		</view>
 
 		<view class="acts-list">
-			<view class="card" v-for="item in items" :key="item.id" hover-class="card-hover" @click="goAll">
-				<image
-					v-if="item.feature_image"
-					class="cover"
-					:src="item.feature_image"
-					mode="aspectFill"
-					lazy-load
-				></image>
-				<view v-else class="cover cover-empty">
-					<text class="cover-icon">🛰️</text>
+			<!-- 骨架屏：形状对齐活动卡（上图下文、封面 260rpx），
+			     不复用 skeleton-card —— 那个是发射卡的「图左文右」，形状对不上，
+			     占位和真卡一换会整块往下跳 -->
+			<template v-if="loading">
+				<view class="sk-card" v-for="i in limit" :key="'sk' + i">
+					<view class="sk-cover"></view>
+					<view class="sk-body">
+						<view class="sk-line" style="width: 42%"></view>
+						<view class="sk-line" style="width: 76%"></view>
+						<view class="sk-line" style="width: 58%"></view>
+					</view>
 				</view>
+			</template>
 
-				<view class="body">
-					<view class="top">
-						<text class="type">{{ (item.type && item.type.name) || '活动' }}</text>
-						<text class="date">{{ formatShort(item.date) }}</text>
+			<template v-else>
+				<view class="card" v-for="item in visible" :key="item.id" hover-class="card-hover" @click="goDetail(item)">
+					<image
+						v-if="item.feature_image"
+						class="cover"
+						:src="item.feature_image"
+						mode="aspectFill"
+						lazy-load
+					></image>
+					<view v-else class="cover cover-empty">
+						<text class="cover-icon">🛰️</text>
 					</view>
-					<text class="title">{{ item.name }}</text>
-					<view class="tags" v-if="item.location">
-						<text class="tag">{{ item.location }}</text>
+
+					<view class="body">
+						<view class="top">
+							<text class="type">{{ (item.type && item.type.name) || '活动' }}</text>
+							<text class="date">{{ formatShort(item.date) }}</text>
+						</view>
+						<text class="title">{{ item.name }}</text>
+						<view class="tags" v-if="item.location">
+							<text class="tag">{{ item.location }}</text>
+						</view>
+						<text class="desc" v-if="descOf(item)">{{ descOf(item) }}</text>
 					</view>
-					<text class="desc" v-if="descOf(item)">{{ descOf(item) }}</text>
 				</view>
-			</view>
+			</template>
 		</view>
 
-		<view class="acts-foot" v-if="items.length" hover-class="acts-foot-hover" @click="goAll">
+		<!-- 下拉到底自动续上一批（宿主页 onReachBottom 驱动），
+		     这一行只说清「还有没有」，不做可点按钮。加载期不显示，
+		     否则骨架屏脚下会挂一句「已显示全部 0 条」 -->
+		<view class="acts-hint" v-if="!loading">
+			<text v-if="hasMore">上拉加载更多 · 已显示 {{ visible.length }}/{{ items.length }}</text>
+			<text v-else>已显示全部 {{ items.length }} 条</text>
+		</view>
+
+		<view class="acts-foot" v-if="items.length && !loading" hover-class="acts-foot-hover" @click="goAll">
 			<text>查看全部活动</text>
 			<text class="acts-arrow">›</text>
 		</view>
@@ -54,9 +80,31 @@ import { formatShort, truncate } from '@/utils/format.js'
  * 完整列表仍留在 event 页，避免首页出现第二套分页体系。
  */
 export default {
+	// limit 是「首屏露几条」，同时也是每次下拉追加的步长。
+	// 今日页整页是滚动容器，活动排在最后一屏，滚到底就自动续上一批，
+	// 直到 27 条全部出来为止 —— 不需要「加载更多」按钮。
+	props: {
+		limit: { type: Number, default: 4 }
+	},
+
 	data() {
 		return {
-			items: []
+			// 全量留在内存里，只控制露几条：events.json 就 27 条，
+			// 与其为了翻页再请求一遍，不如一次拿全、按需展示
+			items: [],
+			shown: 0,
+			// 首次拉取期间显示骨架屏：今日页其它块都是「数据没到就先占位」，
+			// 这一块以前是真空白，滚到这儿会以为页面断了
+			loading: true
+		}
+	},
+
+	computed: {
+		visible() {
+			return this.items.slice(0, this.shown)
+		},
+		hasMore() {
+			return this.shown < this.items.length
 		}
 	},
 
@@ -70,14 +118,32 @@ export default {
 		async load() {
 			try {
 				const d = await spaceData.load('events')
-				this.items = (d && d.list || []).slice(0, 4)
+				this.items = (d && d.list) || []
+				this.shown = Math.min(this.limit, this.items.length)
 			} catch (e) {
 				console.warn('[activity-section] 加载活动失败', e)
+			} finally {
+				// 失败也要收骨架屏，否则它会一直呼吸、像是永远在加载
+				this.loading = false
 			}
+		},
+
+		// 由宿主页的 onReachBottom 调用（组件自己拿不到页面滚动事件）
+		loadMore() {
+			if (!this.hasMore) return 0
+			const before = this.shown
+			this.shown = Math.min(this.shown + this.limit, this.items.length)
+			return this.shown - before
 		},
 
 		descOf(item) {
 			return truncate(item.descriptionZh || item.description, 50)
+		},
+
+		/** 卡片进详情页；「全部 / 查看全部活动」仍然去列表页 */
+		goDetail(item) {
+			if (!item || item.id == null) return
+			uni.navigateTo({ url: '/pages/event/eventInfo?id=' + item.id })
 		},
 
 		goAll() {
@@ -116,6 +182,43 @@ export default {
 .acts-arrow {
 	font-size: 30rpx;
 	margin-left: 4rpx;
+}
+
+/* 骨架屏：封面高度、圆角、外边距全部对齐 .card，
+   数据到位后从占位换成真卡不会产生一次跳动 */
+.sk-card {
+	margin-bottom: 24rpx;
+	background: #141a26;
+	border-radius: 20rpx;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	overflow: hidden;
+	animation: acts-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes acts-breathe {
+	0%, 100% { opacity: 0.45; }
+	50% { opacity: 1; }
+}
+
+.sk-cover {
+	width: 100%;
+	height: 260rpx;
+	background: #1a2231;
+}
+
+.sk-body {
+	padding: 22rpx 28rpx 26rpx;
+}
+
+.sk-line {
+	height: 24rpx;
+	margin-bottom: 16rpx;
+	border-radius: 8rpx;
+	background: #1a2231;
+}
+
+.sk-line:last-child {
+	margin-bottom: 0;
 }
 
 .card {
@@ -207,6 +310,15 @@ export default {
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
 	overflow: hidden;
+}
+
+.acts-hint {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 4rpx 0 20rpx;
+	color: #4d596b;
+	font-size: 22rpx;
 }
 
 .acts-foot {

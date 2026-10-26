@@ -72,12 +72,10 @@
 				<swiper
 					v-if="heroImages.length > 1"
 					class="hero-swiper"
-					:indicator-dots="true"
-					indicator-color="rgba(255,255,255,0.35)"
-					indicator-active-color="#38bdf8"
 					:autoplay="true"
 					:interval="5000"
 					circular
+					@change="onHeroChange"
 				>
 					<swiper-item v-for="(img, i) in heroImages" :key="i">
 						<image
@@ -101,26 +99,43 @@
 
 				<view class="hero-mask"></view>
 
-				<!-- 图片库入口：仿火箭详情页，叠在首图左下角，点击进该系列媒体库。
-				     只在该系列确实有图时显示，避免「入口有数字、进去是空」的割裂感 -->
+				<!-- 轮播指示点：照火箭详情页那一套 —— 右上角一排小圆点，
+				     当前那张拉成短胶囊。比「1/8」这种数字角标安静得多，
+				     也不会和下面的状态徽章抢位置。
+				     必须放在渐变遮罩之后渲染，否则会被压暗到看不见 -->
 				<view
-					class="hero-media"
-					v-if="!reviewMode && heroMediaCount && heroImages.length"
-					hover-class="hero-media-hover"
-					@click="goMedia('image')"
+					class="hero-dots"
+					v-if="heroImages.length > 1"
+					:style="{ top: statusBarH + 56 + 'px' }"
 				>
-					<view class="hm-icon">
-						<view class="hm-dot"></view>
-						<view class="hm-dot"></view>
-						<view class="hm-dot"></view>
-						<view class="hm-dot"></view>
-					</view>
-					<text class="hm-text">图片库</text>
-					<text class="hm-count">{{ heroMediaCount }}</text>
+					<view
+						class="hero-dot"
+						v-for="(img, i) in heroImages"
+						:key="'d' + i"
+						:class="{ on: i === heroIdx }"
+					></view>
 				</view>
 
-				<!-- 图片计数角标：多图轮播时才有意义，单图显示「1/1」纯噪音 -->
-				<view class="hero-count" v-if="heroImages.length > 1">1/{{ heroImages.length }}</view>
+				<!-- 首图右下角：图片库入口（计数已去掉，圆点负责表示进度） -->
+				<view class="hero-tools">
+					<!-- 图片库入口：只在该系列确实有图时显示，
+					     避免「入口有数字、进去是空」的割裂感 -->
+					<view
+						class="hero-media"
+						v-if="!reviewMode && heroMediaCount && heroImages.length"
+						hover-class="hero-media-hover"
+						@click="goMedia('image')"
+					>
+						<view class="hm-icon">
+							<view class="hm-dot"></view>
+							<view class="hm-dot"></view>
+							<view class="hm-dot"></view>
+							<view class="hm-dot"></view>
+						</view>
+						<text class="hm-text">图片库</text>
+						<text class="hm-count">{{ heroMediaCount }}</text>
+					</view>
+				</view>
 			</view>
 
 			<view class="body">
@@ -172,6 +187,7 @@
 								<text class="fav-text">{{ isFav ? '已收藏' : '收藏' }}</text>
 							</view>
 							<view class="remind" :class="{ on: isReminded }" v-if="isUpcoming" @click="addReminder">
+								<view class="remind-bell"></view>
 								<text class="remind-text">{{ isReminded ? '已提醒' : '提醒' }}</text>
 							</view>
 						</view>
@@ -487,6 +503,8 @@ export default {
 			const i = this.album.findIndex((x) => x && String(x.id) === String(v))
 			this.cur = i >= 0 ? i : 0
 			this.st = 0
+			// 换了一条发射，首图区重排，角标也要回到第 1 张
+			this.heroIdx = 0
 			if (this.photo) uni.pageScrollTo({ scrollTop: 0, duration: 0 })
 		}
 	},
@@ -497,6 +515,10 @@ export default {
 			agency: null,
 			// 同系列媒体聚合（图片库 / 视频库入口的数字来自这里，和媒体页同一口径）
 			media: null,
+			// 首图轮播的当前页：圆点靠它判断高亮，换发射时归零
+			heroIdx: 0,
+			// 状态栏高度（组件不是页面，拿不到 navMixin，created 里自己取）
+			statusBarH: 20,
 			loading: true,
 			isFav: false,
 			// 是否已写进系统日历提醒（API 无查询能力，本地记一笔防重复添加）
@@ -596,7 +618,30 @@ export default {
 		heroImages() {
 			const d = this.detail
 			if (!d) return []
-			return [d.image].filter(Boolean)
+
+			const out = []
+			const seen = {}
+			const push = (u) => {
+				if (!u || seen[u]) return
+				seen[u] = 1
+				out.push(u)
+			}
+
+			// 首图固定是本任务自己的图，无论聚合结果怎么排都压在最前
+			push(d.image)
+
+			// 再补同系列的照片，让首图区真的轮播起来（以前这里恒返回 1 张，
+			// swiper 分支等于死代码）。信息图是长图、字多，塞进首图很跳，跳过；
+			// 上限 5 张：首屏流量与「轮播」的观感在这里取平衡，也和火箭详情页一致。
+			// 想看全的走「图片库」入口，那边是完整聚合
+			const imgs = (this.media && this.media.images) || []
+			for (const it of imgs) {
+				if (out.length >= 5) break
+				if (it.kind === 'infographic') continue
+				push(it.thumb || it.url)
+			}
+
+			return out
 		},
 		// 同系列媒体聚合只在媒体页算过一次，这里复用同样的 collectMedia，
 		// 入口数字必须和媒体页一致 —— 入口写 39 张、点进去只有 20 张最招疑。
@@ -954,6 +999,9 @@ export default {
 			const info = uni.getSystemInfoSync()
 			this.winW = info.windowWidth || 375
 			this.winH = info.windowHeight || 667
+			// 轮播圆点要按状态栏高度定位（避开右上角微信胶囊），组件不是页面，
+			// 拿不到 navMixin，这里自己取一次
+			this.statusBarH = info.statusBarHeight || 20
 			this.heroPx = uni.upx2px(HERO_RPX) || 330
 		} catch (e) {
 			// 取不到就用 375×667 / 首图 330px，绝大多数机型在这个值附近
@@ -1653,6 +1701,12 @@ export default {
 			}
 		},
 
+		/** 首图轮播翻页：让 1/N 跟上当前下标 */
+		onHeroChange(e) {
+			const i = e && e.detail && e.detail.current
+			this.heroIdx = typeof i === 'number' && i >= 0 ? i : 0
+		},
+
 		/** 进图片库 / 视频库：传发射的型号 id，媒体页按系列聚合展示 */
 		goMedia(tab) {
 			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
@@ -1887,29 +1941,47 @@ export default {
 	width: 100%;
 	height: 200rpx;
 	background: linear-gradient(to bottom, rgba(10, 14, 23, 0) 0%, #0a0e17 100%);
+	/* 纯装饰渐变，必须让事件穿透 —— 否则首图底部一截滑不动 */
+	pointer-events: none;
 }
 
-/* 图片计数角标：右上角压在图上，给一层半透明底保证在亮天空上也读得清 */
-.hero-count {
+/* 轮播指示点：与火箭详情页同一套 —— 右上角一排小圆点，当前那张拉成短胶囊 */
+.hero-dots {
+	position: absolute;
+	right: 32rpx;
+	z-index: 2;
+	/* 纯指示，不接事件，否则右上角那一小条会截走滑动 */
+	pointer-events: none;
+	display: flex;
+	align-items: center;
+	gap: 10rpx;
+}
+
+.hero-dot {
+	width: 10rpx;
+	height: 10rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.38);
+	transition: all 0.3s ease;
+}
+
+.hero-dot.on {
+	width: 26rpx;
+	background: rgba(255, 255, 255, 0.95);
+}
+
+/* 首图右下角：图片库入口（进度由圆点表示，这里只剩入口本身） */
+.hero-tools {
 	position: absolute;
 	right: 24rpx;
-	bottom: 24rpx;
-	padding: 4rpx 16rpx;
-	border-radius: 24rpx;
-	background: rgba(0, 0, 0, 0.42);
-	color: rgba(255, 255, 255, 0.92);
-	font-size: 22rpx;
-	line-height: 32rpx;
-	letter-spacing: 1rpx;
+	bottom: 80rpx;
+	z-index: 2;
+	display: flex;
+	align-items: center;
 }
 
-/* 图片库入口：磨砂胶囊，叠在首图左下角，与火箭详情页同一套语言。
-   用绝对定位，避免挤占右下角的计数角标 */
+/* 图片库入口：磨砂胶囊，与火箭详情页同一套语言 */
 .hero-media {
-	position: absolute;
-	left: 24rpx;
-	bottom: 24rpx;
-	z-index: 2;
 	display: flex;
 	align-items: center;
 	padding: 7rpx 18rpx;
@@ -2542,10 +2614,45 @@ export default {
 	display: flex;
 	align-items: center;
 	margin-left: 20rpx;
-	padding: 8rpx 22rpx;
+	/* 20rpx 与分享/收藏对齐（原来是 22rpx，三个胶囊并排时右边会多出一点） */
+	padding: 8rpx 20rpx;
 	border-radius: 40rpx;
 	background: rgba(56, 189, 248, 0.1);
 	border: 1rpx solid rgba(56, 189, 248, 0.28);
+}
+
+/* 提醒图标：纯 CSS 画的钟形，线宽 2rpx，与 ★ / ⤴ 是同一套线条语言。
+   不用 ⏰ 🔔 —— 这两个码位在 iOS/Android 上都按彩色 emoji 渲染，
+   旁边是单色符号，三个胶囊摆一起会明显粗细不齐、还凭空多一块底色 */
+.remind-bell {
+	position: relative;
+	flex-shrink: 0;
+	/* 20×19rpx：26rpx 的字符（★ ⤴）字形高约 19rpx，
+	   矮一点点是为了让底横线和文字基线看起来齐 */
+	width: 20rpx;
+	height: 19rpx;
+	margin-right: 8rpx;
+	box-sizing: border-box;
+	border: 2rpx solid #38bdf8;
+	border-bottom: none;
+	border-radius: 10rpx 10rpx 0 0;
+}
+
+/* 铃口横线：比铃身左右各宽一点，才像倒扣的钟，不是半个圆环 */
+.remind-bell::after {
+	content: '';
+	position: absolute;
+	left: -3rpx;
+	right: -3rpx;
+	bottom: -2rpx;
+	height: 2rpx;
+	background: #38bdf8;
+	border-radius: 2rpx;
+}
+
+/* 已提醒：铃身填满，不用读文字也能看出状态 */
+.remind.on .remind-bell {
+	background: rgba(56, 189, 248, 0.55);
 }
 
 .remind.on {

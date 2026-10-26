@@ -27,7 +27,7 @@
 					</view>
 				</template>
 
-				<view class="card" v-for="item in visible" :key="item.id">
+				<view class="card" v-for="item in visible" :key="item.id" hover-class="card-hover" @click="goDetail(item)">
 					<image
 						v-if="item.feature_image"
 						class="cover"
@@ -120,6 +120,11 @@ export default {
 		// 也避免整页看起来像「科普文章列表」（审核按内容型小程序判类目会拒）
 		descOf(item) {
 			return truncate(item.descriptionZh || item.description, 60)
+		},
+
+		goDetail(item) {
+			if (!item || item.id == null) return
+			uni.navigateTo({ url: '/pages/event/eventInfo?id=' + item.id })
 		}
 	}
 }

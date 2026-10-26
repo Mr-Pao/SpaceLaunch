@@ -59,6 +59,17 @@
 				</view>
 			</view>
 
+		<!-- 简介紧接战绩：看完「飞过几次、出舱多少小时」之后，
+		     下一步最想知道的就是「这人是谁」，而不是先看一串链接。
+		     CI 只给在轨人员翻了中文，缺失回退英文原文 -->
+		<view class="card" v-if="bioText">
+			<view class="card-title">简介</view>
+			<text class="desc" :class="{ open: descExpanded }">{{ bioText }}</text>
+			<text class="desc-toggle" v-if="descOver" @click="descExpanded = !descExpanded">
+				{{ descExpanded ? '收起' : '展开全文' }}
+			</text>
+		</view>
+
 		<!-- 所属空间站 / 参与远征队：与 station / expedition 页反向索引，
 		     构成「宇航员 ↔ 空间站 ↔ 远征队」闭环。在轨人员在这里能看到
 		     自己当前所在站，历史航天员能看到自己执行过的远征队。 -->
@@ -116,15 +127,6 @@
 					</view>
 					<text class="eva-h" v-if="e.h">{{ e.h }} 小时</text>
 				</view>
-			</view>
-
-			<!-- 简介：CI 只给在轨人员翻了中文，缺失回退英文 -->
-			<view class="card" v-if="bioText">
-				<view class="card-title">简介</view>
-				<text class="desc" :class="{ open: descExpanded }">{{ bioText }}</text>
-				<text class="desc-toggle" v-if="descOver" @click="descExpanded = !descExpanded">
-					{{ descExpanded ? '收起' : '展开全文' }}
-				</text>
 			</view>
 
 			<!-- 资料：生卒 / 相关链接（小程序打不开网页，点了复制链接） -->

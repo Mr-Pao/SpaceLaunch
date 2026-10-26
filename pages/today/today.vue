@@ -134,6 +134,11 @@
 				</view>
 			</view>
 
+			<!-- 5 近期活动（EVA / 轨道插入 / 飞掠这类「不是发射但同样在看」的事）。
+			     它以前挂在发射页列表最底部，100 条发射压在上面，等于没人看得到，
+			     现在搬到今日页当第五块；活动页仍是完整列表的落点 -->
+			<activity-section ref="acts" :limit="3" />
+
 			<!-- 四块都没数据（冷启动 + 全挂了）：给一句人话，别留空白页 -->
 			<view class="empty" v-if="!daily && !inSpace.length && !next && !otd.length">
 				<text class="empty-icon">🛰️</text>
@@ -194,6 +199,8 @@ export default {
 			reviewMode: false,
 			loading: true,
 			imgBroken: false,
+			// 每日一图的原图是否已预载完成：false 时 dailySrc 先给缩略图顶上
+			fullReady: false,
 			today: '',
 			gallery: [],
 			astronauts: [],
@@ -220,12 +227,19 @@ export default {
 			return pickDaily(this.gallery, this.daySeed())
 		},
 
-		// 优先 2000px 原图（卡片铺满整行，480px 会糊），加载失败回退缩略图
+		// 缩略图先上屏、原图到了再换（卡片铺满整行，480px 最终会糊，
+		// 但那是「先看到图」之后的事，不该为清晰度付首屏的等待）
 		dailySrc() {
-			if (!this.daily) return ''
-			const thumb = this.daily.thumb || ''
-			if (this.imgBroken) return thumb
-			return fullImageOf(thumb) || thumb
+			const t = (this.daily && this.daily.thumb) || ''
+			if (!t) return ''
+
+			// 首屏永远先给缩略图：它是 COS 上几十 KB 的小图，几乎和文字同一帧到；
+			// 原图（{hash}_2000）动辄几百 KB —— 以前直接把原图当 src，
+			// 表现就是「有时候这块要空一会儿才出图」。
+			// 原图在后台预载，到了再把 src 换过去；两张都是 aspectFill、
+			// 同一构图，替换的瞬间看不出跳。
+			if (this.imgBroken || !this.fullReady) return t
+			return fullImageOf(t) || t
 		},
 
 		/** LL2 的名字是「火箭型号 | 任务名」，卡片上只留任务名 ——
@@ -283,6 +297,19 @@ export default {
 		}
 	},
 
+	/**
+	 * 每日一图换了（换了天、或 gallery 首次到达）就重新预载原图。
+	 *
+	 * gallery 是异步到的，daily 一开始是 null、拿到数据后才变成具体那张，
+	 * 所以必须 watch 而不是在 onLoad 里预载一次。
+	 */
+	watch: {
+		daily(nv) {
+			this.fullReady = false
+			if (nv && nv.thumb) this.preloadDailyFull(nv.thumb)
+		}
+	},
+
 	onLoad() {
 		this.today = todayText()
 
@@ -308,10 +335,47 @@ export default {
 		this.loadAll(true).then(() => uni.stopPullDownRefresh())
 	},
 
+	/**
+	 * 滚到底自动续活动。
+	 *
+	 * 活动排在整页最后一块，所以「触底」基本就等于「活动看完了」，
+	 * 直接让子组件再放一批出来（每次一批 = limit 条）。
+	 * 往年今日展开后页面变长，也会自然多触发几次，直到 27 条全出。
+	 */
+	onReachBottom() {
+		const acts = this.$refs.acts
+		if (acts) acts.loadMore()
+	},
+
 	methods: {
 		/** 模板里用 astroName(a)：中国籍显示中文名。options API 的模板看不到模块作用域 */
 		astroName(a) {
 			return astroNameOf(a)
+		},
+
+		/**
+		 * 后台把每日一图的原图拉下来。
+		 *
+		 * 用 getImageInfo 而不是再挂一个隐藏 image：它会把图落到本地缓存，
+		 * 之后 dailySrc 切到同一个 URL 时直接命中缓存，不会二次下载。
+		 * 失败就静默保持缩略图 —— 用户只会觉得「这张没那么清楚」，
+		 * 而不是看到一个裂图或一直转圈。
+		 */
+		preloadDailyFull(thumb) {
+			const full = fullImageOf(thumb)
+			if (!full || full === thumb) {
+				this.fullReady = true
+				return
+			}
+			uni.getImageInfo({
+				src: full,
+				success: () => {
+					this.fullReady = true
+				},
+				fail: () => {
+					// 原图不存在或网差：一直用缩略图
+				}
+			})
 		},
 
 		daySeed() {
@@ -427,9 +491,11 @@ export default {
 	margin-bottom: 14rpx;
 }
 
+/* 四块标题统一 34rpx：观察下来 30rpx 偏小，
+   「近期活动」那块的 acts-title 一直是 34rpx，两个大标题并排时肉眼能看出差一档 */
 .sec-title {
 	color: #ffffff;
-	font-size: 30rpx;
+	font-size: 34rpx;
 	font-weight: 600;
 	letter-spacing: 1rpx;
 }
