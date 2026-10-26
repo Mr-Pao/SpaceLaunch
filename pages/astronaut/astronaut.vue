@@ -13,7 +13,9 @@
 
 		<block v-else>
 			<!-- 顶部：证件照 + 名字 + 徽标。在轨的挂亮蓝「在轨」章 -->
-			<view class="head">
+			<!-- 顶部 padding 必须动态让出状态栏 + 胶囊按钮（fixed 导航不占位），
+			     写死 36rpx 会被微信胶囊压住名字行 -->
+			<view class="head" :style="{ paddingTop: statusBarH + 52 + 'px' }">
 				<image
 					v-if="a.img"
 					class="avatar"
@@ -396,11 +398,11 @@ function destZhOf(v) {
 	font-size: 26rpx;
 }
 
-/* 头部 */
+/* 头部：padding-top 由 statusBarH 动态接管（让出状态栏+胶囊），这里只管左右下 */
 .head {
 	display: flex;
 	align-items: center;
-	padding: 36rpx 32rpx 8rpx;
+	padding: 0 32rpx 8rpx;
 }
 
 .avatar {

@@ -77,7 +77,6 @@
 
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
-import { syncTabBar } from '@/utils/tabbar.js'
 import { formatShort, truncate } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -98,10 +97,6 @@ export default {
 			this.reviewMode = Boolean(c && c.review)
 			if (!this.reviewMode) this.getData()
 		})
-	},
-
-	onShow() {
-		syncTabBar(4)
 	},
 
 	onPullDownRefresh() {

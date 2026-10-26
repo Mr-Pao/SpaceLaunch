@@ -10,7 +10,8 @@
 		</view>
 
 		<block v-else>
-			<view class="head">
+			<!-- padding-top 动态让出状态栏+胶囊（fixed 导航不占位），写死会顶进胶囊区域 -->
+			<view class="head" :style="{ paddingTop: statusBarH + 52 + 'px' }">
 				<text class="name">{{ exp.name }}</text>
 				<view class="sub">
 					<text class="range">{{ rangeText }}</text>
@@ -137,7 +138,7 @@ export default {
 }
 
 .head {
-	padding: 40rpx 32rpx 8rpx;
+	padding: 0 32rpx 8rpx;
 }
 
 .name {

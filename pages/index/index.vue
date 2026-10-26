@@ -138,6 +138,9 @@
 				<text v-else>已显示全部 {{ visible.length }} 条</text>
 			</view>
 			</template>
+
+			<!-- 近期活动：原活动 tab 的入口搬回首页底部，做预览 + 查看全部 -->
+			<activity-section />
 			</view>
 		</block>
 

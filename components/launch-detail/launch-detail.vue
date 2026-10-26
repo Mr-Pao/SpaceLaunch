@@ -1,11 +1,9 @@
 <template>
-<!-- 发射详情。从列表点进来直接是详情；从图库/每日一图点进来走「图片优先态」：
-	 首图先占满整屏，上拉（页面滚动）时它收缩成详情页的首图，滚到位就是同一页 -->
+	<!-- 发射详情。从列表点进来直接是详情；从图库/每日一图点进来走「图片优先态」：
+	     首图先占满整屏当看图器，底部「查看发射详情」按钮跳到这条发射的详情页 -->
 	<view class="page">
-		<!-- 图片层：钉在屏幕顶，高度由滚动量驱动（整屏 → 660rpx）。
-		     收缩的同时图片从「完整显示」交叉到「满宽裁切」，看起来就是这张图
-		     自己变成了详情页的首图。它是 fixed，滚到位后撤掉，
-		     交给下面 .hero 那张真首图接管，之后才跟手一起滚 -->
+		<!-- 图片层：钉在屏幕顶、恒占满整屏的看图器，左右滑换同组图，
+		     底部「查看发射详情」按钮跳到这张图所属发射的详情页 -->
 		<view
 			class="stage"
 			v-if="photoOn"
@@ -39,26 +37,21 @@
 				></image>
 			</view>
 
-			<!-- 图上信息：不做标题栏，只在底部压一行轻提示 -->
+			<!-- 图上信息 + 底部「查看发射详情」：替代原来的上拉提示，点一下跳到本条发射详情 -->
 			<view class="stage-bar" :style="{ opacity: barOpacity }">
 				<view class="stage-bar-main">
 					<text class="stage-title">{{ photoTitle }}</text>
 					<text class="stage-meta" v-if="photoMeta">{{ photoMeta }}</text>
 				</view>
-				<view class="stage-hint">
-					<text class="stage-hint-arrow">︿</text>
-					<text class="stage-hint-text">上拉</text>
+				<view class="stage-foot">
+					<text class="stage-count" v-if="album.length > 1">{{ cur + 1 }} / {{ album.length }}</text>
+					<view class="more-btn" hover-class="more-btn-hover" @click.stop="goMore">
+						<text class="more-btn-text">查看发射详情</text>
+						<text class="more-btn-arrow">›</text>
+					</view>
 				</view>
 			</view>
-
-			<view class="stage-count" v-if="album.length > 1 && p < 0.05">
-				{{ cur + 1 }} / {{ album.length }}
-			</view>
 		</view>
-
-		<!-- 图片优先态多占的一屏：正文起点 = winH − 滚动量，
-		     与图片层底边严格重合，所以内容是从图的下缘接上来的 -->
-		<view class="spacer" v-if="photoOn" :style="{ height: spacerH }"></view>
 
 		<view class="loading" v-if="loading">
 			<text class="loading-text">加载中...</text>
@@ -107,6 +100,24 @@
 				<view v-else class="hero-img hero-placeholder"></view>
 
 				<view class="hero-mask"></view>
+
+				<!-- 图片库入口：仿火箭详情页，叠在首图左下角，点击进该系列媒体库。
+				     只在该系列确实有图时显示，避免「入口有数字、进去是空」的割裂感 -->
+				<view
+					class="hero-media"
+					v-if="!reviewMode && heroMediaCount && heroImages.length"
+					hover-class="hero-media-hover"
+					@click="goMedia('image')"
+				>
+					<view class="hm-icon">
+						<view class="hm-dot"></view>
+						<view class="hm-dot"></view>
+						<view class="hm-dot"></view>
+						<view class="hm-dot"></view>
+					</view>
+					<text class="hm-text">图片库</text>
+					<text class="hm-count">{{ heroMediaCount }}</text>
+				</view>
 
 				<!-- 图片计数角标：多图轮播时才有意义，单图显示「1/1」纯噪音 -->
 				<view class="hero-count" v-if="heroImages.length > 1">1/{{ heroImages.length }}</view>
@@ -159,6 +170,9 @@
 							<view class="fav" :class="{ on: isFav }" @click="toggleFav">
 								<text class="fav-icon">{{ isFav ? '★' : '☆' }}</text>
 								<text class="fav-text">{{ isFav ? '已收藏' : '收藏' }}</text>
+							</view>
+							<view class="remind" :class="{ on: isReminded }" v-if="isUpcoming" @click="addReminder">
+								<text class="remind-text">{{ isReminded ? '已提醒' : '提醒' }}</text>
 							</view>
 						</view>
 					</view>
@@ -429,13 +443,14 @@ import {
 	massText,
 	costText,
 	isStillUpcoming,
-	textUnits
+	textUnits,
+	seriesKey
 } from '@/utils/format.js'
 import { pickTimeline, sortedTimeline, parseDuration, tlLabel, tlRelative } from '@/utils/timeline.js'
 import * as fav from '@/utils/favorites.js'
 import { getConfig } from '@/utils/config.js'
 import { getAlbum } from '@/utils/album.js'
-import { fullImageOf } from '@/utils/media.js'
+import { fullImageOf, collectMedia } from '@/utils/media.js'
 
 // 详情页首图高度，必须与下面 .hero 的 height 一致（660rpx）
 const HERO_RPX = 660
@@ -448,8 +463,8 @@ export default {
 		id: { type: String, default: '' },
 		// 大致时间（net）：往历史归档里翻的时候用来直达分片，可为空
 		net: { type: String, default: '' },
-		// 图片优先态：进来时首图占满整屏，上拉时收缩成详情页的首图，
-		// 收缩到位后就是普通详情页。从图库/每日一图点进来时用这个模式
+		// 图片优先态：进来时首图占满整屏当看图器，底部「查看发射详情」按钮
+		// 跳到这条发射的详情页。从图库 / 每日一图 / 全量图库点进来时用这个模式
 		photo: { type: Boolean, default: false }
 	},
 
@@ -480,8 +495,12 @@ export default {
 		return {
 			detail: null,
 			agency: null,
+			// 同系列媒体聚合（图片库 / 视频库入口的数字来自这里，和媒体页同一口径）
+			media: null,
 			loading: true,
 			isFav: false,
+			// 是否已写进系统日历提醒（API 无查询能力，本地记一笔防重复添加）
+			isReminded: false,
 			// 任务描述折叠态：默认收起，点击「展开全文」才铺开
 			descExpanded: false,
 			// 发射时间线（T- 序列）原始节点，来自 timelines.json，可能为空
@@ -546,29 +565,9 @@ export default {
 			}
 			return out
 		},
-		/**
-		 * 图片层：高度整屏 → 660rpx。
-		 *
-		 * 为什么用滚动驱动而不是手势驱动：从图库点进来是「进页面」，
-		 * 页面滚多少图片就缩多少，滚到位接着往下滚就是详情 —— 一套滚动，
-		 * 没有「手势接管再交还」的接缝。
-		 */
+		// 图片优先态改「底部按钮跳详情」后，图片层恒占满整屏、不再随滚动收缩
 		stageStyle() {
-			const h = Math.max(this.heroPx, this.winH - Math.min(this.st, this.range))
-			const op = this.p >= 1 ? 0 : 1
-			// 撤掉后不能再接手势，否则手指从首图上划过时详情页滚不动
-			const pe = op === 0 ? 'none' : 'auto'
-			return `height:${h}px;opacity:${op};pointer-events:${pe}`
-		},
-		/**
-		 * 正文前垫一屏高的空白。
-		 *
-		 * 这一屏是图片优先态多占的空间：正文起点 = winH − st，
-		 * 图片层底边也正好 = winH − st，两者严格重合，所以图片收缩时
-		 * 内容是从它下缘「接上来」的，不会盖住也不会露缝。
-		 */
-		spacerH() {
-			return this.photoOn ? this.winH + 'px' : '0px'
+			return `height:${this.winH}px`
 		},
 		// aspectFill 那一层的透明度：p 到 0.65 全交给裁切版
 		fillOpacity() {
@@ -598,6 +597,20 @@ export default {
 			const d = this.detail
 			if (!d) return []
 			return [d.image].filter(Boolean)
+		},
+		// 同系列媒体聚合只在媒体页算过一次，这里复用同样的 collectMedia，
+		// 入口数字必须和媒体页一致 —— 入口写 39 张、点进去只有 20 张最招疑。
+		// 没有火箭型号（极少数任务）或型号不在快照里时，media 为 null，入口不显示
+		mediaStats() {
+			const m = this.media
+			return {
+				images: (m && m.images.length) || 0,
+				videos: (m && m.videos.length) || 0
+			}
+		},
+		// 首图上的「图片库」入口：有图、非审核态、且该系列确实有图才出现
+		heroMediaCount() {
+			return this.mediaStats.images
 		},
 		netText() {
 			if (!this.detail) return ''
@@ -954,25 +967,8 @@ export default {
 	},
 
 	methods: {
-		// ---- 图片优先态：滚动驱动形变 ----
-		/**
-		 * 壳把页面的滚动量转发进来。
-		 *
-		 * 普通详情页直接返回：每帧 setData 一个数字是白花的开销，
-		 * 而普通模式本来就靠页面自己滚。
-		 */
-		setScroll(top) {
-			if (!this.photoOn) return
-			const r = this.range
-			const v = top > 0 ? top : 0
-			// 形变走完图片层已经撤掉，再往下滚只是详情页自己滚，不必跟着记
-			if (v >= r) {
-				if (this.st !== r) this.st = r
-				return
-			}
-			if (Math.abs(v - this.st) < 1) return
-			this.st = v
-		},
+		// 图片优先态已改为「底部按钮跳详情」，不再用滚动形变，这里空转即可
+		setScroll() {},
 
 		/**
 		 * 机构国的中文简称。
@@ -1072,10 +1068,19 @@ export default {
 			this.$emit('switch', this.curId)
 		},
 
-		// 点图 = 想看这次发射：直接把页面滚到详情态，比再滑一下省事
+		// 看图态下点图本身不跳转，跳转交给底部「查看发射详情」按钮
 		onStageTap() {
 			if (this.moveEndAt && Date.now() - this.moveEndAt < 400) return
-			uni.pageScrollTo({ scrollTop: this.range, duration: 260 })
+		},
+
+		// 底部按钮：跳到当前这张图所属发射的详情页（替代原来的上拉加载）
+		goMore() {
+			const id = this.curId
+			if (!id) return
+			const net = this.curNet || ''
+			let url = '/pages/launch/launchInfo?id=' + id
+			if (net) url += '&net=' + encodeURIComponent(net)
+			uni.redirectTo({ url })
 		},
 
 		// 展示开关（App onLaunch 已预热，命中内存缓存，零开销）。
@@ -1091,7 +1096,7 @@ export default {
 		 * 加载详情。
 		 *
 		 * 抽成组件后 id 会在抽屉被反复打开时变化，用 _seq 挡住过期的异步结果：
-		 * 用户在图上连滑几张再上拉，前一张的请求可能后到，会把内容盖成别人的。
+		 * 用户在图上连滑几张再点详情，前一张的请求可能后到，会把内容盖成别人的。
 		 */
 		async load() {
 			const id = this.curId
@@ -1106,9 +1111,12 @@ export default {
 			this.loading = true
 			this.detail = null
 			this.agency = null
+			// 换任务进来时旧系列的图数先清掉，避免新图没算完时残留上一个型号的入口
+			this.media = null
 			this.timeline = []
 			this.craft = null
 			this.isFav = fav.has(id)
+			this.isReminded = this._hasReminded(id)
 			// 换一个任务进来时描述回到折叠态
 			this.descExpanded = false
 
@@ -1131,6 +1139,10 @@ export default {
 
 			// 时间线不阻塞首屏：内容先画出来，抓到的时间线到了再补一块
 			this.loadTimeline(id)
+
+			// 首图上的「图片库」入口数字：聚合同系列媒体，和媒体页同一口径。
+			// 不阻塞首屏，算完前入口只是不显示
+			if (this._seq === seq) this.loadMedia(seq)
 
 			const providerId = d && d.launch_service_provider && d.launch_service_provider.id
 			if (providerId) {
@@ -1474,6 +1486,103 @@ export default {
 			})
 		},
 
+				// ==================== 系统日历提醒 ====================
+		/**
+		 * 点击「提醒」：往系统日历写一条事件，发射时刻提前提醒。
+		 * 微信 addPhoneCalendar 只有「新增」、没有查询/删除，所以本地记一笔
+		 * 已提醒的 id，避免重复添加；再点只提示已在日历中。
+		 */
+		async addReminder() {
+			const d = this.detail
+			if (!d || !d.net) return
+			if (this.isReminded) {
+				uni.showToast({ title: '已在系统日历中', icon: 'none' })
+				return
+			}
+			// 能力检测：基础库 2.20.0+ 才有 addPhoneCalendar
+			if (typeof uni === 'undefined' || typeof uni.addPhoneCalendar !== 'function') {
+				uni.showToast({ title: '当前环境不支持日历提醒', icon: 'none' })
+				return
+			}
+			const netMs = new Date(d.net).getTime()
+			if (isNaN(netMs) || netMs <= Date.now()) {
+				uni.showToast({ title: '发射已结束', icon: 'none' })
+				return
+			}
+			const start = Math.floor(netMs / 1000)
+			// 结束时间必须有长度，给 30 分钟兜底
+			const end = start + 30 * 60
+			const now = Math.floor(Date.now() / 1000)
+			// 默认提前 1 小时提醒；不足 1 小时则到点提醒，避免 alarmTime 早于现在
+			const lead = 60 * 60
+			const alarmTime = start - lead > now ? start - lead : start
+			const title = this.displayName || '太空发射任务'
+			const desc = '发射时间：' + (formatDateTime(d.net) || '')
+			const pad = (d.pad && d.pad.name) || ''
+			const agency = (d.launch_service_provider && d.launch_service_provider.name) || ''
+			const location = [pad, agency].filter(Boolean).join(' · ')
+			uni.showLoading({ title: '添加中…', mask: true })
+			try {
+				await new Promise((resolve, reject) => {
+					uni.addPhoneCalendar({
+						title,
+						description: desc,
+						location,
+						startTime: start,
+						endTime: end,
+						alarm: true,
+						alarmTime,
+						success: resolve,
+						fail: reject
+					})
+				})
+				this._markReminded(d.id)
+				uni.hideLoading()
+				uni.showToast({ title: '已添加到系统日历', icon: 'success' })
+			} catch (e) {
+				uni.hideLoading()
+				const msg = (e && e.errMsg) || ''
+				// 用户主动取消授权不算失败
+				if (msg.indexOf('cancel') !== -1) return
+				if (msg.indexOf('auth') !== -1 || msg.indexOf('deny') !== -1) {
+					this._calAuthModal()
+				} else {
+					console.warn('[launchInfo] 日历提醒添加失败', e)
+					uni.showToast({ title: '添加失败，请重试', icon: 'none' })
+				}
+			}
+		},
+		/** 本地记录某条发射已写进系统日历 */
+		_markReminded(id) {
+			this.isReminded = true
+			try {
+				const KEY = 'reminded_launches'
+				const set = new Set(uni.getStorageSync(KEY) || [])
+				set.add(String(id))
+				uni.setStorageSync(KEY, Array.from(set))
+			} catch (e) {}
+		},
+		/** 是否已写进系统日历（本地记录） */
+		_hasReminded(id) {
+			try {
+				const set = new Set(uni.getStorageSync('reminded_launches') || [])
+				return set.has(String(id))
+			} catch (e) {
+				return false
+			}
+		},
+		/** 日历权限被拒时的引导弹窗 */
+		_calAuthModal() {
+			uni.showModal({
+				title: '需要日历权限',
+				content: '添加提醒需要系统日历权限，请在设置中开启',
+				confirmText: '去设置',
+				success: (r) => {
+					if (r.confirm) uni.openSetting()
+				}
+			})
+		},
+
 		goAgency(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/agencies/agencies?id=' + id })
@@ -1484,6 +1593,72 @@ export default {
 			const name = c.full_name || c.name || ''
 			uni.navigateTo({
 				url: '/pages/rocket/rocket?id=' + c.id + '&name=' + encodeURIComponent(name)
+			})
+		},
+
+		/**
+		 * 首图「图片库」入口的数字来源。
+		 *
+		 * 和媒体页同一个口径：拿发射的型号 id → 在 launchers 里找同系列构型 →
+		 * 把该系列全部发射记录的图片/视频摊平聚合。算出来的是「这个型号整条线」
+		 * 的图数（含本次发射那一张），和媒体页点进去看到的一致。
+		 * 型号不在快照里时直接不显示入口，不做假数字。
+		 */
+		async loadMedia(seq) {
+			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
+			if (!c || !c.id) return
+			try {
+				const [launchers, prev, up, vd] = await Promise.all([
+					spaceData.load('launchers').catch(() => null),
+					spaceData.load('previous').catch(() => null),
+					spaceData.load('upcoming').catch(() => null),
+					spaceData.load('videos').catch(() => null)
+				])
+				// 用户在图上连滑几张再点详情，旧请求可能后到，盖成别的型号
+				if (this._seq !== seq) return
+
+				const list = (launchers && launchers.list) || []
+				const config = list.find((x) => String(x.id) === String(c.id)) || null
+				if (!config) return
+
+				// 同系列构型一起算：Falcon 9 / Falcon Heavy 共用一批发射照片
+				const key = seriesKey(config)
+				const series = key ? list.filter((x) => seriesKey(x) === key) : [config]
+				const ids = {}
+				series.forEach((x) => {
+					ids[String(x.id)] = 1
+				})
+
+				// 视频单独在 videos.json（列表端点不返回 vid_urls），按 id 合回记录
+				const vmap = {}
+				for (const row of (vd && vd.list) || []) {
+					if (row && row.id && (row.vids || []).length) vmap[String(row.id)] = row.vids
+				}
+
+				const all = [...((prev && prev.list) || []), ...((up && up.list) || [])]
+				const records = all
+					.filter((x) => {
+						const cc = x.rocket && x.rocket.configuration
+						return cc && ids[String(cc.id)]
+					})
+					.map((x) => {
+						const vids = vmap[String(x.id)]
+						return vids ? Object.assign({}, x, { vid: vids }) : x
+					})
+
+				this.media = collectMedia(series, records)
+			} catch (e) {
+				// 任一数据集没生成 / 网络失败：静默降级，入口自然不显示
+				console.warn('[launchInfo] 媒体聚合失败', e)
+			}
+		},
+
+		/** 进图片库 / 视频库：传发射的型号 id，媒体页按系列聚合展示 */
+		goMedia(tab) {
+			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
+			if (!c || !c.id) return
+			uni.navigateTo({
+				url: '/pages/media/media?id=' + c.id + '&tab=' + (tab || 'image')
 			})
 		},
 		/**
@@ -1536,7 +1711,7 @@ export default {
 
 /* ---- 图片优先态 ---- */
 
-/* 图片层：钉在屏幕顶，高度由 setScroll 驱动（整屏 → 660rpx） */
+/* 图片层：钉在屏幕顶，恒占满整屏（不再随滚动收缩） */
 .stage {
 	position: fixed;
 	left: 0;
@@ -1571,7 +1746,7 @@ export default {
 	top: 0;
 }
 
-/* 图上那行信息：压在底部，上拉时先退场 */
+/* 图上信息：压在底部，标题在左、查看详情按钮在右 */
 .stage-bar {
 	position: absolute;
 	left: 0;
@@ -1581,12 +1756,14 @@ export default {
 	align-items: flex-end;
 	justify-content: space-between;
 	padding: 40rpx 44rpx 56rpx;
+	padding-bottom: calc(56rpx + env(safe-area-inset-bottom));
 	background: linear-gradient(180deg, rgba(4, 6, 10, 0) 0%, rgba(4, 6, 10, 0.82) 100%);
 }
 
 .stage-bar-main {
 	flex: 1;
 	min-width: 0;
+	padding-right: 20rpx;
 }
 
 .stage-title {
@@ -1610,54 +1787,45 @@ export default {
 	white-space: nowrap;
 }
 
-.stage-hint {
+/* 右侧：计数 + 查看发射详情按钮 */
+.stage-foot {
 	display: flex;
 	flex-direction: column;
-	align-items: center;
+	align-items: flex-end;
+	flex-shrink: 0;
 	margin-left: 26rpx;
-	padding-bottom: 4rpx;
-}
-
-.stage-hint-arrow {
-	color: rgba(255, 255, 255, 0.62);
-	font-size: 26rpx;
-	line-height: 1;
-	animation: stage-breathe 1.8s ease-in-out infinite;
-}
-
-.stage-hint-text {
-	margin-top: 6rpx;
-	color: rgba(255, 255, 255, 0.5);
-	font-size: 20rpx;
-}
-
-@keyframes stage-breathe {
-	0%,
-	100% {
-		opacity: 0.35;
-		transform: translateY(0);
-	}
-	50% {
-		opacity: 0.95;
-		transform: translateY(-4rpx);
-	}
 }
 
 .stage-count {
-	position: absolute;
-	left: 50%;
-	bottom: 18rpx;
-	transform: translateX(-50%);
-	padding: 4rpx 16rpx;
-	border-radius: 20rpx;
-	background: rgba(0, 0, 0, 0.32);
-	color: rgba(255, 255, 255, 0.72);
-	font-size: 20rpx;
+	color: rgba(255, 255, 255, 0.62);
+	font-size: 21rpx;
+	margin-bottom: 12rpx;
 }
 
-/* 图片优先态多占的那一屏，高度由 spacerH 给 */
-.spacer {
-	width: 100%;
+.more-btn {
+	display: flex;
+	align-items: center;
+	padding: 14rpx 30rpx;
+	border-radius: 999rpx;
+	background: rgba(56, 189, 248, 0.16);
+	border: 1rpx solid rgba(56, 189, 248, 0.45);
+}
+
+.more-btn-hover {
+	background: rgba(56, 189, 248, 0.32);
+}
+
+.more-btn-text {
+	color: #7dd3fc;
+	font-size: 25rpx;
+	font-weight: 600;
+}
+
+.more-btn-arrow {
+	margin-left: 8rpx;
+	color: #7dd3fc;
+	font-size: 30rpx;
+	line-height: 1;
 }
 
 .loading,
@@ -1733,6 +1901,58 @@ export default {
 	font-size: 22rpx;
 	line-height: 32rpx;
 	letter-spacing: 1rpx;
+}
+
+/* 图片库入口：磨砂胶囊，叠在首图左下角，与火箭详情页同一套语言。
+   用绝对定位，避免挤占右下角的计数角标 */
+.hero-media {
+	position: absolute;
+	left: 24rpx;
+	bottom: 24rpx;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	padding: 7rpx 18rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.14);
+	-webkit-backdrop-filter: blur(20rpx) saturate(150%);
+	backdrop-filter: blur(20rpx) saturate(150%);
+	border: 1rpx solid rgba(255, 255, 255, 0.22);
+	box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.18);
+}
+
+.hero-media-hover {
+	background: rgba(255, 255, 255, 0.24);
+}
+
+/* 2×2 小方格当图标，纯 CSS，比图片省一次请求 */
+.hm-icon {
+	display: flex;
+	flex-wrap: wrap;
+	width: 18rpx;
+	height: 18rpx;
+	margin-right: 10rpx;
+}
+
+.hm-dot {
+	width: 6rpx;
+	height: 6rpx;
+	margin: 0 3rpx 3rpx 0;
+	border-radius: 1.5rpx;
+	background: rgba(255, 255, 255, 0.9);
+}
+
+.hm-text {
+	color: #ffffff;
+	font-size: 22rpx;
+	line-height: 1.2;
+}
+
+.hm-count {
+	margin-left: 8rpx;
+	color: rgba(255, 255, 255, 0.6);
+	font-size: 22rpx;
+	line-height: 1.2;
 }
 
 .body {
@@ -2281,6 +2501,9 @@ export default {
 .meta-acts {
 	display: flex;
 	align-items: center;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	row-gap: 12rpx;
 	flex-shrink: 0;
 }
 
@@ -2310,6 +2533,28 @@ export default {
 
 .share-text {
 	color: #6b7891;
+	font-size: 24rpx;
+}
+
+/* 提醒按钮：品牌蓝胶囊，与收藏的琥珀色区分 */
+.remind {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	margin-left: 20rpx;
+	padding: 8rpx 22rpx;
+	border-radius: 40rpx;
+	background: rgba(56, 189, 248, 0.1);
+	border: 1rpx solid rgba(56, 189, 248, 0.28);
+}
+
+.remind.on {
+	background: rgba(56, 189, 248, 0.18);
+	border-color: rgba(56, 189, 248, 0.5);
+}
+
+.remind-text {
+	color: #38bdf8;
 	font-size: 24rpx;
 }
 

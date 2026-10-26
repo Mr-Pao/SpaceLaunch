@@ -15,7 +15,7 @@ export default {
 			launchId: '',
 			// 调用方带的大致时间（net），归档查找用来直接定位分片，可为空
 			netHint: '',
-			// 图片优先态：进来时首图占满整屏，上拉逐步变成这个详情页
+			// 图片优先态：进来时首图占满整屏当看图器，底部「查看发射详情」跳详情
 			photoMode: false,
 			navSolid: false
 		}
@@ -28,21 +28,22 @@ export default {
 		this.photoMode = Boolean(query && String(query.photo) === '1')
 	},
 
-	// 滚过首图后导航栏切成实色，否则图片上的文字看不清
+	// 看图态是整屏看图器，导航栏始终透明（无标题），不随滚动切切实色
 	onPageScroll(e) {
 		const top = (e && e.scrollTop) || 0
 		const d = this.$refs.detail
 
-		// 图片优先态：形变期间（图片还在收缩）导航必须保持透明，
-		// 标题一出来就压在半程的图上，和列表进来的沉浸观感不一致；
-		// 形变走完（滚满 range，比普通页的 200 深得多）才允许切实色。
-		// 此刻视觉上正好是「滚到普通详情页首图之下」，两边状态一致
-		const threshold = d && d.photoOn ? Math.max(200, d.range) : 200
+		// 看图态下导航保持透明：否则滚一下会露出顶栏，盖在图上
+		if (this.photoMode) {
+			if (this.navSolid) this.navSolid = false
+			return
+		}
+
+		const threshold = 200
 		const solid = top >= threshold
 		if (solid !== this.navSolid) this.navSolid = solid
 
-		// 图片优先态的形变完全由滚动量驱动：滚多少，首图缩多少。
-		// 转发给组件，它自己决定要不要理（普通详情页直接返回）
+		// 普通详情页的滚动量转发给组件（看图态下组件已忽略）
 		if (d && d.setScroll) d.setScroll(top)
 	},
 

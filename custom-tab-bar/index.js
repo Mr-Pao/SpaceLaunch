@@ -93,12 +93,12 @@ Component({
 				iconActive: '/static/image/tabbar/rocket2.png'
 			},
 			{
-				// 统计已降级为发射页上的按钮，不再占 tab 位（微信上限就是 5 个）
-				pagePath: 'pages/event/event',
-				text: '活动',
-				icon: '/static/image/tabbar/guanyu1.png',
-				iconActive: '/static/image/tabbar/guanyu2.png'
-			}
+			// 统计已降级为发射页上的按钮，不再占 tab 位（微信上限就是 5 个）
+			pagePath: 'pages/mine/mine',
+			text: '我的',
+			icon: '/static/image/tabbar/guanyu1.png',
+			iconActive: '/static/image/tabbar/guanyu2.png'
+		}
 		]
 	},
 
