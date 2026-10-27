@@ -568,7 +568,8 @@ function fixTerms(text) {
 export function launchTitle(item) {
 	if (!item) return ''
 
-	const rocket = rocketName(item.rocket && item.rocket.configuration)
+	// 用完整名：只有「猎鹰 9 号」的话，同系列各构型在列表里长得一模一样
+	const rocket = rocketFullName(item.rocket && item.rocket.configuration)
 	const m = item.mission || {}
 	const mission = fixTerms(m.nameZh || m.name || '')
 

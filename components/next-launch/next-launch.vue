@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import { formatDateTime, statusInfo, launchTitle } from '@/utils/format.js'
+import { formatDateTime, statusInfo, launchTitle, agencyLabel, placeZh } from '@/utils/format.js'
 
 export default {
 	name: 'next-launch',
@@ -55,11 +55,14 @@ export default {
 			return statusInfo(this.item.status)
 		},
 		provider() {
-			return (this.item.launch_service_provider && this.item.launch_service_provider.name) || ''
+			const n = (this.item.launch_service_provider && this.item.launch_service_provider.name) || ''
+			// 机构优先中文（中国航天科技 / 蓝箭航天…），没词条回原文
+			return agencyLabel(n)
 		},
 		padName() {
 			const loc = this.item.pad && this.item.pad.location && this.item.pad.location.name
-			return loc || (this.item.pad && this.item.pad.name) || ''
+			// 场地也中文化：Vandenberg SFB, CA, USA → 范登堡
+			return placeZh(loc) || (this.item.pad && this.item.pad.name) || ''
 		},
 		metaText() {
 			return [this.provider, this.padName].filter(Boolean).join(' · ')

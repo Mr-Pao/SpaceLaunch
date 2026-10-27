@@ -34,7 +34,8 @@
 				<text class="date" v-if="showDate">{{ dateText }}</text>
 			</view>
 
-			<text class="rocket" v-if="rocketName">{{ rocketName }}</text>
+			<!-- 火箭名已经拼在 title 里（「猎鹰 9 号 Block 5 | 星链15-18」），
+			     这里不再重复一行 -->
 
 			<!-- 机构与状态同一行：机构靠左可省略，状态靠右永不换行 -->
 			<view class="foot">
