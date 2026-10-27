@@ -1,7 +1,7 @@
 <template>
 	<view class="page">
 		<star-field />
-		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
+		<view class="nav-row" :class="{ solid: navSolid }" :style="{ paddingTop: statusBarH + 'px' }">
 			<!-- 连点 5 次呼出展示开关（静默切换）：入口隐藏，普通用户与审核不可见 -->
 			<text class="nav-title" @click="onTitleTap">火箭资料库</text>
 		</view>
@@ -113,6 +113,7 @@
 		<view class="list" v-else>
 			<view
 				class="rank-card"
+				:class="{ 'is-top': i < 3 }"
 				v-for="(r, i) in visible"
 				:key="r.id"
 				hover-class="rank-card-hover"
@@ -122,7 +123,7 @@
 				<view class="rank-media">
 					<image class="rank-img" v-if="r.image" :src="r.image" mode="aspectFill" lazy-load />
 					<view class="rank-img rank-ph" v-else><text class="rank-ph-icon">🚀</text></view>
-					<text class="rank-no" :class="{ top: i < 3 }">#{{ i + 1 }}</text>
+					<text class="rank-no" :class="i < 3 ? 'lv' + (i + 1) : ''">#{{ i + 1 }}</text>
 					<text class="rank-flag" v-if="r.reusable">可复用</text>
 				</view>
 
@@ -248,6 +249,7 @@ export default {
 			sort: 'overall',
 			region: 'all',
 			listNum: STEP,
+			navSolid: false,
 			sorts: SORTS,
 			regions: REGIONS,
 			// 暗门计数：3 秒内连点 5 次「火箭资料库」标题呼出审核视角调试面板
@@ -375,6 +377,12 @@ export default {
 
 	onShow() {
 		syncTabBar(3)
+	},
+
+	// 滚过榜单头以后给顶栏加毛玻璃，标题不悬空在内容上
+	onPageScroll(e) {
+		const solid = (e && e.scrollTop ? e.scrollTop : 0) > 120
+		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
 	onPullDownRefresh() {
@@ -525,21 +533,64 @@ function leoText(kg) {
 @import '../../styles/list.scss';
 
 .page {
+	position: relative;
 	min-height: 100vh;
 	padding: 0 24rpx 200rpx;
 	box-sizing: border-box;
+	/* 顶部两团冷/暖光晕压在星空之上：暖色呼应榜单主色，冷色补纵深，
+	   比纯黑底更有「站在观测台往下看」的空间感 */
+	background: radial-gradient(120% 55% at 50% -8%, rgba(255, 106, 61, 0.16) 0%, rgba(255, 106, 61, 0) 62%),
+		radial-gradient(90% 45% at 100% 6%, rgba(64, 132, 255, 0.12) 0%, rgba(64, 132, 255, 0) 58%);
+}
+
+/* 顶栏只在滚过榜单头之后才有底：一开始标题直接压在光晕上，更沉浸 */
+.nav-row {
+	transition: background 0.24s ease;
+}
+
+.nav-row.solid {
+	background: rgba(10, 14, 23, 0.82);
+	-webkit-backdrop-filter: blur(24rpx) saturate(140%);
+	backdrop-filter: blur(24rpx) saturate(140%);
 }
 
 /* ==================== 榜单头部 ==================== */
 .hero {
+	position: relative;
 	margin-top: 6rpx;
-	padding: 24rpx 24rpx 0;
-	background: #131926;
-	border: 1rpx solid rgba(255, 255, 255, 0.06);
-	border-radius: 18rpx;
+	padding: 28rpx 26rpx 0;
+	background: linear-gradient(158deg, rgba(30, 39, 58, 0.96) 0%, rgba(18, 24, 36, 0.94) 58%, rgba(15, 20, 31, 0.96) 100%);
+	border: 1rpx solid rgba(255, 255, 255, 0.08);
+	border-radius: 26rpx;
+	overflow: hidden;
+	box-shadow: 0 24rpx 60rpx rgba(0, 0, 0, 0.42), inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
+}
+
+/* 卡面顶部的暖色辉光：把「榜」的重量感做出来，而不是一张平卡 */
+.hero::before {
+	content: '';
+	position: absolute;
+	left: -18%;
+	top: -58%;
+	width: 136%;
+	height: 130%;
+	background: radial-gradient(50% 50% at 50% 50%, rgba(255, 106, 61, 0.24) 0%, rgba(255, 106, 61, 0) 68%);
+	pointer-events: none;
+}
+
+/* 底部极细的主色线，收住整张卡 */
+.hero::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 2rpx;
+	background: linear-gradient(90deg, rgba(255, 106, 61, 0) 0%, rgba(255, 106, 61, 0.55) 50%, rgba(255, 106, 61, 0) 100%);
 }
 
 .hero-top {
+	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -552,12 +603,15 @@ function leoText(kg) {
 }
 
 .hero-state {
-	padding: 2rpx 10rpx;
-	border: 1rpx solid rgba(255, 77, 79, 0.6);
-	border-radius: 4rpx;
-	color: #ff4d4f;
+	position: relative;
+	padding: 3rpx 12rpx;
+	border: 1rpx solid rgba(255, 77, 79, 0.55);
+	border-radius: 6rpx;
+	color: #ff6b6d;
 	font-size: 19rpx;
 	line-height: 1.5;
+	background: rgba(255, 77, 79, 0.08);
+	box-shadow: 0 0 16rpx rgba(255, 77, 79, 0.18);
 }
 
 .hero-main {
@@ -575,10 +629,11 @@ function leoText(kg) {
 .hero-title {
 	display: block;
 	color: #ffffff;
-	font-size: 44rpx;
-	font-weight: 600;
-	letter-spacing: 1rpx;
-	line-height: 1.25;
+	font-size: 48rpx;
+	font-weight: 700;
+	letter-spacing: 2rpx;
+	line-height: 1.22;
+	text-shadow: 0 6rpx 28rpx rgba(255, 106, 61, 0.34);
 }
 
 .hero-sub {
@@ -596,10 +651,11 @@ function leoText(kg) {
 
 .hero-num {
 	display: block;
-	color: #ff6a3d;
-	font-size: 60rpx;
-	font-weight: 600;
+	color: #ff8a5c;
+	font-size: 66rpx;
+	font-weight: 700;
 	line-height: 1;
+	text-shadow: 0 0 30rpx rgba(255, 106, 61, 0.55);
 }
 
 .hero-unit {
@@ -611,16 +667,17 @@ function leoText(kg) {
 
 /* 三格极值：连成一条，用竖线分隔，不各占一张卡 */
 .hero-cells {
+	position: relative;
 	display: flex;
-	margin-top: 22rpx;
-	border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+	margin-top: 24rpx;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.07);
 }
 
 .hcell {
 	flex: 1;
 	min-width: 0;
-	padding: 18rpx 0 20rpx;
-	border-right: 1rpx solid rgba(255, 255, 255, 0.06);
+	padding: 18rpx 0 22rpx;
+	border-right: 1rpx solid rgba(255, 255, 255, 0.07);
 }
 
 .hcell:last-child {
@@ -636,7 +693,7 @@ function leoText(kg) {
 .hcell-v {
 	display: block;
 	margin-top: 8rpx;
-	color: #e6edf6;
+	color: #f0f5fc;
 	font-size: 24rpx;
 	font-weight: 600;
 	white-space: nowrap;
@@ -655,12 +712,13 @@ function leoText(kg) {
 .search {
 	display: flex;
 	align-items: center;
-	height: 76rpx;
+	height: 78rpx;
 	margin: 18rpx 0;
 	padding: 0 24rpx;
-	background: #131926;
-	border: 1rpx solid rgba(255, 255, 255, 0.06);
-	border-radius: 12rpx;
+	background: rgba(19, 25, 38, 0.92);
+	border: 1rpx solid rgba(255, 255, 255, 0.07);
+	border-radius: 14rpx;
+	box-shadow: inset 0 2rpx 10rpx rgba(0, 0, 0, 0.28);
 }
 
 .search-icon {
@@ -671,7 +729,7 @@ function leoText(kg) {
 
 .search-input {
 	flex: 1;
-	height: 76rpx;
+	height: 78rpx;
 	color: #e2e8f0;
 	font-size: 26rpx;
 }
@@ -717,10 +775,11 @@ function leoText(kg) {
 }
 
 .sort-tab.on {
-	background: #ff6a3d;
-	border-color: #ff6a3d;
+	background: linear-gradient(135deg, #ff8a5c 0%, #ff5a2b 100%);
+	border-color: rgba(255, 138, 92, 0.9);
 	color: #14181f;
 	font-weight: 600;
+	box-shadow: 0 8rpx 24rpx rgba(255, 106, 61, 0.3);
 }
 
 /* 横滑区必须有确定高度，否则 scroll-view 会塌陷 */
@@ -747,10 +806,11 @@ function leoText(kg) {
 }
 
 .region.on {
-	background: #e9eef6;
-	border-color: #e9eef6;
+	background: #eef3fa;
+	border-color: #eef3fa;
 	color: #14181f;
 	font-weight: 600;
+	box-shadow: 0 6rpx 18rpx rgba(210, 226, 246, 0.18);
 }
 
 /* 榜单口径行 */
@@ -790,25 +850,43 @@ function leoText(kg) {
 
 /* ==================== 排行卡片 ==================== */
 .rank-card {
+	position: relative;
 	display: flex;
 	margin-bottom: 16rpx;
 	padding: 16rpx;
-	background: #131926;
-	border: 1rpx solid rgba(255, 255, 255, 0.05);
-	border-radius: 16rpx;
+	background: linear-gradient(150deg, rgba(25, 32, 47, 0.96) 0%, rgba(16, 21, 32, 0.96) 100%);
+	border: 1rpx solid rgba(255, 255, 255, 0.06);
+	border-radius: 20rpx;
+	overflow: hidden;
+	box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.22);
+}
+
+/* 前三名：描边转暖，左侧加一条渐隐的主色竖线 */
+.rank-card.is-top {
+	border-color: rgba(255, 106, 61, 0.22);
+}
+
+.rank-card.is-top::before {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 22rpx;
+	bottom: 22rpx;
+	width: 3rpx;
+	background: linear-gradient(180deg, rgba(255, 138, 92, 0.95) 0%, rgba(255, 106, 61, 0) 100%);
 }
 
 .rank-card-hover {
-	background: #182031;
+	background: linear-gradient(150deg, rgba(32, 40, 58, 0.98) 0%, rgba(22, 28, 41, 0.98) 100%);
 }
 
 .rank-media {
 	position: relative;
-	width: 224rpx;
-	height: 214rpx;
+	width: 228rpx;
+	height: 216rpx;
 	flex-shrink: 0;
 	margin-right: 18rpx;
-	border-radius: 10rpx;
+	border-radius: 12rpx;
 	overflow: hidden;
 	background: #0f1520;
 }
@@ -816,6 +894,18 @@ function leoText(kg) {
 .rank-img {
 	width: 100%;
 	height: 100%;
+}
+
+/* 图片底部压暗，让角标在亮图上也能读清 */
+.rank-media::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 64rpx;
+	background: linear-gradient(to top, rgba(6, 10, 18, 0.82) 0%, rgba(6, 10, 18, 0) 100%);
+	pointer-events: none;
 }
 
 .rank-ph {
@@ -829,21 +919,34 @@ function leoText(kg) {
 	opacity: 0.4;
 }
 
-/* 排名贴在图左上角，前三名用主色 */
+/* 排名贴图左上角；前三名给金 / 银 / 铜，其余保持低调 */
 .rank-no {
 	position: absolute;
 	left: 0;
 	top: 0;
-	padding: 4rpx 12rpx;
-	background: rgba(6, 10, 18, 0.72);
-	border-bottom-right-radius: 10rpx;
+	z-index: 2;
+	padding: 4rpx 14rpx;
+	background: rgba(6, 10, 18, 0.76);
+	border-bottom-right-radius: 12rpx;
 	color: #8a97a8;
 	font-size: 21rpx;
-	font-weight: 600;
+	font-weight: 700;
+	letter-spacing: 1rpx;
 }
 
-.rank-no.top {
-	background: #ff6a3d;
+.rank-no.lv1 {
+	background: linear-gradient(135deg, #ffa268 0%, #ff5a2b 100%);
+	color: #14181f;
+	box-shadow: 0 4rpx 18rpx rgba(255, 106, 61, 0.42);
+}
+
+.rank-no.lv2 {
+	background: linear-gradient(135deg, #eef3fa 0%, #b6c4d8 100%);
+	color: #14181f;
+}
+
+.rank-no.lv3 {
+	background: linear-gradient(135deg, #eab68c 0%, #c4834f 100%);
 	color: #14181f;
 }
 
@@ -852,11 +955,13 @@ function leoText(kg) {
 	position: absolute;
 	left: 0;
 	bottom: 0;
-	padding: 3rpx 10rpx;
-	background: rgba(6, 10, 18, 0.72);
+	z-index: 2;
+	padding: 3rpx 12rpx;
+	background: rgba(6, 10, 18, 0.7);
 	border-top-right-radius: 8rpx;
 	color: #9fd0ff;
 	font-size: 18rpx;
+	letter-spacing: 0.5rpx;
 }
 
 .rank-body {
@@ -886,8 +991,12 @@ function leoText(kg) {
 .rank-more {
 	flex-shrink: 0;
 	margin-left: 10rpx;
-	color: #ff6a3d;
-	font-size: 21rpx;
+	padding: 2rpx 14rpx;
+	border: 1rpx solid rgba(255, 106, 61, 0.32);
+	border-radius: 999rpx;
+	color: #ff8a5c;
+	font-size: 19rpx;
+	line-height: 1.6;
 }
 
 .rank-maker {
@@ -908,8 +1017,9 @@ function leoText(kg) {
 
 .rtag {
 	margin: 0 8rpx 4rpx 0;
-	padding: 2rpx 10rpx;
-	background: rgba(255, 255, 255, 0.06);
+	padding: 2rpx 12rpx;
+	background: rgba(255, 255, 255, 0.055);
+	border: 1rpx solid rgba(255, 255, 255, 0.06);
 	border-radius: 4rpx;
 	color: #97a4b6;
 	font-size: 18rpx;
@@ -929,8 +1039,8 @@ function leoText(kg) {
 
 .m-v {
 	display: block;
-	color: #e6edf6;
-	font-size: 25rpx;
+	color: #f0f5fc;
+	font-size: 26rpx;
 	font-weight: 600;
 	white-space: nowrap;
 	overflow: hidden;
