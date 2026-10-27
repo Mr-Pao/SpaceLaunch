@@ -47,6 +47,65 @@ const PROVIDER = process.env.TRANSLATE_PROVIDER || 'auto'
 const OUT_DIR = path.resolve(__dirname, '..', '..', 'dist')
 const CACHE_FILE = path.join(OUT_DIR, 'translation-cache.json')
 
+/**
+ * 两张人工干预表，优先级高于机翻：
+ *
+ *   translation-overrides.json —— 原文 → 人工译文。命中就完全不走机翻，
+ *                                 也不进缓存。改一个词只要改 JSON + push。
+ *   data/i18n-terms.json       —— 机翻错译 → 正确译法。写缓存之前、
+ *                                 以及 getZh 返回之前各跑一遍，
+ *                                 所以历史脏数据不用清缓存也会被修正。
+ *
+ * 都没有就是纯机翻。两张表都是可选的，缺文件不影响主流程。
+ */
+const OVERRIDE_FILE = path.resolve(__dirname, '..', 'translation-overrides.json')
+const TERMS_FILE = path.resolve(__dirname, '..', 'data', 'i18n-terms.json')
+
+let overrides = {}
+let termRules = []
+
+function loadHumanTables() {
+	try {
+		if (fs.existsSync(OVERRIDE_FILE)) {
+			const obj = JSON.parse(fs.readFileSync(OVERRIDE_FILE, 'utf8'))
+			for (const [k, v] of Object.entries(obj || {})) {
+				if (k.startsWith('_') || typeof v !== 'string' || !v.trim()) continue
+				overrides[k] = v
+			}
+			console.log(`  人工译文: ${Object.keys(overrides).length} 条`)
+		}
+	} catch (e) {
+		console.warn(`  人工译文表损坏，忽略: ${e.message}`)
+	}
+
+	try {
+		if (fs.existsSync(TERMS_FILE)) {
+			const obj = JSON.parse(fs.readFileSync(TERMS_FILE, 'utf8'))
+			for (const [from, to] of obj.fixes || []) {
+				termRules.push([new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), to])
+			}
+			for (const [re, to] of obj._regexFixes || []) {
+				try {
+					termRules.push([new RegExp(re, 'g'), to])
+				} catch (e) {
+					console.warn(`  术语规则无效（${re}）`)
+				}
+			}
+			console.log(`  术语纠正: ${termRules.length} 条规则`)
+		}
+	} catch (e) {
+		console.warn(`  术语表损坏，忽略: ${e.message}`)
+	}
+}
+
+/** 把机翻的常见错译拉回来。纯字符串替换，不会引入新的错误 */
+function fixTerms(zh) {
+	if (!zh) return zh
+	let s = zh
+	for (const [re, to] of termRules) s = s.replace(re, to)
+	return s
+}
+
 /** hash 原文 → 缓存键。djb2 加长度前缀，足够避免碰撞 */
 function hash(str) {
 	let h = 5381
@@ -218,7 +277,8 @@ async function translateWithRetry(seg) {
  */
 async function translateTexts(texts) {
 	const uniq = [...new Set((texts || []).filter((t) => t && t.trim()))]
-	const todo = uniq.filter((t) => !cache[hash(t)])
+	// 人工译文优先：命中的既不发请求，也不进缓存，永远以表里为准
+	const todo = uniq.filter((t) => !overrides[t] && !cache[hash(t)])
 	stats.hit += uniq.length - todo.length
 
 	const skipped = !process.env.TRANSLATE_DISABLE ? '' : '（已禁用）'
@@ -240,7 +300,9 @@ async function translateTexts(texts) {
 				for (const seg of splitSegments(text)) {
 					parts.push(await translateWithRetry(seg))
 				}
-				const zh = parts.join(' ').replace(/\s+/g, ' ').trim()
+				// 落缓存前先过术语纠正：脏译文从此不再进库，
+				// 以后即使有人从旧缓存里再读出来，getZh 出口还有一道
+				const zh = fixTerms(parts.join(' ').replace(/\s+/g, ' ').trim())
 				if (zh) {
 					cache[hash(text)] = { zh, at: new Date().toISOString() }
 					dirty = true
@@ -266,11 +328,13 @@ async function translateTexts(texts) {
 	await Promise.all(Array.from({ length: CONCURRENCY }, worker))
 }
 
-/** 查缓存，没有就返回空串（前端会回退英文） */
+/** 查译文：人工表 → 缓存 → 术语纠正。都没有就返回空串（前端回退英文） */
 function getZh(text) {
 	if (!text) return ''
+	const human = overrides[text]
+	if (human) return human
 	const hit = cache[hash(text)]
-	return (hit && hit.zh) || ''
+	return fixTerms((hit && hit.zh) || '')
 }
 
 function cosCacheUrl() {
@@ -288,6 +352,9 @@ function cosCacheUrl() {
  * CI 每次都是全新容器，必须从 COS 拉最新缓存，否则每轮都要重翻、必然撞限额
  */
 async function loadCache() {
+	// 先装人工表：后面 translateTexts 要靠 overrides 判断哪些不用翻
+	loadHumanTables()
+
 	const seed = path.resolve(__dirname, '..', 'data', 'translation-cache.json')
 
 	const mergeFile = (label, file) => {

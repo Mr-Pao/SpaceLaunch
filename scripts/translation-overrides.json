@@ -1,0 +1,16 @@
+{
+  "_comment": "人工校对表：英文原文 → 人工译文。命中即完全绕过机翻（不发请求、不写缓存），优先级最高。改一个词只要改这里 + push，不用清缓存、不用重跑。",
+  "_usage": "键必须与数据里的原文完全一致（activities 用 name，发射用 mission.name / mission.description）。以 _ 开头的键会被忽略。",
+  "_priority": "1) 本表  →  2) 翻译缓存  →  3) 术语纠正",
+
+  "Juice Earth Flyby": "JUICE 飞越地球",
+  "Juice Jupiter Orbit Insertion": "JUICE 木星入轨",
+  "Juice Ganymede Orbit Insertion": "JUICE 木卫三入轨",
+  "Juice Ganymede Impact": "JUICE 撞击木卫三",
+
+  "Boeing Starliner-1 Docking": "波音星际客机-1 对接",
+  "Boeing Starliner-1 Landing": "波音星际客机-1 着陆",
+  "Boeing Starliner-1 Undocking": "波音星际客机-1 脱离对接",
+
+  "Orbital insertion around Mercury of the ESA-JAXA BepiColombo mission.": "ESA-JAXA 的贝皮科伦坡号任务进入水星轨道。"
+}
