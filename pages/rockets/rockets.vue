@@ -3,17 +3,43 @@
 		<star-field />
 		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
 			<!-- 连点 5 次呼出展示开关（静默切换）：入口隐藏，普通用户与审核不可见 -->
-			<text class="nav-title" @click="onTitleTap">火箭大全</text>
-		</view>
-		<view class="header-sub">
-			<text class="subtitle">主流现役与历史型号，按发射次数排序</text>
+			<text class="nav-title" @click="onTitleTap">火箭资料库</text>
 		</view>
 
-		<!-- 顶部统计 -->
-		<view class="stats">
-			<view class="stat-cell" v-for="s in stats" :key="s.label">
-				<text class="stat-num">{{ s.value }}</text>
-				<text class="stat-label">{{ s.label }}</text>
+		<!-- 榜单头部：一句话说清「这是什么榜」，顺手给三个横向对比的极值 -->
+		<view class="hero">
+			<view class="hero-top">
+				<text class="hero-kicker">SPACEDALLY / LAUNCH INDEX</text>
+				<text class="hero-state">在役</text>
+			</view>
+
+			<view class="hero-main">
+				<view class="hero-left">
+					<text class="hero-title">全球火箭实力榜</text>
+					<text class="hero-sub">基于运力、可靠性、发射活跃度</text>
+				</view>
+				<view class="hero-count">
+					<text class="hero-num">{{ pool.length }}</text>
+					<text class="hero-unit">型号火箭</text>
+				</view>
+			</view>
+
+			<view class="hero-cells">
+				<view class="hcell">
+					<text class="hcell-k">最近近地运力</text>
+					<text class="hcell-v">{{ topLeo.name }}</text>
+					<text class="hcell-n">{{ topLeo.text }}</text>
+				</view>
+				<view class="hcell">
+					<text class="hcell-k">发射最活跃</text>
+					<text class="hcell-v">{{ topLaunch.name }}</text>
+					<text class="hcell-n">{{ topLaunch.text }}</text>
+				</view>
+				<view class="hcell">
+					<text class="hcell-k">可复用型号</text>
+					<text class="hcell-v">{{ reusableCount }}</text>
+					<text class="hcell-n">型</text>
+				</view>
 			</view>
 		</view>
 
@@ -24,55 +50,49 @@
 				class="search-input"
 				v-model="keyword"
 				type="text"
-				placeholder="搜索型号、系列、制造商"
+				placeholder="搜索中文名、型号、制造商"
 				placeholder-class="search-ph"
 				confirm-type="search"
 			/>
 			<text class="search-clear" v-if="keyword" @click="keyword = ''">✕</text>
 		</view>
 
-		<!-- 状态筛选：只有三档，直接平铺；右侧加一个「中国火箭」快捷入口 -->
-		<view class="filter-row">
+		<!-- 排序方式 -->
+		<text class="sort-label">排序方式</text>
+		<view class="sort-tabs">
 			<view
-				class="chip"
-				v-for="s in statusOptions"
+				class="sort-tab"
+				v-for="s in sorts"
 				:key="s.value"
-				:class="{ on: status === s.value }"
-				@click="status = s.value"
+				:class="{ on: sort === s.value }"
+				@click="sort = s.value"
 			>
 				{{ s.label }}
 			</view>
-			<view class="chip chip-cn" :class="{ on: cnOnly }" @click="cnOnly = !cnOnly">
-				中国火箭
-			</view>
 		</view>
 
-		<!-- 系列筛选：数量多，横向滚动 -->
-		<scroll-view class="family-scroll" scroll-x enable-flex :show-scrollbar="false">
-			<view class="family-inner">
+		<!-- 地区筛选：横向滚动，项数会随数据变化 -->
+		<scroll-view class="region-scroll" scroll-x enable-flex :show-scrollbar="false">
+			<view class="region-inner">
 				<view
-					class="chip chip-sm"
-					:class="{ on: family === '' }"
-					@click="family = ''"
+					class="region"
+					v-for="r in regions"
+					:key="r.value"
+					:class="{ on: region === r.value }"
+					@click="region = r.value"
 				>
-					全部系列
-				</view>
-				<view
-					class="chip chip-sm"
-					v-for="f in topFamilies"
-					:key="f.name"
-					:class="{ on: family === f.name }"
-					@click="family = f.name"
-				>
-					{{ f.name }}
-					<text class="chip-count">{{ f.count }}</text>
+					{{ r.label }}
 				</view>
 			</view>
 		</scroll-view>
 
-		<view class="result-line">
-			<text class="result-text">共 {{ filtered.length }} 个型号</text>
-			<text class="result-reset" v-if="hasFilter" @click="resetFilter">清空筛选</text>
+		<!-- 榜单口径：当前排的是什么、按什么权重、共几条 -->
+		<view class="board-line">
+			<view class="board-left">
+				<text class="board-title">{{ currentSort.label }}</text>
+				<text class="board-desc">{{ currentSort.desc }}</text>
+			</view>
+			<text class="board-count">{{ ranked.length }} 个结果</text>
 		</view>
 
 		<view class="loading" v-if="loading && !all.length">
@@ -85,53 +105,61 @@
 			<view class="btn" @click="getData(true)">重新加载</view>
 		</view>
 
-		<view class="empty" v-else-if="!filtered.length">
+		<view class="empty" v-else-if="!ranked.length">
 			<text class="empty-icon">🔍</text>
 			<text class="hint-text">没有符合条件的型号</text>
 		</view>
 
 		<view class="list" v-else>
 			<view
-				class="card"
-				v-for="r in visible"
+				class="rank-card"
+				v-for="(r, i) in visible"
 				:key="r.id"
-				hover-class="card-hover"
+				hover-class="rank-card-hover"
 				@click="goRocket(r)"
 			>
-				<!-- 型号缩略图：现役与退役都镜像到了 COS，没有图的给占位 -->
-				<image
-					class="thumb"
-					v-if="r.image"
-					:src="r.image"
-					mode="aspectFill"
-					lazy-load
-				/>
-				<view class="thumb thumb-ph" v-else>
-					<text class="thumb-ph-icon">🚀</text>
+				<!-- 左：型号图，排名叠在左上角 -->
+				<view class="rank-media">
+					<image class="rank-img" v-if="r.image" :src="r.image" mode="aspectFill" lazy-load />
+					<view class="rank-img rank-ph" v-else><text class="rank-ph-icon">🚀</text></view>
+					<text class="rank-no" :class="{ top: i < 3 }">#{{ i + 1 }}</text>
+					<text class="rank-flag" v-if="r.reusable">可复用</text>
 				</view>
 
-				<view class="info">
-					<view class="name-line">
-						<text class="name">{{ r.zhName || r.name }}</text>
-						<text class="badge" :class="{ off: !r.active }">{{ r.active ? '现役' : '退役' }}</text>
+				<!-- 右：名称 / 制造商 / 三项硬指标 -->
+				<view class="rank-body">
+					<view class="rank-head">
+						<text class="rank-name">{{ r.zhName }}</text>
+						<text class="rank-more">详情</text>
 					</view>
 
-					<text class="sub" v-if="r.subName">{{ r.subName }}</text>
+					<text class="rank-maker">{{ r.manufacturer || '未知制造商' }}</text>
 
-					<view class="meta">
-						<text class="count" v-if="r.total_launch_count">{{ r.total_launch_count }} 次发射</text>
-						<text class="count" v-else>暂无发射记录</text>
-						<text class="dot" v-if="r.leoText">·</text>
-						<text class="rate" v-if="r.leoText">LEO {{ r.leoText }}</text>
+					<view class="rank-tags" v-if="r.family || r.variant">
+						<text class="rtag" v-if="r.family">{{ r.family }}</text>
+						<text class="rtag" v-if="r.variant">{{ r.variant }}</text>
+					</view>
+
+					<view class="rank-metrics">
+						<view class="metric">
+							<text class="m-v">{{ r.leoText }}</text>
+							<text class="m-k">LEO 运力</text>
+						</view>
+						<view class="metric">
+							<text class="m-v">{{ r.total_launch_count || 0 }}</text>
+							<text class="m-k">累计发射</text>
+						</view>
+						<view class="metric">
+							<text class="m-v">{{ r.rateText }}</text>
+							<text class="m-k">成功率</text>
+						</view>
 					</view>
 				</view>
-
-				<text class="arrow">›</text>
 			</view>
 
 			<view class="foot-hint">
 				<text v-if="hasMore">上拉加载更多</text>
-				<text v-else>已显示全部 {{ filtered.length }} 个型号</text>
+				<text v-else>已显示全部 {{ ranked.length }} 个型号</text>
 			</view>
 		</view>
 
@@ -162,29 +190,52 @@ import { setOverride, getDebugInfo } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 
 const STEP = 14
-// 系列太多（66 个），只把最活跃的放进筛选条，其余靠搜索
-const FAMILY_LIMIT = 20
+
+// 可靠榜的准入门槛：只打过一两发的型号 100% 成功率没有说服力
+const MIN_LAUNCH_FOR_RELIABILITY = 5
+
+const SORTS = [
+	{ value: 'overall', label: '综合榜', desc: '45% 活跃度 · 35% 可靠性 · 20% LEO 运力' },
+	{ value: 'capacity', label: '运力榜', desc: '按 LEO 运力从高到低' },
+	{ value: 'launches', label: '发射榜', desc: '按累计发射次数从高到低' },
+	{ value: 'reliability', label: '可靠榜', desc: '成功率优先，至少 ' + MIN_LAUNCH_FOR_RELIABILITY + ' 次发射才参与排名' }
+]
+
+const REGIONS = [
+	{ value: 'all', label: '全球' },
+	{ value: 'cn', label: '中国' },
+	{ value: 'us', label: '美国' },
+	{ value: 'ru', label: '俄罗斯' },
+	{ value: 'eu', label: '欧洲' },
+	{ value: 'asia', label: '亚洲其他' },
+	{ value: 'other', label: '其他' }
+]
 
 /**
- * 中国火箭的系列名。
- * LL2 的型号库**没有国家字段**（manufacturer 只是字符串），
- * 所以用「系列白名单 + 制造商含 China」两条路一起判断 ——
- * LandSpace、Galactic Energy 这类公司名里并没有 China。
+ * 地区判定。
+ *
+ * LL2 的型号库**没有国家字段**，manufacturer 只是一串公司名，
+ * 而且很多中国商业航天公司名字里并没有 China（LandSpace、Galactic Energy…），
+ * 所以只能靠关键词白名单，漏掉的落到「其他」而不是硬猜。
  */
-const CN_FAMILIES = [
-	'Long March',
-	'Zhuque',
-	'Ceres',
-	'Kuaizhou',
-	'Kinetica',
-	'Gravity',
-	'Pallas',
-	'Tianlong',
-	'Lijian',
-	'Hyperbola',
-	'Kaituo',
-	'Jielong'
+const REGION_RULES = [
+	{
+		value: 'cn',
+		re: /china|chinese|landspace|galactic energy|i-?space|cas space|expace|orienspace|space pioneer|deep blue|china rocket|one space|kuaizhou|zhuque|ceres|hyperbola|gravity|tianlong|jielong|kinetica|pallas|lijian|kaituo|rocket co\./i
+	},
+	{ value: 'us', re: /spacex|united launch|orbital sciences|orbital atk|firefly|astra|blue origin|stoke|rocket lab|northrop|masten|relativity/i },
+	{ value: 'ru', re: /khrunichev|progress rocket|energia|roskosmos|makeyev|yuzhnoye|yuzhmash/i },
+	{ value: 'eu', re: /ariane|esa|hyimpulse|hyprspace|maiaspace|payload aerospace|avio|ohb|isaraerospace|orbex|skyrora|augsburg/i },
+	{ value: 'asia', re: /indian space|isro|mitsubishi|japan aerospace|jaxa|korean|innospace|space one|interstellar|tispace|kari|galaxy space|land space/i }
 ]
+
+function regionOf(x) {
+	const maker = x.manufacturer || ''
+	for (const r of REGION_RULES) {
+		if (r.re.test(maker)) return r.value
+	}
+	return 'other'
+}
 
 export default {
 	mixins: [navMixin],
@@ -194,101 +245,127 @@ export default {
 			all: [],
 			loading: true,
 			keyword: '',
-			status: 'all',
-			family: '',
-			cnOnly: false,
+			sort: 'overall',
+			region: 'all',
 			listNum: STEP,
-			// 暗门计数：3 秒内连点 5 次「火箭大全」标题呼出审核视角调试面板
+			sorts: SORTS,
+			regions: REGIONS,
+			// 暗门计数：3 秒内连点 5 次「火箭资料库」标题呼出审核视角调试面板
 			taps: 0,
 			tapTimer: null,
 			// 调试面板状态
 			dbgShow: false,
-			dbgInput: '',
-			statusOptions: [
-				{ label: '全部', value: 'all' },
-				{ label: '现役', value: 'active' },
-				{ label: '退役', value: 'retired' }
-			]
+			dbgInput: ''
 		}
 	},
 
 	computed: {
-		stats() {
-			const list = this.all
-			if (!list.length) return []
-
-			const families = new Set()
-			const makers = new Set()
-			let active = 0
-
-			for (const x of list) {
-				if (x.active) active++
-				if (x.manufacturer) makers.add(x.manufacturer)
-				const fam = (x.families || [])[0]
-				if (fam) families.add(fam)
-			}
-
-			return [
-				{ label: '个型号', value: list.length },
-				{ label: '现役', value: active },
-				{ label: '个系列', value: families.size },
-				{ label: '家制造商', value: makers.size }
-			]
-		},
-
-		// 系列按「现役型号数」优先排序，再按总数。
-		// 纯按总数排的话，Delta / Thor / Titan 这些老系列会排在前面，
-		// 点进去全是退役型号，筛选条就失去意义了
-		topFamilies() {
-			const map = new Map()
+		/**
+		 * 榜单的候选池：只排现役型号，按地区收窄，再按型号名去重。
+		 *
+		 * 型号库里同一型火箭会有多个构型记录（Starship / Starship V2…），
+		 * 不去重的话榜单上会出现两条同名条目，看起来像 bug。
+		 * 同名只保留综合分最高的那条，其余构型在详情页的「同系列构型」里能看到。
+		 */
+		pool() {
+			const seen = new Map()
 			for (const x of this.all) {
-				const fam = (x.families || [])[0]
-				if (!fam) continue
-				const cur = map.get(fam) || { total: 0, active: 0 }
-				cur.total++
-				if (x.active) cur.active++
-				map.set(fam, cur)
-			}
+				if (!x.active) continue
+				if (this.region !== 'all' && x.region !== this.region) continue
 
-			return [...map.entries()]
-				.sort((a, b) => b[1].active - a[1].active || b[1].total - a[1].total)
-				.slice(0, FAMILY_LIMIT)
-				.map(([name, v]) => ({ name, count: v.total }))
+				const k = x.name || x.zhName
+				const cur = seen.get(k)
+				if (!cur || x.score > cur.score) seen.set(k, x)
+			}
+			return [...seen.values()]
 		},
 
-		filtered() {
+		currentSort() {
+			return SORTS.find((s) => s.value === this.sort) || SORTS[0]
+		},
+
+		/** 归一化的分母，整个榜单共用一套，换筛选时名次才有可比性 */
+		maxes() {
+			let maxLaunch = 1
+			let maxLeo = 1
+			for (const x of this.all) {
+				if (!x.active) continue
+				maxLaunch = Math.max(maxLaunch, x.total_launch_count || 0)
+				maxLeo = Math.max(maxLeo, x.leo_capacity || 0)
+			}
+			return { maxLaunch, maxLeo }
+		},
+
+		ranked() {
 			const q = this.keyword.trim().toLowerCase()
+			let list = this.pool
 
-			return this.all.filter((x) => {
-				if (this.status === 'active' && !x.active) return false
-				if (this.status === 'retired' && x.active) return false
+			if (q) {
+				list = list.filter((x) => {
+					const hay = [x.zhName, x.name, x.full_name, x.manufacturer, x.family, x.variant]
+						.filter(Boolean)
+						.join(' ')
+						.toLowerCase()
+					return hay.indexOf(q) !== -1
+				})
+			}
 
-				if (this.cnOnly && !isChinese(x)) return false
+			const arr = list.slice()
 
-				if (this.family) {
-					const fams = x.families || []
-					if (fams.indexOf(this.family) === -1) return false
-				}
+			if (this.sort === 'capacity') {
+				arr.sort((a, b) => (b.leo_capacity || 0) - (a.leo_capacity || 0))
+			} else if (this.sort === 'launches') {
+				arr.sort((a, b) => (b.total_launch_count || 0) - (a.total_launch_count || 0))
+			} else if (this.sort === 'reliability') {
+				arr.sort((a, b) => {
+					const qa = (a.total_launch_count || 0) >= MIN_LAUNCH_FOR_RELIABILITY
+					const qb = (b.total_launch_count || 0) >= MIN_LAUNCH_FOR_RELIABILITY
+					if (qa !== qb) return qa ? -1 : 1
+					if (qa && qb) {
+						const d = (b.rate || 0) - (a.rate || 0)
+						if (d) return d
+					}
+					// 成功率相同（或都不够门槛）时，发射多的更靠前
+					return (b.total_launch_count || 0) - (a.total_launch_count || 0)
+				})
+			} else {
+				arr.sort((a, b) => b.score - a.score || (b.total_launch_count || 0) - (a.total_launch_count || 0))
+			}
 
-				if (!q) return true
-
-				const hay = [x.zhName, x.name, x.full_name, x.manufacturer, (x.families || []).join(' ')]
-					.join(' ')
-					.toLowerCase()
-				return hay.indexOf(q) !== -1
-			})
+			return arr
 		},
 
 		visible() {
-			return this.filtered.slice(0, this.listNum)
+			return this.ranked.slice(0, this.listNum)
 		},
 
 		hasMore() {
-			return this.listNum < this.filtered.length
+			return this.listNum < this.ranked.length
 		},
 
-		hasFilter() {
-			return this.status !== 'all' || !!this.family || this.cnOnly || !!this.keyword.trim()
+		// ---- 头部三格：运力之最 / 最活跃 / 可复用数量 ----
+		topLeo() {
+			let best = null
+			for (const x of this.pool) {
+				if (!(x.leo_capacity > 0)) continue
+				if (!best || x.leo_capacity > best.leo_capacity) best = x
+			}
+			if (!best) return { name: '—', text: '暂无数据' }
+			return { name: best.zhName, text: leoText(best.leo_capacity) }
+		},
+
+		topLaunch() {
+			let best = null
+			for (const x of this.pool) {
+				if (!(x.total_launch_count > 0)) continue
+				if (!best || x.total_launch_count > best.total_launch_count) best = x
+			}
+			if (!best) return { name: '—', text: '暂无数据' }
+			return { name: best.zhName, text: best.total_launch_count + ' 次发射' }
+		},
+
+		reusableCount() {
+			return this.pool.filter((x) => x.reusable).length
 		}
 	},
 
@@ -370,35 +447,46 @@ export default {
 				const d = await spaceData.load('launchers', { force: !!force })
 				const list = (d && d.list) || []
 
-				this.all = list
-					.map((x) => {
-						const zh = rocketName(x)
-						const en = x.full_name || x.name || ''
-						return {
-							...x,
-							zhName: zh,
-							// 中文名和英文名不同就都显示，方便对照
-							subName: en && en !== zh ? en : x.manufacturer || '',
-							leoText: leoOf(x.leo_capacity)
-						}
-					})
-					// 现役优先，同组内按发射次数倒序
-					.sort((a, b) => {
-						if (a.active !== b.active) return a.active ? -1 : 1
-						return (b.total_launch_count || 0) - (a.total_launch_count || 0)
-					})
+				// 归一化用的分母先算出来，综合分的三项才好加权到同一量纲
+				let maxLaunch = 1
+				let maxLeo = 1
+				for (const x of list) {
+					if (!x.active) continue
+					maxLaunch = Math.max(maxLaunch, x.total_launch_count || 0)
+					maxLeo = Math.max(maxLeo, x.leo_capacity || 0)
+				}
+
+				this.all = list.map((x) => {
+					const zh = rocketName(x)
+					const ok = x.successful_launches || 0
+					const bad = x.failed_launches || 0
+					const tried = ok + bad
+					// 没打过 / 只有成功记录但总数为 0 的，不给成功率，避免 100% 假象
+					const rate = tried > 0 ? ok / tried : 0
+
+					const act = (x.total_launch_count || 0) / maxLaunch
+					const cap = (x.leo_capacity || 0) / maxLeo
+					const score = 0.45 * act + 0.35 * rate + 0.2 * cap
+
+					const fams = x.families || []
+					return {
+						...x,
+						zhName: zh,
+						region: regionOf(x),
+						rate,
+						rateText: tried > 0 ? (rate * 100).toFixed(1) + '%' : '—',
+						leoText: x.leo_capacity > 0 ? leoText(x.leo_capacity) : '—',
+						// families[0] 是家族（Falcon / Long March），第二层才是具体系列
+						family: fams[0] || '',
+						variant: x.variant || '',
+						score
+					}
+				})
 			} catch (e) {
 				console.warn('[rockets] 获取型号库失败', e)
 			} finally {
 				this.loading = false
 			}
-		},
-
-		resetFilter() {
-			this.status = 'all'
-			this.family = ''
-			this.cnOnly = false
-			this.keyword = ''
 		},
 
 		goRocket(r) {
@@ -412,34 +500,23 @@ export default {
 		keyword() {
 			this.listNum = STEP
 		},
-		status() {
+		sort() {
 			this.listNum = STEP
 		},
-		family() {
-			this.listNum = STEP
-		},
-		cnOnly() {
+		region() {
 			this.listNum = STEP
 		}
 	}
 }
 
-/** 是否中国火箭：制造商含 China，或系列命中白名单 */
-function isChinese(x) {
-	const maker = (x.manufacturer || '').toLowerCase()
-	if (maker.indexOf('china') !== -1 || maker.indexOf('chinese') !== -1) return true
-
-	const fams = x.families || []
-	for (const f of fams) {
-		if (CN_FAMILIES.indexOf(f) !== -1) return true
-	}
-	return false
-}
-
-function leoOf(kg) {
+/** 运力文案：吨位级的用「吨」，小型的直接用 kg，都比一串数字好扫 */
+function leoText(kg) {
 	const v = Number(kg)
-	if (!isFinite(v) || v <= 0) return ''
-	if (v >= 1000) return Math.round((v / 1000) * 10) / 10 + ' 吨'
+	if (!isFinite(v) || v <= 0) return '—'
+	if (v >= 1000) {
+		const t = Math.round((v / 1000) * 10) / 10
+		return (t % 1 === 0 ? t.toFixed(0) : t) + ' 吨'
+	}
 	return v + ' kg'
 }
 </script>
@@ -453,97 +530,150 @@ function leoOf(kg) {
 	box-sizing: border-box;
 }
 
-
-.header-sub {
-	/* 横向留白由 .page 统一给（24rpx），这里再叠就双重缩进了 */
-	padding: 0 0 12rpx;
-	/* 往上贴近标题：nav-row 的 44px 行盒下方有富余 */
-	margin-top: -8rpx;
+/* ==================== 榜单头部 ==================== */
+.hero {
+	margin-top: 6rpx;
+	padding: 24rpx 24rpx 0;
+	background: #131926;
+	border: 1rpx solid rgba(255, 255, 255, 0.06);
+	border-radius: 18rpx;
 }
 
-.subtitle {
-	color: #6b7891;
-	font-size: 23rpx;
-}
-
-.thumb {
-	width: 96rpx;
-	height: 128rpx;
-	border-radius: 12rpx;
-	margin-right: 20rpx;
-	flex-shrink: 0;
-	background: #0f1520;
-}
-
-.thumb-ph {
+.hero-top {
 	display: flex;
 	align-items: center;
-	justify-content: center;
+	justify-content: space-between;
 }
 
-.thumb-ph-icon {
-	font-size: 44rpx;
-	opacity: 0.45;
+.hero-kicker {
+	color: #5d6a7e;
+	font-size: 19rpx;
+	letter-spacing: 1rpx;
 }
 
-/* 顶部四格统计 */
-.stats {
+.hero-state {
+	padding: 2rpx 10rpx;
+	border: 1rpx solid rgba(255, 77, 79, 0.6);
+	border-radius: 4rpx;
+	color: #ff4d4f;
+	font-size: 19rpx;
+	line-height: 1.5;
+}
+
+.hero-main {
 	display: flex;
-	margin-bottom: 22rpx;
+	align-items: flex-end;
+	justify-content: space-between;
+	margin-top: 16rpx;
 }
 
-.stat-cell {
+.hero-left {
 	flex: 1;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	padding: 22rpx 0;
-	margin-right: 12rpx;
-	background: #141a26;
-	border: 1rpx solid rgba(255, 255, 255, 0.05);
-	border-radius: 16rpx;
+	min-width: 0;
 }
 
-.stat-cell:last-child {
-	margin-right: 0;
-}
-
-.stat-num {
+.hero-title {
+	display: block;
 	color: #ffffff;
-	font-size: 38rpx;
+	font-size: 44rpx;
 	font-weight: 600;
-	line-height: 1.15;
+	letter-spacing: 1rpx;
+	line-height: 1.25;
 }
 
-.stat-label {
+.hero-sub {
+	display: block;
+	margin-top: 8rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.hero-count {
+	flex-shrink: 0;
+	margin-left: 20rpx;
+	text-align: right;
+}
+
+.hero-num {
+	display: block;
+	color: #ff6a3d;
+	font-size: 60rpx;
+	font-weight: 600;
+	line-height: 1;
+}
+
+.hero-unit {
+	display: block;
 	margin-top: 6rpx;
 	color: #6b7891;
 	font-size: 20rpx;
 }
 
-/* 搜索 */
+/* 三格极值：连成一条，用竖线分隔，不各占一张卡 */
+.hero-cells {
+	display: flex;
+	margin-top: 22rpx;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.hcell {
+	flex: 1;
+	min-width: 0;
+	padding: 18rpx 0 20rpx;
+	border-right: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.hcell:last-child {
+	border-right: none;
+}
+
+.hcell-k {
+	display: block;
+	color: #5d6a7e;
+	font-size: 19rpx;
+}
+
+.hcell-v {
+	display: block;
+	margin-top: 8rpx;
+	color: #e6edf6;
+	font-size: 24rpx;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.hcell-n {
+	display: block;
+	margin-top: 4rpx;
+	color: #8a97a8;
+	font-size: 20rpx;
+}
+
+/* ==================== 搜索 ==================== */
 .search {
 	display: flex;
 	align-items: center;
 	height: 76rpx;
-	margin-bottom: 18rpx;
+	margin: 18rpx 0;
 	padding: 0 24rpx;
-	background: #141a26;
+	background: #131926;
 	border: 1rpx solid rgba(255, 255, 255, 0.06);
-	border-radius: 38rpx;
+	border-radius: 12rpx;
 }
 
 .search-icon {
 	margin-right: 12rpx;
 	font-size: 24rpx;
-	opacity: 0.6;
+	opacity: 0.55;
 }
 
 .search-input {
 	flex: 1;
 	height: 76rpx;
 	color: #e2e8f0;
-	font-size: 27rpx;
+	font-size: 26rpx;
 }
 
 .search-ph {
@@ -556,113 +686,195 @@ function leoOf(kg) {
 	font-size: 26rpx;
 }
 
-/* 筛选项 */
-.filter-row {
-	display: flex;
-	margin-bottom: 14rpx;
+/* ==================== 排序 / 地区 ==================== */
+.sort-label {
+	display: block;
+	margin-bottom: 12rpx;
+	color: #6b7891;
+	font-size: 21rpx;
 }
 
-.chip {
-	padding: 10rpx 26rpx;
-	margin-right: 14rpx;
-	background: #141a26;
+.sort-tabs {
+	display: flex;
+	margin-bottom: 16rpx;
+}
+
+.sort-tab {
+	flex: 1;
+	height: 68rpx;
+	line-height: 68rpx;
+	margin-right: 12rpx;
+	text-align: center;
+	background: #131926;
 	border: 1rpx solid rgba(255, 255, 255, 0.06);
-	border-radius: 30rpx;
+	border-radius: 8rpx;
 	color: #8a97a8;
 	font-size: 25rpx;
 }
 
-.chip.on {
-	background: rgba(56, 189, 248, 0.14);
-	border-color: rgba(56, 189, 248, 0.45);
-	color: #38bdf8;
-}
-
-/* 「中国火箭」用琥珀色区分：它是跨系列的快捷筛选，不是状态 */
-.chip-cn {
-	margin-left: auto;
+.sort-tab:last-child {
 	margin-right: 0;
 }
 
-.chip-cn.on {
-	background: rgba(245, 195, 59, 0.14);
-	border-color: rgba(245, 195, 59, 0.45);
-	color: #f5c33b;
+.sort-tab.on {
+	background: #ff6a3d;
+	border-color: #ff6a3d;
+	color: #14181f;
+	font-weight: 600;
 }
 
-.chip-sm {
-	padding: 8rpx 20rpx;
-	font-size: 23rpx;
-}
-
-.chip-count {
-	margin-left: 8rpx;
-	color: #4a5568;
-	font-size: 20rpx;
-}
-
-.chip.on .chip-count {
-	color: rgba(56, 189, 248, 0.7);
-}
-
-/* 系列横向滚动。scroll-view 横向滚动必须有确定高度，否则会塌陷 */
-.family-scroll {
+/* 横滑区必须有确定高度，否则 scroll-view 会塌陷 */
+.region-scroll {
 	width: 100%;
-	height: 68rpx;
-	margin-bottom: 16rpx;
+	height: 64rpx;
 	white-space: nowrap;
 }
 
-.family-inner {
+.region-inner {
 	display: flex;
 	align-items: center;
-	padding-bottom: 4rpx;
 }
 
-.result-line {
+.region {
+	flex-shrink: 0;
+	margin-right: 12rpx;
+	padding: 8rpx 22rpx;
+	background: #131926;
+	border: 1rpx solid rgba(255, 255, 255, 0.06);
+	border-radius: 8rpx;
+	color: #8a97a8;
+	font-size: 23rpx;
+}
+
+.region.on {
+	background: #e9eef6;
+	border-color: #e9eef6;
+	color: #14181f;
+	font-weight: 600;
+}
+
+/* 榜单口径行 */
+.board-line {
 	display: flex;
-	align-items: center;
+	align-items: flex-end;
 	justify-content: space-between;
-	padding: 4rpx 0 16rpx;
+	padding: 10rpx 0 16rpx;
 }
 
-.result-text {
-	color: #6b7891;
-	font-size: 23rpx;
-}
-
-.result-reset {
-	color: #38bdf8;
-	font-size: 23rpx;
-}
-
-/* 卡片 */
-.card {
-	display: flex;
-	align-items: center;
-	margin-bottom: 16rpx;
-	padding: 24rpx 26rpx;
-	background: #141a26;
-	border-radius: 18rpx;
-	border: 1rpx solid rgba(255, 255, 255, 0.05);
-}
-
-.card-hover {
-	background: #1a2231;
-}
-
-.info {
+.board-left {
 	flex: 1;
 	min-width: 0;
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
 }
 
-.name-line {
+.board-title {
+	margin-right: 12rpx;
+	color: #ffffff;
+	font-size: 26rpx;
+	font-weight: 600;
+}
+
+.board-desc {
+	color: #6b7891;
+	font-size: 20rpx;
+}
+
+.board-count {
+	flex-shrink: 0;
+	margin-left: 12rpx;
+	color: #ff6a3d;
+	font-size: 22rpx;
+}
+
+/* ==================== 排行卡片 ==================== */
+.rank-card {
+	display: flex;
+	margin-bottom: 16rpx;
+	padding: 16rpx;
+	background: #131926;
+	border: 1rpx solid rgba(255, 255, 255, 0.05);
+	border-radius: 16rpx;
+}
+
+.rank-card-hover {
+	background: #182031;
+}
+
+.rank-media {
+	position: relative;
+	width: 224rpx;
+	height: 214rpx;
+	flex-shrink: 0;
+	margin-right: 18rpx;
+	border-radius: 10rpx;
+	overflow: hidden;
+	background: #0f1520;
+}
+
+.rank-img {
+	width: 100%;
+	height: 100%;
+}
+
+.rank-ph {
 	display: flex;
 	align-items: center;
+	justify-content: center;
 }
 
-.name {
+.rank-ph-icon {
+	font-size: 56rpx;
+	opacity: 0.4;
+}
+
+/* 排名贴在图左上角，前三名用主色 */
+.rank-no {
+	position: absolute;
+	left: 0;
+	top: 0;
+	padding: 4rpx 12rpx;
+	background: rgba(6, 10, 18, 0.72);
+	border-bottom-right-radius: 10rpx;
+	color: #8a97a8;
+	font-size: 21rpx;
+	font-weight: 600;
+}
+
+.rank-no.top {
+	background: #ff6a3d;
+	color: #14181f;
+}
+
+/* 可复用角标贴图底 */
+.rank-flag {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	padding: 3rpx 10rpx;
+	background: rgba(6, 10, 18, 0.72);
+	border-top-right-radius: 8rpx;
+	color: #9fd0ff;
+	font-size: 18rpx;
+}
+
+.rank-body {
 	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.rank-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+.rank-name {
+	flex: 1;
+	min-width: 0;
 	color: #ffffff;
 	font-size: 30rpx;
 	font-weight: 600;
@@ -671,59 +883,65 @@ function leoOf(kg) {
 	text-overflow: ellipsis;
 }
 
-.badge {
+.rank-more {
 	flex-shrink: 0;
-	margin-left: 14rpx;
-	padding: 3rpx 12rpx;
-	border-radius: 6rpx;
-	background: rgba(52, 199, 89, 0.12);
-	color: #34c759;
-	font-size: 20rpx;
+	margin-left: 10rpx;
+	color: #ff6a3d;
+	font-size: 21rpx;
 }
 
-.badge.off {
-	background: rgba(255, 255, 255, 0.06);
-	color: #6b7891;
-}
-
-.sub {
+.rank-maker {
 	display: block;
-	margin-top: 8rpx;
+	margin-top: 6rpx;
 	color: #6b7891;
-	font-size: 23rpx;
+	font-size: 21rpx;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.meta {
+.rank-tags {
 	display: flex;
-	align-items: center;
-	margin-top: 10rpx;
+	flex-wrap: wrap;
+	margin-top: 8rpx;
 }
 
-.count {
-	color: #38bdf8;
-	font-size: 23rpx;
+.rtag {
+	margin: 0 8rpx 4rpx 0;
+	padding: 2rpx 10rpx;
+	background: rgba(255, 255, 255, 0.06);
+	border-radius: 4rpx;
+	color: #97a4b6;
+	font-size: 18rpx;
 }
 
-.dot {
-	margin: 0 10rpx;
-	color: #3d4a5c;
-	font-size: 20rpx;
+/* 三项指标平铺在卡片底部，数值大、标签小 */
+.rank-metrics {
+	display: flex;
+	margin-top: auto;
+	padding-top: 12rpx;
 }
 
-.rate {
-	color: #8a97a8;
-	font-size: 22rpx;
+.metric {
+	flex: 1;
+	min-width: 0;
 }
 
-.arrow {
-	flex-shrink: 0;
-	margin-left: 16rpx;
-	color: #3d4a5c;
-	font-size: 32rpx;
-	line-height: 1;
+.m-v {
+	display: block;
+	color: #e6edf6;
+	font-size: 25rpx;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.m-k {
+	display: block;
+	margin-top: 2rpx;
+	color: #5d6a7e;
+	font-size: 18rpx;
 }
 
 .foot-hint {
@@ -750,7 +968,6 @@ function leoOf(kg) {
 
 .dbg-panel {
 	width: 100%;
-	/* 只剩输入框和按钮，收窄一点更像小工具面板 */
 	max-width: 600rpx;
 	padding: 34rpx 32rpx 28rpx;
 	box-sizing: border-box;
