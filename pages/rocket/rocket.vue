@@ -118,18 +118,6 @@
 					<text class="vchip-cur" v-if="config">{{ config.full_name || config.name }}</text>
 				</view>
 
-				<!-- 技术参数：始终显示当前这一型，切构型时整块换掉 -->
-				<view class="card" v-if="currentParams.length">
-					<view class="card-head">
-						<text class="card-title">技术参数</text>
-						<text class="card-note">{{ config.name }}</text>
-					</view>
-					<view class="param-row" v-for="p in currentParams" :key="p.label">
-						<text class="param-label">{{ p.label }}</text>
-						<text class="param-value">{{ p.value }}</text>
-					</view>
-				</view>
-
 				<!-- 简介 -->
 				<view class="card" v-if="descText || !reviewMode">
 					<view class="card-head">
@@ -162,11 +150,26 @@
 					</view>
 				</view>
 
-				<!-- 发射战绩：同系列构型加总，标题不再写「系列」，避免和下面的「不同构型」打架 -->
-				<view class="card" v-if="stats.length">
+				<!-- 技术参数：两列网格，比一列 label/value 更像参数表 -->
+				<view class="card" v-if="currentParams.length">
+					<view class="card-head">
+						<text class="card-title">技术参数</text>
+						<text class="card-note">{{ config.name }}</text>
+					</view>
+
+					<view class="param-grid">
+						<view class="param-cell" v-for="p in currentParams" :key="p.label">
+							<text class="pc-label">{{ p.label }}</text>
+							<text class="pc-value">{{ p.value }}</text>
+						</view>
+					</view>
+				</view>
+
+				<!-- 发射战绩：只看当前这一型，不再做系列合计 -->
+				<view class="card" v-if="hasRecord">
 					<view class="card-head">
 						<text class="card-title">发射战绩</text>
-						<text class="card-note" v-if="variants.length > 1">系列合计 · {{ variants.length }} 个构型</text>
+						<text class="card-note">{{ config.name }}</text>
 					</view>
 
 					<!-- 发射机构：从该系列全部发射记录聚合，单机构可点进机构页。
@@ -182,31 +185,35 @@
 						<view class="agency-arrow"></view>
 					</view>
 
-					<view class="stat-grid">
-						<view class="stat-cell" v-for="s in stats" :key="s.label">
-							<view class="stat-label-row">
-								<view class="stat-dot" :class="'dot-' + s.tone"></view>
-								<text class="stat-label">{{ s.label }}</text>
-							</view>
-							<text class="stat-num" :class="'num-' + s.tone">{{ s.value }}</text>
+					<!-- 主指标：成功率放大，右边挂总发射与连续成功 -->
+					<view class="record-head">
+						<view class="rh-main">
+							<text class="rh-num">{{ rateText }}</text>
+							<text class="rh-label">成功率</text>
+						</view>
+						<view class="rh-side">
+							<text class="rh-line">总发射 <text class="rh-strong">{{ statsTotal }}</text></text>
+							<text class="rh-line">连续成功 <text class="rh-strong">{{ streakText }}</text></text>
+						</view>
+					</view>
+
+					<view class="record-grid" v-if="stats.length">
+						<view class="rg-cell" v-for="s in stats" :key="s.label">
+							<text class="rg-value" :class="'rg-' + s.tone">{{ s.value }}</text>
+							<text class="rg-label">{{ s.label }}</text>
 						</view>
 					</view>
 				</view>
-
-
 				<!-- 回收记录：只有真做过回收的型号才有数 -->
 				<view class="card" v-if="landingStats.length">
 					<view class="card-head">
 						<text class="card-title">回收记录</text>
 						<text class="card-note" v-if="config.reusable">可复用</text>
 					</view>
-					<view class="stat-grid">
-						<view class="stat-cell" v-for="s in landingStats" :key="s.label">
-							<view class="stat-label-row">
-								<view class="stat-dot" :class="'dot-' + s.tone"></view>
-								<text class="stat-label">{{ s.label }}</text>
-							</view>
-							<text class="stat-num" :class="'num-' + s.tone">{{ s.value }}</text>
+					<view class="record-grid">
+						<view class="rg-cell" v-for="s in landingStats" :key="s.label">
+							<text class="rg-value" :class="'rg-' + s.tone">{{ s.value }}</text>
+							<text class="rg-label">{{ s.label }}</text>
 						</view>
 					</view>
 				</view>
@@ -448,41 +455,57 @@ export default {
 			return en && en !== this.seriesTitle ? en : ''
 		},
 
+		/**
+		 * 发射战绩：只看**当前这一型**，不再做系列合计。
+		 *
+		 * 系列加总的口径对用户没有意义 —— 他选的是 Block 5，
+		 * 想看的是 Block 5 打了几次、成功率多少，而不是「猎鹰家族一共 600 次」。
+		 * 连续成功同理，跨构型累加本身就是伪指标。
+		 */
 		stats() {
-			const list = this.siblings.length ? this.siblings : this.config ? [this.config] : []
-			if (!list.length) return []
+			const c = this.config
+			if (!c) return []
 
-			let ok = 0
-			let fail = 0
-			let pending = 0
-			let total = 0
-			for (const x of list) {
-				ok += Number(x.successful_launches) || 0
-				fail += Number(x.failed_launches) || 0
-				pending += Number(x.pending_launches) || 0
-				total += Number(x.total_launch_count) || 0
-			}
+			const ok = Number(c.successful_launches) || 0
+			const fail = Number(c.failed_launches) || 0
+			const pending = Number(c.pending_launches) || 0
 
-			const flown = ok + fail
-			const rate = flown > 0 ? ((ok / flown) * 100).toFixed(1).replace(/\.0$/, '') + '%' : '—'
-
-			const out = [
-				{ label: '总发射', value: fmtInt(total || flown), tone: 'plain' },
-				{ label: '成功率', value: rate, tone: 'good' },
+			return [
 				{ label: '成功', value: fmtInt(ok), tone: 'good' },
 				{ label: '失败', value: fmtInt(fail), tone: 'bad' },
-				{ label: '待发射', value: fmtInt(pending), tone: 'warn' },
-				{ label: '构型', value: fmtInt(list.length), tone: 'plain' }
-			]
+				{ label: '待发射', value: fmtInt(pending), tone: 'warn' }
+			].filter((s) => s.value !== '0')
+		},
 
-			// 连续成功只对单一构型有意义：跨构型累加是伪指标，不显示
-			if (list.length === 1) {
-				const streak = Number(this.config && this.config.consecutive_successful_launches) || 0
-				if (streak) out.splice(2, 0, { label: '连续成功', value: fmtInt(streak), tone: 'good' })
-			}
+		/** 成功率：主指标，单独放大显示 */
+		rateText() {
+			const c = this.config
+			if (!c) return '—'
+			const ok = Number(c.successful_launches) || 0
+			const fail = Number(c.failed_launches) || 0
+			const flown = ok + fail
+			if (!flown) return '—'
+			const v = (ok / flown) * 100
+			// 100% 不写成 100.0%，99.8% 保留一位
+			return (v === 100 ? '100' : v.toFixed(1)) + '%'
+		},
 
-			// 全 0 的格子没意义（早期型号常常只有一两个数字）
-			return out.filter((s) => s.value !== '0' && s.value !== '—')
+		statsTotal() {
+			const c = this.config
+			if (!c) return '—'
+			const total = Number(c.total_launch_count) || 0
+			return total ? fmtInt(total) : '—'
+		},
+
+		streakText() {
+			const c = this.config
+			if (!c) return '—'
+			const streak = Number(c.consecutive_successful_launches) || 0
+			return streak ? fmtInt(streak) : '—'
+		},
+
+		hasRecord() {
+			return this.rateText !== '—' || this.stats.length > 0
 		},
 
 		/**
@@ -1701,6 +1724,124 @@ function byNetDesc(a, b) {
 
 .param-row:first-child {
 	border-top: none;
+}
+
+/* ---- 技术参数：两列网格 ---- */
+.param-grid {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0 -6rpx;
+}
+
+.param-cell {
+	width: calc(50% - 12rpx);
+	margin: 0 6rpx 12rpx;
+	padding: 16rpx 18rpx;
+	box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 12rpx;
+}
+
+.pc-label {
+	display: block;
+	color: #6b7891;
+	font-size: 20rpx;
+	letter-spacing: 0.5rpx;
+}
+
+.pc-value {
+	display: block;
+	margin-top: 6rpx;
+	color: #e6edf6;
+	font-size: 28rpx;
+	font-weight: 600;
+}
+
+/* ---- 发射战绩 / 回收记录：主数字 + 三列小格 ---- */
+.record-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4rpx 0 20rpx;
+}
+
+.rh-main {
+	display: flex;
+	align-items: baseline;
+}
+
+.rh-num {
+	color: #4ade80;
+	font-size: 64rpx;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: -1rpx;
+}
+
+.rh-label {
+	margin-left: 12rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.rh-side {
+	text-align: right;
+}
+
+.rh-line {
+	display: block;
+	color: #7d8ba0;
+	font-size: 22rpx;
+	line-height: 1.75;
+}
+
+.rh-strong {
+	color: #e6edf6;
+	font-weight: 600;
+}
+
+.record-grid {
+	display: flex;
+	flex-wrap: wrap;
+	padding-top: 16rpx;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.rg-cell {
+	width: 33.33%;
+	padding: 10rpx 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.rg-value {
+	color: #e6edf6;
+	font-size: 34rpx;
+	font-weight: 600;
+	line-height: 1.15;
+}
+
+.rg-label {
+	margin-top: 4rpx;
+	color: #6b7891;
+	font-size: 20rpx;
+}
+
+.rg-good {
+	color: #4ade80;
+}
+
+.rg-bad {
+	color: #f87171;
+}
+
+.rg-warn {
+	color: #f5c33b;
+}
+
+.rg-plain {
+	color: #e6edf6;
 }
 
 .param-label {
