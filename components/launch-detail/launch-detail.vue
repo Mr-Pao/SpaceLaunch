@@ -446,6 +446,7 @@ import {
 	relativeTime,
 	launchTitle,
 	rocketName as rocketNameOf,
+	rocketFullName,
 	orbitName,
 	missionTypeName,
 	craftTypeName,
@@ -699,7 +700,8 @@ export default {
 			return orbitName(o.abbrev) || orbitName(o.name) || ''
 		},
 		rocketName() {
-			return rocketNameOf(this.detail && this.detail.rocket && this.detail.rocket.configuration)
+			// 用完整名带构型：只写「猎鹰 9 号」的话，Block 5 和 v1.0 在同一次发射里分不出来
+			return rocketFullName(this.detail && this.detail.rocket && this.detail.rocket.configuration)
 		},
 
 		// 型号简介、图片、参数都来自同步阶段 join 进来的 rocketBrief
@@ -713,13 +715,13 @@ export default {
 		rocketActive() {
 			return Boolean(this.rocketBrief && this.rocketBrief.active)
 		},
-		// 副标题给英文原名：中文型号名有时是意译（猎鹰九号 / Falcon 9），
-		// 两行并排一看就对得上英文资料
+		// 副标题给英文全名（含构型）：中文名有时是意译，两行并排一看就对得上英文资料
 		rocketSub() {
-			const b = this.rocketBrief
-			if (!b || !b.name) return ''
+			const c = this.detail && this.detail.rocket && this.detail.rocket.configuration
+			if (!c) return ''
+			const en = c.full_name || c.name || ''
 			const zh = this.rocketName
-			return b.name === zh ? '' : b.name
+			return en && en !== zh ? en : ''
 		},
 		rocketFlags() {
 			const b = this.rocketBrief
