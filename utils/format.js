@@ -565,16 +565,31 @@ function fixTerms(text) {
  * LL2 的 launch.name 是「型号 | 任务名」拼好的英文串，直接显示全英文。
  * 这里用「中文型号 + 中文任务名」重新拼，任务名没翻出来时才回退原始串。
  */
+/**
+ * 任务名清理。
+ *
+ * LL2 里未定名的任务会写成 "SatNet LEO Group TBD?"，机翻之后变成
+ * 「SatNet LEO 集团待定?」—— 问号留在标题里很像表单没填完。
+ * 这里把末尾的 TBD / 待定（含问号）摘掉，任务名本身保留。
+ */
+function cleanMission(text) {
+	return String(text == null ? '' : text)
+		.replace(/[\s,，]*[(（]?\s*(TBD|TBC|待定|待公布)\s*[)）]?\s*[?？]?\s*$/i, '')
+		.trim()
+}
+
 export function launchTitle(item) {
 	if (!item) return ''
 
 	// 用完整名：只有「猎鹰 9 号」的话，同系列各构型在列表里长得一模一样
 	const rocket = rocketFullName(item.rocket && item.rocket.configuration)
 	const m = item.mission || {}
-	const mission = fixTerms(m.nameZh || m.name || '')
+	const mission = cleanMission(fixTerms(m.nameZh || m.name || ''))
 
 	if (mission && rocket) return rocket + ' | ' + mission
 	if (mission) return mission
+	// 任务名被清空（原来只有 TBD）时只留型号，别回退到含 TBD 的英文原串
+	if (rocket) return rocket
 	return item.name || ''
 }
 
