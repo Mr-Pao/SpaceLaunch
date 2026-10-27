@@ -541,12 +541,15 @@ export default {
 		 */
 		pads() {
 			const arr = (this.config && this.config.pads) || []
-			return arr.map((p) => ({
-				name: p.name,
-				short: padShort(p.name) || p.name,
-				location: placeZh(p.location),
-				count: p.count || 0
-			}))
+			return arr
+				// LL2 里有一批工的位名就叫 "Unknown Pad"，聚出来是纯噪音
+				.filter((p) => p.name && !/unknown/i.test(p.name))
+				.map((p) => ({
+					name: p.name,
+					short: padShort(p.name) || p.name,
+					location: placeZh(p.location),
+					count: p.count || 0
+				}))
 		},
 
 		/** 发射机构：该系列全部发射记录里出现过的机构，去重拼接。
