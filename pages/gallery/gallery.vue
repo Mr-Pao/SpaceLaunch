@@ -65,6 +65,7 @@
 				<text class="all-num">{{ total }}</text>
 				<text class="all-arrow">›</text>
 			</view>
+			<text class="dock-tip">点任意一张查看发射详情</text>
 		</view>
 
 		<view class="loading" v-if="loading">
@@ -426,8 +427,29 @@ export default {
 	bottom: 210rpx;
 	z-index: 20;
 	display: flex;
-	justify-content: center;
+	flex-direction: column;
+	align-items: center;
 	pointer-events: none;
+}
+
+/* 点图提示：轻呼吸，不抢画面但看得见 */
+.dock-tip {
+	margin-top: 16rpx;
+	color: rgba(200, 214, 232, 0.6);
+	font-size: 20rpx;
+	letter-spacing: 1rpx;
+	text-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.7);
+	animation: tipBreath 3.4s ease-in-out infinite;
+}
+
+@keyframes tipBreath {
+	0%,
+	100% {
+		opacity: 0.5;
+	}
+	50% {
+		opacity: 0.95;
+	}
 }
 
 .all-btn {

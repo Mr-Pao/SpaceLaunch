@@ -81,6 +81,7 @@ ${css}
         <text class="all-num">${total}</text>
         <text class="all-arrow">›</text>
       </view>
+      <text class="dock-tip">点任意一张查看发射详情</text>
     </view>
 
     <view class="sb"><text>21:12</text><view class="caps"></view></view>
