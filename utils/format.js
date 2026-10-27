@@ -425,9 +425,12 @@ export function rocketName(config) {
 		ROCKET_ZH[base] ||
 		ROCKET_ZH[bare] ||
 		ROCKET_ZH[noUpper] ||
+		// 长征走规则推导时 full_name 优先：{name:'Long March', full_name:'Long March 5'}
+		// 必须先试 full，否则 base 会先命中「长征」而丢掉编号
+		zhLongMarch(full) ||
+		zhLongMarch(bare) ||
 		zhLongMarch(base) ||
 		zhLongMarch(noUpper) ||
-		zhLongMarch(full) ||
 		full
 	)
 }

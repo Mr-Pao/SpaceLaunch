@@ -166,7 +166,7 @@ async function testFormat() {
 	eq(f.rocketName({ name: 'Long March 12A' }), '长征十二号甲', '长征规则：两位数字 + 甲')
 	eq(f.rocketName({ name: 'Long March 8 (Core Only)' }), '长征八号（仅芯级）', '长征规则：仅芯级补注')
 	eq(f.rocketName({ name: 'Long March' }), '长征', '长征规则：无编号不产生「长征号」')
-	eq(f.rocketName({ name: 'Falcon 9 Block 5' }), 'Falcon 9 Block 5', '非中国型号保留英文原文')
+	eq(f.rocketName({ name: 'Falcon 9 Block 5' }), '猎鹰 9 号', '英文型号剥掉构型后缀后命中中文名')
 	eq(f.rocketName({ full_name: 'Long March 5', name: 'Long March' }), '长征五号', 'full_name 优先于 name')
 
 	// countryOf：国家只能从 pad.location.name 的末段推，末段不一定是国家名
