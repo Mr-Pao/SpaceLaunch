@@ -584,7 +584,9 @@ function leoText(kg) {
 .hero {
 	position: relative;
 	margin-top: 0;
-	padding: 26rpx 26rpx 0;
+	/* 顶上这 44px 是给微信胶囊让位的：留白放进卡片里，卡片背景仍顶到屏幕顶部，
+	   既不被胶囊压住，也不会在卡外留一条黑边 */
+	padding: 44px 26rpx 0;
 	background: linear-gradient(158deg, rgba(30, 39, 58, 0.96) 0%, rgba(18, 24, 36, 0.94) 58%, rgba(15, 20, 31, 0.96) 100%);
 	border: 1rpx solid rgba(255, 255, 255, 0.08);
 	border-radius: 26rpx;
