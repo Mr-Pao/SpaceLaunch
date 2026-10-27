@@ -45,7 +45,7 @@
 							<text class="date">{{ formatShort(item.date) }}</text>
 						</view>
 
-						<text class="title">{{ item.name }}</text>
+						<text class="title">{{ item.nameZh || item.name }}</text>
 
 						<view class="tags" v-if="item.location || (item.launches && item.launches.length)">
 							<text class="tag" v-if="item.location">{{ item.location }}</text>

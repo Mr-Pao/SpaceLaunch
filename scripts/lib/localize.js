@@ -90,13 +90,23 @@ async function localizeLaunchNames(list) {
 
 /** event.description → descriptionZh */
 function localizeEvents(list) {
-	return fill(
-		list,
-		(x) => x.description,
-		(x, zh) => {
-			x.descriptionZh = zh
-		}
-	)
+	// 活动名也翻：列表和详情页的标题全靠它，不翻就是纯英文标题
+	return Promise.all([
+		fill(
+			list,
+			(x) => x.name,
+			(x, zh) => {
+				x.nameZh = zh
+			}
+		),
+		fill(
+			list,
+			(x) => x.description,
+			(x, zh) => {
+				x.descriptionZh = zh
+			}
+		)
+	])
 }
 
 /** agency.description → descriptionZh */

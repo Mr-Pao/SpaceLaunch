@@ -291,6 +291,8 @@ function slimEvent(e) {
 	return {
 		id: e.id ?? null,
 		name: str(e.name),
+		// 中文名由同步阶段回填，前端回退英文原名
+		nameZh: '',
 		date: str(e.date),
 		description: str(e.description),
 		descriptionZh: '',

@@ -33,7 +33,8 @@
 						<text class="tag">{{ typeText }}</text>
 						<text class="tag tag-loc" v-if="ev.location">{{ ev.location }}</text>
 					</view>
-					<text class="hero-name">{{ ev.name }}</text>
+					<text class="hero-name">{{ ev.nameZh || ev.name }}</text>
+					<text class="hero-en" v-if="ev.nameZh && ev.name">{{ ev.name }}</text>
 				</view>
 			</view>
 
@@ -258,6 +259,15 @@ export default {
 	font-size: 40rpx;
 	font-weight: 600;
 	line-height: 1.35;
+}
+
+/* 英文原名：中文译名之外给一行原文，专有事件名不至于失真 */
+.hero-en {
+	display: block;
+	margin-top: 8rpx;
+	color: #93a3b8;
+	font-size: 22rpx;
+	line-height: 1.5;
 }
 
 /* ---- 正文 ---- */

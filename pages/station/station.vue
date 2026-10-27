@@ -15,7 +15,10 @@
 				<view v-else class="hero-img hero-ph"><text>🛰️</text></view>
 				<view class="hero-mask"></view>
 				<view class="hero-bar">
-					<text class="h-name">{{ stationName(station.name) }}</text>
+					<view class="h-main">
+						<text class="h-name">{{ stationName(station.name) }}</text>
+						<text class="h-en" v-if="station.name && stationName(station.name) !== station.name">{{ station.name }}</text>
+					</view>
 					<text class="badge" :class="station.status === 'Active' ? 'on' : 'dim'">{{ statusZh(station.status) }}</text>
 				</view>
 			</view>
@@ -253,12 +256,26 @@ export default {
 	padding: 0 32rpx;
 }
 
+/* 主名 + 英文原名竖排，右侧留给状态标签 */
+.h-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.h-en {
+	display: block;
+	margin-top: 4rpx;
+	color: rgba(255, 255, 255, 0.62);
+	font-size: 20rpx;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .h-name {
 	color: #fff;
 	font-size: 38rpx;
 	font-weight: 700;
-	flex: 1;
-	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

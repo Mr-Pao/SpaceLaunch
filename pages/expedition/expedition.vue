@@ -13,6 +13,7 @@
 			<!-- padding-top 动态让出状态栏+胶囊（fixed 导航不占位），写死会顶进胶囊区域 -->
 			<view class="head" :style="{ paddingTop: statusBarH + 52 + 'px' }">
 				<text class="name">{{ expeditionName(exp.name) }}</text>
+				<text class="name-en" v-if="exp.name && expeditionName(exp.name) !== exp.name">{{ exp.name }}</text>
 				<view class="sub">
 					<text class="range">{{ rangeText }}</text>
 					<text class="state" :class="exp.end ? 'gone' : 'on'">{{ exp.end ? '已结束' : '进行中' }}</text>
@@ -152,6 +153,15 @@ export default {
 	font-size: 36rpx;
 	font-weight: 700;
 	line-height: 1.3;
+}
+
+/* 英文原名：Expedition 70 这类编号在原文里更严谨 */
+.name-en {
+	display: block;
+	margin-top: 8rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+	letter-spacing: 0.5rpx;
 }
 
 .sub {
