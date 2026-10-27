@@ -649,18 +649,19 @@ function leoText(kg) {
 	letter-spacing: 1rpx;
 }
 
+/* 「在役」用绿色：这一页的红色只留给失败与告警，绿色表示仍在服役 */
 .hero-state {
 	position: relative;
 	flex-shrink: 0;
 	margin-left: 16rpx;
 	padding: 3rpx 12rpx;
-	border: 1rpx solid rgba(255, 77, 79, 0.55);
+	border: 1rpx solid rgba(52, 199, 89, 0.55);
 	border-radius: 6rpx;
-	color: #ff6b6d;
+	color: #34c759;
 	font-size: 19rpx;
 	line-height: 1.5;
-	background: rgba(255, 77, 79, 0.08);
-	box-shadow: 0 0 16rpx rgba(255, 77, 79, 0.18);
+	background: rgba(52, 199, 89, 0.08);
+	box-shadow: 0 0 16rpx rgba(52, 199, 89, 0.18);
 }
 
 .hero-main {
