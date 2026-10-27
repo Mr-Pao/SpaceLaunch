@@ -94,6 +94,42 @@
 			</view>
 
 			<view class="body">
+				<!-- 切换构型：紧跟头图。切的是「哪一型」，后面的参数、战绩、发射场都跟着它走 -->
+				<view class="section" v-if="variants.length > 1">
+					<view class="section-head">
+						<text class="section-title">切换构型</text>
+						<text class="section-note">{{ variants.length }} 型</text>
+					</view>
+
+					<scroll-view class="vchips" scroll-x enable-flex :show-scrollbar="false">
+						<view class="vchips-inner">
+							<view
+								class="vchip"
+								v-for="v in variants"
+								:key="v.id"
+								:class="{ on: v.current, off: !v.active && !v.current }"
+								@click="v.current || switchTo(v)"
+							>
+								<text class="vchip-name">{{ v.chipName }}</text>
+							</view>
+						</view>
+					</scroll-view>
+
+					<text class="vchip-cur" v-if="config">{{ config.full_name || config.name }}</text>
+				</view>
+
+				<!-- 技术参数：始终显示当前这一型，切构型时整块换掉 -->
+				<view class="card" v-if="currentParams.length">
+					<view class="card-head">
+						<text class="card-title">技术参数</text>
+						<text class="card-note">{{ config.name }}</text>
+					</view>
+					<view class="param-row" v-for="p in currentParams" :key="p.label">
+						<text class="param-label">{{ p.label }}</text>
+						<text class="param-value">{{ p.value }}</text>
+					</view>
+				</view>
+
 				<!-- 简介 -->
 				<view class="card" v-if="descText || !reviewMode">
 					<view class="card-head">
@@ -157,40 +193,6 @@
 					</view>
 				</view>
 
-				<!-- 切换构型：同系列的各型号横向排开，点一下原地换，不再每个都铺一张大卡 -->
-				<view class="section" v-if="variants.length > 1">
-					<view class="section-head">
-						<text class="section-title">切换构型</text>
-						<text class="section-note">{{ variants.length }} 型</text>
-					</view>
-
-					<scroll-view class="vchips" scroll-x enable-flex :show-scrollbar="false">
-						<view class="vchips-inner">
-							<view
-								class="vchip"
-								v-for="v in variants"
-								:key="v.id"
-								:class="{ on: v.current, off: !v.active && !v.current }"
-								@click="v.current || switchTo(v)"
-							>
-								<text class="vchip-name">{{ v.chipName }}</text>
-							</view>
-						</view>
-					</scroll-view>
-
-					<text class="vchip-cur" v-if="config">{{ config.full_name || config.name }}</text>
-				</view>
-
-				<!-- 单构型的系列没有「不同构型」可列，参数直接铺开 -->
-				<view class="card" v-else-if="currentParams.length">
-					<view class="card-head">
-						<text class="card-title">技术参数</text>
-					</view>
-					<view class="param-row" v-for="p in currentParams" :key="p.label">
-						<text class="param-label">{{ p.label }}</text>
-						<text class="param-value">{{ p.value }}</text>
-					</view>
-				</view>
 
 				<!-- 回收记录：只有真做过回收的型号才有数 -->
 				<view class="card" v-if="landingStats.length">
@@ -611,10 +613,10 @@ export default {
 			})
 		},
 
-		/** 单构型系列的参数长表 */
+		/** 单构型系列的参数长表；多构型时也显示当前这一型的参数（切换后跟着换） */
 		currentParams() {
 			const c = this.config
-			if (!c || this.variants.length > 1) return []
+			if (!c) return []
 			return paramList(c)
 		},
 
@@ -739,6 +741,23 @@ export default {
 		this.syncShare()
 	},
 
+	// 切换构型后 URL 仍是进来时那一型，分享路径得用当前的 rocketId
+	onShareAppMessage() {
+		return {
+			title: this.shareTitle || '火箭详情',
+			path: '/pages/rocket/rocket?id=' + this.rocketId,
+			imageUrl: this.shareImage
+		}
+	},
+
+	onShareTimeline() {
+		return {
+			title: this.shareTitle || '火箭详情',
+			query: 'id=' + this.rocketId,
+			imageUrl: this.shareImage
+		}
+	},
+
 	methods: {
 		/**
 		 * 收藏这个型号。
@@ -820,11 +839,31 @@ export default {
 		},
 
 		/** 切到同系列的另一个构型：原地替换，返回时回列表而不是逐个退栈 */
-		switchTo(v) {
+		/**
+		 * 切换构型：原地换数据，不重建页面。
+		 *
+		 * 之前用 redirectTo 整个页面重开，切一下就被弹回顶部，
+		 * 用户刚滑到参数区又得重新往下滚 —— 这是最烦的点。
+		 * 这里只换 config + 重算依赖它的战绩、芯级、收藏态，滚动位置保持不动。
+		 */
+		async switchTo(v) {
 			if (!v || v.current) return
-			uni.redirectTo({
-				url: '/pages/rocket/rocket?id=' + v.id + '&name=' + encodeURIComponent(v.name)
-			})
+
+			const target = this.all.find((x) => String(x.id) === String(v.id))
+			if (!target) return
+
+			this.rocketId = String(target.id)
+			this.config = target
+			this.slide = 0
+			this.upcomingOpen = false
+			this.historyOpen = false
+			this.descOpen = false
+
+			await this.loadRecords()
+			this.loadCores()
+
+			this.isFav = hasRocket(this.rocketId)
+			this.syncShare()
 		},
 
 		/** 进图片库 / 视频库。tab 只是初始选中项，那边还能自己切 */
