@@ -6,7 +6,7 @@
 				<view class="band">
 					<view class="track t1">
 						<view class="cell wide" v-for="(img, i) in row1" :key="'a' + i" @click="preview(0, i)">
-							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
 							<view class="cell-veil"></view>
 						</view>
 					</view>
@@ -15,7 +15,7 @@
 				<view class="band">
 					<view class="track t2">
 						<view class="cell tall" v-for="(img, i) in row2" :key="'b' + i" @click="preview(1, i)">
-							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
 							<view class="cell-veil"></view>
 						</view>
 					</view>
@@ -24,7 +24,7 @@
 				<view class="band">
 					<view class="track t3">
 						<view class="cell wide" v-for="(img, i) in row3" :key="'c' + i" @click="preview(2, i)">
-							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
 							<view class="cell-veil"></view>
 						</view>
 					</view>
@@ -33,7 +33,7 @@
 				<view class="band">
 					<view class="track t4">
 						<view class="cell tall" v-for="(img, i) in row4" :key="'d' + i" @click="preview(3, i)">
-							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
 							<view class="cell-veil"></view>
 						</view>
 					</view>
@@ -48,11 +48,14 @@
 		</view>
 
 		<!-- HUD：不叫标题，只贴一行极轻的标识，不占任何布局高度 -->
-		<view class="hud" :style="{ top: statusBarH + 10 + 'px' }">
-			<view class="hud-dot"></view>
-			<text class="hud-kicker">SPACE GALLERY</text>
-			<text class="hud-sep">/</text>
-			<text class="hud-count">{{ total }} 张</text>
+		<view class="hud" :style="{ top: statusBarH + 12 + 'px' }">
+			<view class="hud-row">
+				<view class="hud-dot"></view>
+				<text class="hud-kicker">SPACE GALLERY</text>
+				<text class="hud-sep">/</text>
+				<text class="hud-count">{{ total }} 张</text>
+			</view>
+			<view class="hud-line"></view>
 		</view>
 
 		<!-- 底部悬浮入口：半透明胶囊浮在墙上，不切断画面 -->
@@ -224,7 +227,7 @@ export default {
 
 .band {
 	overflow: hidden;
-	margin-bottom: 10rpx;
+	margin-bottom: 8rpx;
 }
 
 .band:last-child {
@@ -277,28 +280,42 @@ export default {
 .cell {
 	position: relative;
 	flex-shrink: 0;
-	margin-right: 10rpx;
-	border-radius: 10rpx;
+	margin-right: 8rpx;
+	border-radius: 14rpx;
 	overflow: hidden;
 	background: #101722;
+	/* 极细内描边：每格在深色墙上有一点轮廓，不至于糊成一团 */
+	box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.05);
 }
 
-/* 行高交替：两「宽」两「矮」，四行叠起来才有层次；
-   宽高固定 + aspectFill，图被裁一点但整面墙是齐的 */
+/* 行高与行宽的差异刻意拉大：四行节奏分明，才不会像四根等宽的带子 */
 .wide {
-	width: 304rpx;
-	height: 216rpx;
+	width: 336rpx;
+	height: 232rpx;
 }
 
 .tall {
-	width: 248rpx;
-	height: 176rpx;
+	width: 232rpx;
+	height: 164rpx;
 }
 
 .cell-img {
 	display: block;
 	width: 100%;
 	height: 100%;
+	/* 逐张错峰淡入 + 轻微推近：开局不是「啪」地铺满，而是墙慢慢显影 */
+	animation: cellIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cellIn {
+	from {
+		opacity: 0;
+		transform: scale(1.06);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
 }
 
 /* 每格底部压一点暗：墙面整体更沉，也压住亮图的刺眼感 */
@@ -332,8 +349,8 @@ export default {
 	left: 0;
 	right: 0;
 	bottom: 0;
-	height: 30%;
-	background: linear-gradient(to top, rgba(7, 11, 18, 0.96) 0%, rgba(7, 11, 18, 0.52) 48%, rgba(7, 11, 18, 0) 100%);
+	height: 34%;
+	background: linear-gradient(to top, rgba(7, 11, 18, 0.98) 0%, rgba(7, 11, 18, 0.6) 42%, rgba(7, 11, 18, 0) 100%);
 }
 
 /* 左右各 90rpx 刚好盖住一格的三分之一，看得到「有图进来」但读不出细节 */
@@ -358,9 +375,12 @@ export default {
 	position: fixed;
 	left: 32rpx;
 	z-index: 20;
+	pointer-events: none;
+}
+
+.hud-row {
 	display: flex;
 	align-items: center;
-	pointer-events: none;
 }
 
 .hud-dot {
@@ -373,20 +393,29 @@ export default {
 }
 
 .hud-kicker {
-	color: #cfe6ff;
-	font-size: 20rpx;
-	letter-spacing: 3rpx;
+	color: #e2eefb;
+	font-size: 21rpx;
+	font-weight: 600;
+	letter-spacing: 4rpx;
 }
 
 .hud-sep {
-	margin: 0 10rpx;
-	color: #3d4a5c;
+	margin: 0 12rpx;
+	color: #36435a;
 	font-size: 18rpx;
 }
 
 .hud-count {
-	color: #7d8ba0;
+	color: #8fa3bd;
 	font-size: 20rpx;
+}
+
+/* HUD 下的一道青色细光：给标识一个落点，不至于飘在图上 */
+.hud-line {
+	margin-top: 10rpx;
+	width: 120rpx;
+	height: 2rpx;
+	background: linear-gradient(90deg, rgba(56, 189, 248, 0.9) 0%, rgba(56, 189, 248, 0) 100%);
 }
 
 /* ---- 底部悬浮入口 ---- */
@@ -407,10 +436,10 @@ export default {
 	padding: 16rpx 32rpx;
 	border-radius: 999rpx;
 	background: rgba(10, 16, 26, 0.55);
-	border: 1rpx solid rgba(56, 189, 248, 0.26);
+	border: 1rpx solid rgba(56, 189, 248, 0.34);
 	-webkit-backdrop-filter: blur(24rpx) saturate(150%);
 	backdrop-filter: blur(24rpx) saturate(150%);
-	box-shadow: 0 14rpx 40rpx rgba(0, 0, 0, 0.45);
+	box-shadow: 0 14rpx 40rpx rgba(0, 0, 0, 0.5), 0 0 32rpx rgba(56, 189, 248, 0.14);
 	pointer-events: auto;
 }
 
