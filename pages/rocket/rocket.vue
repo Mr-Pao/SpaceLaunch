@@ -217,6 +217,45 @@
 					</view>
 				</view>
 
+				<!-- 回收记录：只有真做过回收的型号才有数 -->
+				<view class="card" v-if="landingStats.length">
+					<view class="card-head">
+						<text class="card-title">回收记录</text>
+						<text class="card-note" v-if="config.reusable">可复用</text>
+					</view>
+					<view class="stat-grid">
+						<view class="stat-cell" v-for="s in landingStats" :key="s.label">
+							<view class="stat-label-row">
+								<view class="stat-dot" :class="'dot-' + s.tone"></view>
+								<text class="stat-label">{{ s.label }}</text>
+							</view>
+							<text class="stat-num" :class="'num-' + s.tone">{{ s.value }}</text>
+						</view>
+					</view>
+				</view>
+
+				<!-- 常用发射场：按该型号历史发射次数取前三个 -->
+				<view class="card" v-if="pads.length">
+					<view class="card-head">
+						<text class="card-title">常用发射场</text>
+						<text class="card-note">按发射次数</text>
+					</view>
+					<view
+						class="pad-line"
+						v-for="(p, i) in pads"
+						:key="p.name"
+						hover-class="pad-line-hover"
+						@click="goPad(p.name)"
+					>
+						<text class="pad-idx">{{ i + 1 }}</text>
+						<view class="pad-body">
+							<text class="pad-name">{{ p.name }}</text>
+							<text class="pad-loc" v-if="p.location">{{ p.location }}</text>
+						</view>
+						<text class="arrow">›</text>
+					</view>
+				</view>
+
 				<!-- 芯级：这个型号真实飞过的第一级硬件，编号 + 战绩。
 				     数据来自芯级库（CI 每天全量抓），按型号 id 聚合 -->
 				<view class="section" v-if="cores.length">
@@ -477,8 +516,47 @@ export default {
 				{ label: '待发射', value: fmtInt(pending), tone: 'warn' },
 				{ label: '构型', value: fmtInt(list.length), tone: 'plain' }
 			]
+
+			// 连续成功只对单一构型有意义：跨构型累加是伪指标，不显示
+			if (list.length === 1) {
+				const streak = Number(this.config && this.config.consecutive_successful_launches) || 0
+				if (streak) out.splice(2, 0, { label: '连续成功', value: fmtInt(streak), tone: 'good' })
+			}
+
 			// 全 0 的格子没意义（早期型号常常只有一两个数字）
 			return out.filter((s) => s.value !== '0' && s.value !== '—')
+		},
+
+		/**
+		 * 回收记录：只有真飞过回收的型号才有数。
+		 * consecutive_successful_landings / fastest_turnaround 都是 LL2 原生字段，
+		 * 之前 slim 时被丢掉了，这一版补上。
+		 */
+		landingStats() {
+			const c = this.config
+			if (!c) return []
+
+			const attempted = Number(c.attempted_landings) || 0
+			if (!attempted) return []
+
+			const ok = Number(c.successful_landings) || 0
+			const fail = Number(c.failed_landings) || 0
+			const streak = Number(c.consecutive_successful_landings) || 0
+			const turnaround = Number(c.fastest_turnaround) || 0
+
+			const out = [
+				{ label: '尝试回收', value: fmtInt(attempted), tone: 'plain' },
+				{ label: '成功', value: fmtInt(ok), tone: 'good' },
+				{ label: '失败', value: fmtInt(fail), tone: 'bad' },
+				{ label: '连续成功', value: fmtInt(streak), tone: 'good' }
+			]
+			if (turnaround) out.push({ label: '最快周转', value: turnaround + ' 天', tone: 'plain' })
+			return out.filter((s) => s.value !== '0')
+		},
+
+		/** 常用发射场：CI 从该型号的发射记录里聚合，按次数取前 3 */
+		pads() {
+			return (this.config && this.config.pads) || []
 		},
 
 		/** 发射机构：该系列全部发射记录里出现过的机构，去重拼接。
@@ -905,6 +983,9 @@ function paramList(c) {
 	push('级数', c.max_stage ? c.max_stage + ' 级' : '')
 	push('LEO 运力', mass(c.leo_capacity))
 	push('GTO 运力', mass(c.gto_capacity))
+	push('GEO 运力', mass(c.geo_capacity))
+	push('SSO 运力', mass(c.sso_capacity))
+	push('首飞', c.maiden_flight || '')
 	push('起飞质量', c.launch_mass ? fmt(c.launch_mass) + ' 吨' : '')
 	push('造价', costText(c.launch_cost))
 
@@ -1561,6 +1642,53 @@ function byNetDesc(a, b) {
 
 .param-row:first-child {
 	border-top: none;
+}
+
+/* ---- 常用发射场 ---- */
+.pad-line {
+	display: flex;
+	align-items: center;
+	padding: 16rpx 0;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.04);
+}
+
+.pad-line:first-of-type {
+	border-top: none;
+}
+
+.pad-line-hover {
+	background: rgba(255, 255, 255, 0.03);
+}
+
+.pad-idx {
+	width: 40rpx;
+	flex-shrink: 0;
+	color: #4a5568;
+	font-size: 22rpx;
+}
+
+.pad-body {
+	flex: 1;
+	min-width: 0;
+}
+
+.pad-name {
+	display: block;
+	color: #e6edf6;
+	font-size: 26rpx;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pad-loc {
+	display: block;
+	margin-top: 4rpx;
+	color: #6b7891;
+	font-size: 21rpx;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .param-label {
