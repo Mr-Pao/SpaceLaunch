@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import { relativeTime, formatShort, statusInfo, launchTitle, rocketName } from '@/utils/format.js'
+import { relativeTime, formatShort, statusInfo, launchTitle, rocketName, agencyLabel } from '@/utils/format.js'
 
 export default {
 	name: 'launch-card',
@@ -88,7 +88,9 @@ export default {
 			return rocketName(this.item.rocket && this.item.rocket.configuration)
 		},
 		providerName() {
-			return (this.item.launch_service_provider && this.item.launch_service_provider.name) || ''
+			// 机构统一走 agencyLabel：命中中文表就用中文（中国航天科技 / 蓝箭航天…）
+			const n = (this.item.launch_service_provider && this.item.launch_service_provider.name) || ''
+			return agencyLabel(n)
 		},
 		status() {
 			return statusInfo(this.item.status)

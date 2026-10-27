@@ -154,7 +154,7 @@
 				<view class="card" v-if="currentParams.length">
 					<view class="card-head">
 						<text class="card-title">技术参数</text>
-						<text class="card-note">{{ config.name }}</text>
+						<text class="card-note">{{ config.variant || config.name }}</text>
 					</view>
 
 					<view class="param-grid">
@@ -169,7 +169,7 @@
 				<view class="card" v-if="hasRecord">
 					<view class="card-head">
 						<text class="card-title">发射战绩</text>
-						<text class="card-note">{{ config.name }}</text>
+						<text class="card-note">{{ config.variant || config.name }}</text>
 					</view>
 
 					<!-- 发射机构：从该系列全部发射记录聚合，单机构可点进机构页。
@@ -181,7 +181,7 @@
 						@click="goAgency(agencyNames.split('、')[0])"
 					>
 						<text class="agency-label">发射机构</text>
-						<text class="agency-name">{{ agencyNames }}</text>
+						<text class="agency-name">{{ agencyNamesZh }}</text>
 						<view class="agency-arrow"></view>
 					</view>
 
@@ -545,6 +545,12 @@ export default {
 				if (n) set.add(n)
 			}
 			return [...set].join('、')
+		},
+
+		/** 机构显示名走中文表；跳转仍用 agencyNames 里的英文原名去查 */
+		agencyNamesZh() {
+			if (!this.agencyNames) return ''
+			return this.agencyNames.split('、').map((n) => agencyLabel(n)).join('、')
 		},
 
 		/**

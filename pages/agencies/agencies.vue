@@ -20,7 +20,7 @@
 					<text class="hero-icon">🏢</text>
 				</view>
 
-				<text class="name">{{ agency.name }}</text>
+				<text class="name">{{ agencyLabel(agency.name) }}</text>
 				<text class="sub" v-if="subline">{{ subline }}</text>
 			</view>
 
@@ -93,7 +93,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { rocketName } from '@/utils/format.js'
+import { rocketName, agencyLabel as agencyLabelOf } from '@/utils/format.js'
 
 /**
  * 国家/地区中文名。
@@ -236,6 +236,11 @@ export default {
 	},
 
 	methods: {
+		// 模板只能看见实例成员，模块作用域的函数必须转一层
+		agencyLabel(name) {
+			return agencyLabelOf(name)
+		},
+
 		toggleAll() {
 			this.showAll = !this.showAll
 		},
