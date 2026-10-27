@@ -21,6 +21,9 @@ for (const x of list) {
 	maxC = Math.max(maxC, x.leo_capacity || 0)
 }
 
+// 中文名与国旗复用页面同一套函数，避免预览和真机不一致
+const fmt = await import('file://' + path.join(ROOT, 'utils/format.js').replace(/\\/g, '/'))
+
 const scored = list
 	.filter((x) => x.active)
 	.map((x) => {
@@ -31,6 +34,8 @@ const scored = list
 		return {
 			...x,
 			rate,
+			makerZh: fmt.agencyLabel(x.manufacturer) || '',
+			flag: fmt.countryFlag(x.manufacturer),
 			score: 0.45 * ((x.total_launch_count || 0) / maxL) + 0.35 * rate + 0.2 * ((x.leo_capacity || 0) / maxC)
 		}
 	})
@@ -70,7 +75,7 @@ const card = (r, i) => `
       <text class="rank-name">${nameOf(r)}</text>
       <text class="rank-more">详情</text>
     </view>
-    <text class="rank-maker">${r.manufacturer || '未知制造商'}</text>
+    <view class="rank-maker-row">${r.flag ? `<text class="flag">${r.flag}</text>` : ''}<text class="rank-maker">${r.makerZh || r.manufacturer || '未知制造商'}</text></view>
     <view class="rank-tags">
       ${r.families && r.families[0] ? `<text class="rtag">${r.families[0]}</text>` : ''}
       ${r.variant ? `<text class="rtag">${r.variant}</text>` : ''}

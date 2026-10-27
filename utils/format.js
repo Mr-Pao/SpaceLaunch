@@ -1209,3 +1209,47 @@ export function eventName(ev) {
 	if (!ev) return ''
 	return fixEventTerms(ev.nameZh || ev.name || '')
 }
+
+/**
+ * 机构国籍 → 国旗 emoji。
+ *
+ * 数据里没有国别字段：launcher 只有 manufacturer 字符串，
+ * launch_service_provider 只有 id + name，所以只能靠名字认。
+ * 认不出返回空串，模板里对应节点直接不渲染，不会留空位。
+ *
+ * 顺序有讲究：
+ *   · 朝鲜必须排在韩国前面，否则 "Korean Committee" 会被 🇰🇷 吃掉；
+ *   · 乌克兰排在俄罗斯前面，Yuzhnoye / Yuzhmash 是乌克兰的；
+ *   · 具体国家排在「欧洲」前面，否则 ArianeGroup 会全落到 🇪🇺；
+ *   · "Rocket Lab USA" 要在中国 / 美国组里先拦掉，剩下的 Rocket Lab 才是新西兰。
+ */
+const FLAG_RULES = [
+	[/china|casc|casic|land ?space|galactic energy|i-?space|cas space|expace|orienspace|space pioneer|deep blue|one ?space|kuaizhou|zhuque|ceres|hyperbola|gravity|tianlong|jielong|kinetica|pallas|lijian|kaituo|chinese/i, '🇨🇳'],
+	[/spacex|united launch|\bula\b|blue origin|northrop|orbital (sciences|atk)|firefly|astra space|relativity|stoke|masten|lockheed|martin marietta|mcdonnell|convair|vought|chrysler|boeing|general dynamics|nasa|national aeronautics|air force|virgin (orbit|galactic)|abl space|phantom space|kodiak|rocket lab usa|space systems|spacex/i, '🇺🇸'],
+	[/yuzhnoye|yuzhmash|ukrain/i, '🇺🇦'],
+	[/khrunichev|progress rocket|energia|roskosmos|russian|makeyev|strategic rocket|soviet|moscow institute|chemical automatics/i, '🇷🇺'],
+	[/dprk|north korea|korean committee of space/i, '🇰🇵'],
+	[/korea|kari|innospace|perigee/i, '🇰🇷'],
+	[/mitsubishi|jaxa|japan aerospace|isas|institute of space and astronautical|interstellar technologies|ihi|japanese/i, '🇯🇵'],
+	[/indian space|isro|skyroot|agnikul|dhruva|india/i, '🇮🇳'],
+	[/rocket lab/i, '🇳🇿'],
+	[/israel|\biai\b/i, '🇮🇱'],
+	[/iran/i, '🇮🇷'],
+	[/brazil|conae|argentina/i, '🇧🇷'],
+	[/aérospatiale|aerospatiale|latitude|maia space|hyprspace/i, '🇫🇷'],
+	[/hyimpulse|isar aerospace|rocket factory|ohb|augsburg/i, '🇩🇪'],
+	[/avio/i, '🇮🇹'],
+	[/skyrora|orbex/i, '🇬🇧'],
+	[/pld space|payload aerospace/i, '🇪🇸'],
+	[/swedish space|andøya|andoya|esrange/i, '🇸🇪'],
+	[/\besa\b|european (space|launcher)|arianespace|arianegroup|eldo/i, '🇪🇺']
+]
+
+export function countryFlag(name) {
+	const s = String(name == null ? '' : name).trim()
+	if (!s) return ''
+	for (const [re, flag] of FLAG_RULES) {
+		if (re.test(s)) return flag
+	}
+	return ''
+}

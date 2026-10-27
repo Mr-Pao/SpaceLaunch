@@ -39,6 +39,7 @@
 
 			<!-- 机构与状态同一行：机构靠左可省略，状态靠右永不换行 -->
 			<view class="foot">
+				<text class="flag" v-if="providerFlag">{{ providerFlag }}</text>
 				<text class="provider" v-if="providerName">{{ providerName }}</text>
 				<text class="status" :class="status.cls">{{ status.text }}</text>
 			</view>
@@ -47,7 +48,7 @@
 </template>
 
 <script>
-import { relativeTime, formatShort, statusInfo, launchTitle, rocketName, agencyLabel } from '@/utils/format.js'
+import { relativeTime, formatShort, statusInfo, launchTitle, rocketName, agencyLabel, countryFlag } from '@/utils/format.js'
 
 export default {
 	name: 'launch-card',
@@ -92,6 +93,10 @@ export default {
 			// 机构统一走 agencyLabel：命中中文表就用中文（中国航天科技 / 蓝箭航天…）
 			const n = (this.item.launch_service_provider && this.item.launch_service_provider.name) || ''
 			return agencyLabel(n)
+		},
+		// 国旗必须用英文原名去认，中文名里没有国籍信息
+		providerFlag() {
+			return countryFlag(this.item.launch_service_provider && this.item.launch_service_provider.name)
 		},
 		status() {
 			return statusInfo(this.item.status, this.item.net)
@@ -225,6 +230,14 @@ export default {
 	padding-top: 8rpx;
 	display: flex;
 	align-items: center;
+}
+
+/* 国旗：不参与收缩，机构名太长时由 provider 自己出省略号 */
+.flag {
+	flex-shrink: 0;
+	margin-right: 8rpx;
+	font-size: 22rpx;
+	line-height: 1.4;
 }
 
 .provider {

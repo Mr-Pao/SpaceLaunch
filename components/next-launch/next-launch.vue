@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import { formatDateTime, statusInfo, launchTitle, agencyLabel, placeZh } from '@/utils/format.js'
+import { formatDateTime, statusInfo, launchTitle, agencyLabel, placeZh, countryFlag } from '@/utils/format.js'
 
 export default {
 	name: 'next-launch',
@@ -64,8 +64,13 @@ export default {
 			// 场地也中文化：Vandenberg SFB, CA, USA → 范登堡
 			return placeZh(loc) || (this.item.pad && this.item.pad.name) || ''
 		},
+		// 国旗用英文原名认；接在机构前面，仍用「·」和场地分开
+		providerFlag() {
+			return countryFlag(this.item.launch_service_provider && this.item.launch_service_provider.name)
+		},
 		metaText() {
-			return [this.provider, this.padName].filter(Boolean).join(' · ')
+			const p = this.providerFlag ? this.providerFlag + ' ' + this.provider : this.provider
+			return [p, this.padName].filter(Boolean).join(' · ')
 		},
 		timeText() {
 			const abs = formatDateTime(this.item.net)

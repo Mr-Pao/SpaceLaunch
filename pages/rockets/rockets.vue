@@ -143,7 +143,11 @@
 					<!-- 中文在上、英文在下：中文名没有对应词条时两者相同，就不重复 -->
 					<text class="rank-en" v-if="r.enName">{{ r.enName }}</text>
 
-					<text class="rank-maker">{{ r.makerZh || '未知制造商' }}</text>
+					<!-- 制造商 + 国旗：国籍靠机构名认，认不出的不显示国旗也不留空位 -->
+					<view class="rank-maker-row">
+						<text class="flag" v-if="r.flag">{{ r.flag }}</text>
+						<text class="rank-maker">{{ r.makerZh || '未知制造商' }}</text>
+					</view>
 
 					<view class="rank-metrics">
 						<view class="metric">
@@ -189,7 +193,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { rocketName, rocketFullName, agencyLabel } from '@/utils/format.js'
+import { rocketName, rocketFullName, agencyLabel, countryFlag } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { setOverride, getDebugInfo } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -507,6 +511,7 @@ export default {
 						enName: en && en !== zh ? en : '',
 						// 机构优先用中文名（中国航天科技 / 蓝箭航天…），没词条就回原文
 						makerZh: agencyLabel(x.manufacturer) || '',
+						flag: countryFlag(x.manufacturer),
 						region: regionOf(x),
 						rate,
 						rateText: tried > 0 ? (rate * 100).toFixed(1) + '%' : '—',
@@ -1059,9 +1064,23 @@ function leoText(kg) {
 	text-overflow: ellipsis;
 }
 
-.rank-maker {
-	display: block;
+/* 制造商行：国旗 + 名称。名称过长时省略号截断，国旗不能被挤掉 */
+.rank-maker-row {
+	display: flex;
+	align-items: center;
 	margin-top: 10rpx;
+}
+
+.flag {
+	flex-shrink: 0;
+	margin-right: 8rpx;
+	font-size: 22rpx;
+	line-height: 1;
+}
+
+.rank-maker {
+	flex: 1;
+	min-width: 0;
 	color: #8fa0b6;
 	font-size: 21rpx;
 	white-space: nowrap;

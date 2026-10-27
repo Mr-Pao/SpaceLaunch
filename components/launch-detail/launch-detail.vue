@@ -315,6 +315,7 @@
 							:src="agency.logo_url"
 							mode="aspectFit"
 						></image>
+						<text class="ragency-flag" v-if="agencyFlag">{{ agencyFlag }}</text>
 						<text class="ragency-name">{{ agencyLabel(agency.name) }}</text>
 						<text class="arrow">›</text>
 					</view>
@@ -461,7 +462,8 @@ import {
 	costText,
 	isStillUpcoming,
 	textUnits,
-	seriesKey
+	seriesKey,
+	countryFlag
 } from '@/utils/format.js'
 import { pickTimeline, sortedTimeline, parseDuration, tlLabel, tlRelative } from '@/utils/timeline.js'
 import * as fav from '@/utils/favorites.js'
@@ -562,6 +564,10 @@ export default {
 		}
 	},
 	computed: {
+		// 机构国旗：要用英文原名认，中文名里没有国别信息
+		agencyFlag() {
+			return countryFlag(this.agency && this.agency.name)
+		},
 		// ---- 图片优先态 ----
 		// 真的是从图库/每日一图点进来、且拿得到相册记录时才启用。
 		// 分享打开没有相册，自然退回普通详情页
@@ -2461,6 +2467,13 @@ export default {
 	flex-shrink: 0;
 	margin-right: 14rpx;
 	border-radius: 6rpx;
+}
+
+.ragency-flag {
+	flex-shrink: 0;
+	margin-right: 10rpx;
+	font-size: 26rpx;
+	line-height: 1.2;
 }
 
 .ragency-name {
