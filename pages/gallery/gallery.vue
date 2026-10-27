@@ -38,6 +38,24 @@
 						</view>
 					</view>
 				</view>
+
+				<view class="band">
+					<view class="track t5">
+						<view class="cell wide" v-for="(img, i) in row5" :key="'e' + i" @click="preview(4, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
+							<view class="cell-veil"></view>
+						</view>
+					</view>
+				</view>
+
+				<view class="band">
+					<view class="track t6">
+						<view class="cell tall" v-for="(img, i) in row6" :key="'f' + i" @click="preview(5, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
+							<view class="cell-veil"></view>
+						</view>
+					</view>
+				</view>
 			</view>
 
 			<!-- 四面渐隐：左右让图淡入淡出，上下把墙压进背景，不给硬边 -->
@@ -108,8 +126,9 @@ import navMixin from '@/utils/nav-mixin.js'
 
 // 每行取多少张（复制后翻倍就是这个数 ×2 的节点数）
 const PER_ROW = 12
-// 行数：4 行铺满一屏
-const ROWS = 4
+// 行数：6 行（3 宽 3 窄）才真的铺满一屏。
+// 之前 4 行只有约 400px，屏幕下半截空出一大块，提示被迫浮在空白里。
+const ROWS = 6
 
 export default {
 	mixins: [navMixin],
@@ -121,8 +140,8 @@ export default {
 			// 图库总张数（全量、去重后），底部「看全部」用它。
 			// 和 images.length 不是一回事：images 只是第 0 片
 			total: 0,
-			// 四行各自的原始图（渲染时再拼一份副本）
-			raw: [[], [], [], []]
+			// 各行原始图（渲染时再拼一份副本）
+			raw: [[], [], [], [], [], []]
 		}
 	},
 
@@ -139,6 +158,12 @@ export default {
 		},
 		row4() {
 			return this.raw[3].concat(this.raw[3])
+		},
+		row5() {
+			return this.raw[4].concat(this.raw[4])
+		},
+		row6() {
+			return this.raw[5].concat(this.raw[5])
 		},
 		// 模板里判断有没有内容，随便挑一行看
 		rowsA() {
@@ -157,8 +182,8 @@ export default {
 		this.images = list
 		this.total = (g && g.count) || list.length
 
-		// 四行交错分配：i % 4，这样同一场发射的相邻图不会挤在同一行
-		const buckets = [[], [], [], []]
+		// 各行交错分配：i % ROWS，这样同一场发射的相邻图不会挤在同一行
+		const buckets = [[], [], [], [], [], []]
 		list.slice(0, PER_ROW * ROWS).forEach((x, i) => {
 			buckets[i % ROWS].push(x)
 		})
@@ -260,6 +285,14 @@ export default {
 
 .t4 {
 	animation: marqueeR 48s linear infinite;
+}
+
+.t5 {
+	animation: marqueeL 56s linear infinite;
+}
+
+.t6 {
+	animation: marqueeR 40s linear infinite;
 }
 
 @keyframes marqueeL {

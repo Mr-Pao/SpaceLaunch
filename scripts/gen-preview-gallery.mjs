@@ -14,8 +14,8 @@ const g = await (await fetch(CDN + '/gallery.json?t=' + Date.now())).json()
 const imgs = ((g && g.list) || []).filter((x) => x && x.thumb)
 const total = (g && g.count) || imgs.length
 
-const rows = [[], [], [], []]
-imgs.slice(0, 48).forEach((x, i) => rows[i % 4].push(x))
+const rows = [[], [], [], [], [], []]
+imgs.slice(0, 72).forEach((x, i) => rows[i % 6].push(x))
 
 const cell = (x, i, cls) => `
   <view class="cell ${cls}">
@@ -58,6 +58,8 @@ ${css}
         ${band(rows[1], 'tall', 't2')}
         ${band(rows[2], 'wide', 't3')}
         ${band(rows[3], 'tall', 't4')}
+        ${band(rows[4], 'wide', 't5')}
+        ${band(rows[5], 'tall', 't6')}
       </view>
       <view class="fade top"></view>
       <view class="fade bottom"></view>
