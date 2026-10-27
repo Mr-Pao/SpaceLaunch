@@ -177,6 +177,8 @@ async function testFormat() {
 	eq(f.stationName('International Space Station'), '国际空间站', '空间站：表内直译')
 	eq(f.stationName('Salyut 7'), '礼炮七号', '空间站：Salyut 走规则推导')
 	eq(f.stationName('Unknown Station'), 'Unknown Station', '空间站：未收录保留原文')
+	eq(f.rocketName({ name: 'Atlas V 551' }), '宇宙神 5 号 551', '长后缀：Atlas V 551 归到宇宙神 5 号并保留配置代号')
+	eq(f.rocketName({ name: 'Atlas V N22' }), '宇宙神 5 号', '长后缀：精确 key 优先于前缀匹配')
 	eq(
 		f.rocketFullName({ name: 'Vulcan VC2S', full_name: 'Vulcan VC2S', variant: 'VC2S' }),
 		'火神 VC2S',

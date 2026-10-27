@@ -340,8 +340,16 @@ const ROCKET_ZH = {
 	'Zhuque-3': '朱雀三号',
 	'Ceres-1': '谷神星一号',
 	'Ceres-1S': '谷神星一号S',
+	'Ceres-2': '谷神星二号',
 	'Kuaizhou 1A': '快舟一号甲',
 	'Kuaizhou 11': '快舟十一号',
+	'Kinetica 1': '力箭一号',
+	'Firefly Alpha': '萤火虫阿尔法',
+	'Miura 5': '米乌拉 5 号',
+	'Astra Rocket 4': '阿斯特拉火箭 4 号',
+	Nova: '新星',
+	Nuri: '世界号',
+	'KSLV-2 Nuri': '世界号',
 	'Hyperbola-1': '双曲线一号',
 	'Hyperbola-2': '双曲线二号',
 	'Hyperbola-3': '双曲线三号',
@@ -407,6 +415,27 @@ function zhLongMarch(raw) {
 }
 
 /** 火箭型号名，中国型号换成中文，其余保留原文 */
+/**
+ * 长后缀兜底：型号表里只有基础名时，按前缀认。
+ *
+ * Atlas V 551 / Atlas V 401 这些配置代号不可能逐个入库，
+ * 但都该归到「宇宙神 5 号」；后面的数字保留，因为它是真的配置差异。
+ * 从最长 key 开始试，避免 "Atlas" 抢在 "Atlas V" 前面。
+ */
+function rocketByPrefix(s) {
+	const str = String(s == null ? '' : s)
+	if (!str) return ''
+	const keys = Object.keys(ROCKET_ZH).sort((a, b) => b.length - a.length)
+	for (const k of keys) {
+		if (str === k || !str.startsWith(k + ' ')) continue
+		const tail = str.slice(k.length + 1).trim()
+		// Block 5 / V3 这类构型词不拼，中文名本身已经够用
+		if (/^(Block|V)\s*\d+$/i.test(tail)) return ROCKET_ZH[k]
+		return ROCKET_ZH[k] + ' ' + tail
+	}
+	return ''
+}
+
 export function rocketName(config) {
 	if (!config) return ''
 	const full = config.full_name || config.name || ''
@@ -431,6 +460,8 @@ export function rocketName(config) {
 		zhLongMarch(bare) ||
 		zhLongMarch(base) ||
 		zhLongMarch(noUpper) ||
+		rocketByPrefix(base) ||
+		rocketByPrefix(full) ||
 		full
 	)
 }
