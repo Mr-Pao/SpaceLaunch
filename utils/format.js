@@ -1001,3 +1001,29 @@ export function padShort(name) {
 		.replace(/^Launch Complex\s+/i, 'LC-')
 		.replace(/^Launch Pad\s+/i, 'LP-')
 }
+
+/**
+ * 型号的「完整中文名」。
+ *
+ * rocketName 只负责基础名，于是 Falcon 9 的每个构型都变成「猎鹰 9 号」——
+ * 五张卡片全长一样，分不出 Block 5 和 v1.0。
+ * 这里把构型后缀拼回去：「猎鹰 9 号 Block 5」。
+ *
+ * 拼之前先判断基础名到底是中文还是英文：
+ *   - 基础名没译（仍是英文），直接给 full_name，别拼成 "Falcon 9 Block 5 Block 5"；
+ *   - 基础名已含该后缀（例如名称本身就叫 "Starship V3"），不重复拼。
+ */
+export function rocketFullName(config) {
+	if (!config) return ''
+	const zh = rocketName(config)
+	if (!zh) return ''
+
+	// 基础名里没有汉字 = 没译出来，用原始全名更准确
+	if (!/[\u4e00-\u9fa5]/.test(zh)) {
+		return config.full_name || config.name || zh
+	}
+
+	const variant = String(config.variant || '').trim()
+	if (variant && zh.indexOf(variant) === -1) return zh + ' ' + variant
+	return zh
+}

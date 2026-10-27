@@ -126,11 +126,11 @@
 					</view>
 				</view>
 
-				<!-- 系列统计：同系列的构型加总，和参考页的「系列统计」一个口径 -->
+				<!-- 发射战绩：同系列构型加总，标题不再写「系列」，避免和下面的「不同构型」打架 -->
 				<view class="card" v-if="stats.length">
 					<view class="card-head">
-						<text class="card-title">{{ seriesTitle }} 系列统计</text>
-						<text class="card-note" v-if="variants.length > 1">{{ variants.length }} 个构型</text>
+						<text class="card-title">发射战绩</text>
+						<text class="card-note" v-if="variants.length > 1">系列合计 · {{ variants.length }} 个构型</text>
 					</view>
 
 					<!-- 发射机构：从该系列全部发射记录聚合，单机构可点进机构页。
@@ -352,6 +352,7 @@
 import spaceData from '@/utils/data.js'
 import {
 	rocketName as rocketNameOf,
+	rocketFullName,
 	seriesKey,
 	seriesName,
 	agencyLabel,
@@ -623,7 +624,7 @@ export default {
 
 				return {
 					id: x.id,
-					name: rocketNameOf(x) || x.name,
+					name: rocketFullName(x) || x.name,
 					active: Boolean(x.active),
 					current: String(x.id) === curId,
 					image: x.image || '',

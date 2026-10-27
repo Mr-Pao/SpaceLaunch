@@ -189,7 +189,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { rocketName, agencyLabel } from '@/utils/format.js'
+import { rocketName, rocketFullName, agencyLabel } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { setOverride, getDebugInfo } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -485,8 +485,7 @@ export default {
 					maxLeo = Math.max(maxLeo, x.leo_capacity || 0)
 				}
 
-				this.all = list.map((x) => {
-					const zh = rocketName(x)
+				this.all = list.map((x) => {					const zh = rocketName(x)
 					// 英文行用 name 而不是 full_name：full_name 带构型后缀太长，
 					// 一行放不下，而中文名已经对应到型号这一级了
 					const en = x.name || x.full_name || ''
@@ -518,6 +517,14 @@ export default {
 						score
 					}
 				})
+
+				// 同中文名的型号（Starship / Starship V3 都叫「星舰」）补上构型后缀，
+				// 否则榜单上会出现两条一模一样的名字
+				const cnt = {}
+				for (const x of this.all) if (x.active) cnt[x.zhName] = (cnt[x.zhName] || 0) + 1
+				for (const x of this.all) {
+					if (x.active && cnt[x.zhName] > 1) x.zhName = rocketFullName(x)
+				}
 			} catch (e) {
 				console.warn('[rockets] 获取型号库失败', e)
 			} finally {

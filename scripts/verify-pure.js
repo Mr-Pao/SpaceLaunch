@@ -168,6 +168,17 @@ async function testFormat() {
 	eq(f.rocketName({ name: 'Long March' }), '长征', '长征规则：无编号不产生「长征号」')
 	eq(f.rocketName({ name: 'Falcon 9 Block 5' }), '猎鹰 9 号', '英文型号剥掉构型后缀后命中中文名')
 	eq(f.rocketName({ full_name: 'Long March 5', name: 'Long March' }), '长征五号', 'full_name 优先于 name')
+	eq(
+		f.rocketFullName({ name: 'Falcon 9', full_name: 'Falcon 9 Block 5', variant: 'Block 5' }),
+		'猎鹰 9 号 Block 5',
+		'完整名：中文名拼上构型后缀，同系列各构型才分得开'
+	)
+	eq(f.rocketFullName({ name: 'Starship', variant: '' }), '星舰', '完整名：无构型时只给中文名')
+	eq(
+		f.rocketFullName({ name: 'Vulcan VC2S', full_name: 'Vulcan VC2S', variant: 'VC2S' }),
+		'火神 VC2S',
+		'完整名：未译型号回退英文全名，不重复拼后缀'
+	)
 
 	// countryOf：国家只能从 pad.location.name 的末段推，末段不一定是国家名
 	const loc = (name) => ({ pad: { location: { name } } })
