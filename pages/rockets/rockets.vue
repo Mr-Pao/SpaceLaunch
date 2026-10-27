@@ -1,9 +1,13 @@
 <template>
-	<view class="page">
+	<view class="page" :style="{ paddingTop: statusBarH + 6 + 'px' }">
 		<star-field />
-		<!-- 标题已去掉，只留一条等高顶栏：滚动时当毛玻璃遮罩。
-		     审核视角暗门改挂在榜单眉标上（连点 5 次） -->
-		<view class="nav-row" :class="{ solid: navSolid }" :style="{ paddingTop: statusBarH + 'px' }"></view>
+		<!-- 滚动后才浮出来的毛玻璃条：fixed 不占文档流，首屏高度一点不浪费。
+		     审核视角暗门挂在榜单眉标上（连点 5 次） -->
+		<view
+			class="nav-mask"
+			:class="{ solid: navSolid }"
+			:style="{ height: statusBarH + 44 + 'px' }"
+		></view>
 
 		<!-- 榜单头部：一句话说清「这是什么榜」，顺手给三个横向对比的极值 -->
 		<view class="hero">
@@ -559,13 +563,19 @@ function leoText(kg) {
 		radial-gradient(90% 45% at 100% 6%, rgba(64, 132, 255, 0.12) 0%, rgba(64, 132, 255, 0) 58%);
 }
 
-/* 顶栏只在滚过榜单头之后才有底：一开始标题直接压在光晕上，更沉浸 */
-.nav-row {
+/* 顶栏不占位：只在滚动后浮出来挡一下内容，首屏把高度全留给榜单头 */
+.nav-mask {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	z-index: 20;
+	pointer-events: none;
 	transition: background 0.24s ease;
 }
 
-.nav-row.solid {
-	background: rgba(10, 14, 23, 0.82);
+.nav-mask.solid {
+	background: rgba(10, 14, 23, 0.84);
 	-webkit-backdrop-filter: blur(24rpx) saturate(140%);
 	backdrop-filter: blur(24rpx) saturate(140%);
 }
@@ -573,8 +583,8 @@ function leoText(kg) {
 /* ==================== 榜单头部 ==================== */
 .hero {
 	position: relative;
-	margin-top: 6rpx;
-	padding: 28rpx 26rpx 0;
+	margin-top: 0;
+	padding: 26rpx 26rpx 0;
 	background: linear-gradient(158deg, rgba(30, 39, 58, 0.96) 0%, rgba(18, 24, 36, 0.94) 58%, rgba(15, 20, 31, 0.96) 100%);
 	border: 1rpx solid rgba(255, 255, 255, 0.08);
 	border-radius: 26rpx;
