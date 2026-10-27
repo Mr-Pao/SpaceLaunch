@@ -74,6 +74,14 @@ export default {
 		this.stop()
 	},
 
+	// 父组件异步下发 net：初始为空导致 start() 因 ended 直接 return 没起表，
+	// net 到位后靠这个 watch 重新开表（start 内部先 stop 防重）
+	watch: {
+		net() {
+			this.start()
+		}
+	},
+
 	methods: {
 		start() {
 			this.stop()

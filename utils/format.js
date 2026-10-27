@@ -380,6 +380,10 @@ const ROCKET_ZH = {
 	'Nebula-1': '星云一号'
 }
 
+// 长前缀优先（"Atlas V" 先于 "Atlas"）。列表只在模块加载时排序一次，
+// rocketByPrefix 每次调用复用，避免每次都对几百个 key 重排（P2-2）
+const ROCKET_ZH_PREFIX_KEYS = Object.keys(ROCKET_ZH).sort((a, b) => b.length - a.length)
+
 const CN_NUM = {
 	1: '一',
 	2: '二',
@@ -437,7 +441,7 @@ function zhLongMarch(raw) {
 function rocketByPrefix(s) {
 	const str = String(s == null ? '' : s)
 	if (!str) return ''
-	const keys = Object.keys(ROCKET_ZH).sort((a, b) => b.length - a.length)
+	const keys = ROCKET_ZH_PREFIX_KEYS
 	for (const k of keys) {
 		if (str === k || !str.startsWith(k + ' ')) continue
 		const tail = str.slice(k.length + 1).trim()
@@ -882,6 +886,11 @@ export function countryOf(item) {
 	const last = segs[segs.length - 1].trim()
 	if (!last) return ''
 	if (COUNTRY_ZH[last]) return COUNTRY_ZH[last]
+	// 未命中国家名时，末段也可能本身就是发射场名（如 "Kennedy Space Center"），
+	// 先用发射场表兜底一次；命中（placeZh 返回与入参不同的中文名）就用它，
+	// 否则再按原有逻辑截断，避免把已识别的发射场名也当成未知国家硬截断（P2-5）
+	const place = placeZh(last)
+	if (place && place !== last) return place
 	// 没命中就保留原文，太长截断（"XX Space Center" 之类会撑爆一个 chip）
 	return last.length > 12 ? last.slice(0, 11) + '…' : last
 }
@@ -1283,4 +1292,45 @@ export function countryCode(name) {
 export function flagSrc(name) {
 	const c = countryCode(name)
 	return c ? '/static/flags/' + c + '.png' : ''
+}
+
+// ============ 给页面层复用的公共函数（收敛 pages 里重复实现的 statusZh / dayOf / 简介折叠）============
+// 页面通过 `import { fn as fnOf } from '@/utils/format.js'` + `methods:{ fn(x){ return fnOf(x) } }` 调用，
+// 模板只能见实例成员（项目硬约定）。以下函数保持纯函数、无副作用。
+
+/**
+ * 空间站状态中文化。口径与 pages/station/station.vue 的 statusZh 完全一致：
+ *   Active → 在役 / Retired → 退役 / Under Construction → 建造中 / 其余原样返回。
+ */
+export function stationStatusZh(status) {
+	if (status === 'Active') return '在役'
+	if (status === 'Retired') return '退役'
+	if (status === 'Under Construction') return '建造中'
+	return status || ''
+}
+
+/** 远征队状态中文化：与 stationStatusZh 同一套映射（口径一致，导出两个名字都行） */
+export function expeditionStatusZh(status) {
+	return stationStatusZh(status)
+}
+
+/**
+ * ISO 日期 → 短日期 "2024-03-15"（去掉时间部分）。
+ * 无效 / 空 返回 ''。口径与 station/expedition/astronaut 页的 dayOf 实现完全一致：
+ * 按原串截取日期段、不做时区换算——数据是零补位的 UTC 串，本地时区会把
+ * 跨零点时刻的日期往前/后推一天，页面侧一直用正则截，这里也必须一致。
+ */
+export function dayOf(iso) {
+	const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(iso || ''))
+	return m ? m[1] : ''
+}
+
+/** 简介文本：优先中文简介，回退原文 */
+export function descText(descZh, desc) {
+	return descZh || desc || ''
+}
+
+/** 简介是否超过折叠阈值（默认 120 字）；text/limit 缺失时安全返回 false */
+export function descNeedFold(text, limit) {
+	return (text || '').length > (limit || 120)
 }

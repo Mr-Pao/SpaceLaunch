@@ -163,8 +163,19 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { agencyLabel, nationZh, stationName as stationNameOf } from '@/utils/format.js'
+import {
+	agencyLabel,
+	nationZh,
+	stationName as stationNameOf,
+	stationStatusZh as stationStatusZhOf,
+	dayOf as dayOfOf,
+	descText as descTextOf,
+	descNeedFold as descNeedFoldOf
+} from '@/utils/format.js'
 import navMixin from '@/utils/nav-mixin.js'
+
+// 导航栏变实色的滚动阈值（仅 JS 常量，不进模板，安全）
+const NAV_SOLID_SCROLL = 180
 
 /**
  * 宇航员详情页。
@@ -198,11 +209,11 @@ export default {
 		},
 
 		bioText() {
-			return this.a.bioZh || this.a.bio || ''
+			return descTextOf(this.a.bioZh, this.a.bio)
 		},
 
 		descOver() {
-			return (this.bioText || '').length > 120
+			return descNeedFoldOf(this.bioText)
 		},
 
 		// 状态中文：LL2 枚举 Active/Retired/Deceased/In space/Unknown
@@ -240,14 +251,14 @@ export default {
 			const list = (this.a && this.a.missions) || []
 			return list.map((m) => ({
 				...m,
-				netText: dayOf(m.net),
+				netText: dayOfOf(m.net),
 				destZh: destZhOf(m.dest)
 			}))
 		},
 
 		evas() {
 			const list = (this.a && this.a.evas) || []
-			return list.map((e) => ({ ...e, startText: dayOf(e.start) }))
+			return list.map((e) => ({ ...e, startText: dayOfOf(e.start) }))
 		},
 
 		// 反向索引：本宇航员出现在哪几座空间站的当前乘组里
@@ -266,7 +277,7 @@ export default {
 	},
 
 	onPageScroll(e) {
-		const solid = e.scrollTop > 180
+		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
@@ -336,15 +347,12 @@ export default {
 		},
 
 		stationStatusZh(s) {
-			if (s === 'Active') return '在役'
-			if (s === 'Retired') return '退役'
-			if (s === 'Under Construction') return '建造中'
-			return s || ''
+			return stationStatusZhOf(s)
 		},
 
 		expRangeText(e) {
-			const s = dayOf(e.start)
-			const end = e.end ? dayOf(e.end) : '至今'
+			const s = dayOfOf(e.start)
+			const end = e.end ? dayOfOf(e.end) : '至今'
 			return (s ? s + ' — ' : '') + end
 		}
 	}
@@ -356,13 +364,6 @@ function fmtDayText(v) {
 	if (!m) return String(v || '')
 	const [, y, mo, d] = m
 	return y + ' 年 ' + Number(mo) + ' 月' + (d ? ' ' + Number(d) + ' 日' : '')
-}
-
-/** 完整时间戳 → 「2021-04-23」这种短日期；空/异常返回 '' */
-function dayOf(v) {
-	const s = String(v || '')
-	const m = /^(\d{4}-\d{2}-\d{2})/.exec(s)
-	return m ? m[1] : ''
 }
 
 /** 目的地英文 → 中文，映射不到就原样（slim 存的就是原文） */

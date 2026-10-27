@@ -12,7 +12,9 @@ function favoriteFirst(list) {
 	const top = []
 	const rest = []
 	for (const item of list) {
-		;(set.has(item.id) ? top : rest).push(item)
+		// favorites 模块约定 id 用 String()，而火箭/活动 id 是数字，
+		// 不 String 会让收藏标记静默失效
+		;(set.has(String(item.id)) ? top : rest).push(item)
 	}
 	return top.concat(rest)
 }
@@ -21,7 +23,10 @@ function favoriteFirst(list) {
 function favoriteIds(list) {
 	const set = favSnapshot()
 	if (!set.size) return []
-	return list.filter((item) => set.has(item.id)).map((item) => item.id)
+	return list
+		.filter((item) => set.has(String(item.id)))
+		// favorites 约定 id 全部 String()，返回数组也要统一，否则卡片标记对比不上
+		.map((item) => String(item.id))
 }
 
 /**

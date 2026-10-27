@@ -114,6 +114,12 @@ import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 import { placeZh, agencyLabel as agencyLabelOf, padShort as padShortOf } from '@/utils/format.js'
 
+// 导航栏变实色的滚动阈值（仅 JS 常量，不进模板，安全）
+const NAV_SOLID_SCROLL = 180
+
+// 简介折叠阈值：与 launchInfo 同口径，短简介不挂「展开全文」
+const DESC_FOLD_LEN = 120
+
 /**
  * 发射工位（pad）详情页。
  * 入口：发射任务详情页「发射台」卡片（工位名可点）。
@@ -141,20 +147,13 @@ export default {
 		},
 		/** 超过阈值才显示「展开全文」，两行的短简介折叠没有意义 */
 		descOver() {
-			return (this.descText || '').length > 120
+			return (this.descText || '').length > DESC_FOLD_LEN
 		}
 	},
 
 	onPageScroll(e) {
-		const solid = e.scrollTop > 180
+		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
-	},
-
-	// 页面实例可能被复用，开关状态跟手刷新（getConfig 有内存缓存，零开销）
-	onShow() {
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-		})
 	},
 
 	async onLoad(query) {

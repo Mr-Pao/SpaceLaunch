@@ -29,13 +29,13 @@
 			<view class="grid" v-if="tab === 'image'">
 				<block v-if="images.length">
 					<view class="col">
-						<view class="shot" v-for="(img, i) in colLeft" :key="'l' + i" @click="preview(img)">
+						<view class="shot" v-for="(img, i) in cols.left" :key="'l' + i" @click="preview(img)">
 							<image class="shot-img" :src="img.thumb" mode="widthFix" lazy-load></image>
 							<text class="shot-credit" v-if="img.credit">@{{ img.credit }}</text>
 						</view>
 					</view>
 					<view class="col">
-						<view class="shot" v-for="(img, i) in colRight" :key="'r' + i" @click="preview(img)">
+						<view class="shot" v-for="(img, i) in cols.right" :key="'r' + i" @click="preview(img)">
 							<image class="shot-img" :src="img.thumb" mode="widthFix" lazy-load></image>
 							<text class="shot-credit" v-if="img.credit">@{{ img.credit }}</text>
 						</view>
@@ -91,6 +91,13 @@
 	import { seriesKey, seriesName, rocketName } from '@/utils/format.js'
 	import { collectMedia, fullImageOf } from '@/utils/media.js'
 
+/**
+ * 各类图片的相对高度（同列宽下可直接比较）。
+ * 信息图是竖长图，发射实拍 / 工位图多为横构图，型号图介于两者之间。
+ * 只是分列的权重，不是真实像素高度。
+ */
+const SHOT_H = { infographic: 1.5, config: 1.15, pad: 0.8, launch: 0.7 }
+
 export default {
 	data() {
 		return {
@@ -114,13 +121,27 @@ export default {
 			return rocketName(c) || c.name || '图片库'
 		},
 
-		// 交替分列：简单但足够，图片本身高度不一，视觉上就是瀑布流
-		colLeft() {
-			return this.images.filter((_, i) => i % 2 === 0)
-		},
-
-		colRight() {
-			return this.images.filter((_, i) => i % 2 === 1)
+		// 两列瀑布流：按「累计高度较小者」追加，列高更均衡。
+		// 图片无预存宽高，用 kind 估一个相对高度（列宽相同，可直接比较）。
+		// 各档必须取到不同的值：全取同一个数时贪心会退化成奇偶交替，等于没改。
+		// 精确逐图高度要等 @load 回传，那时整列已铺完，再重排会让图片左右跳，
+		// 这里的取舍是宁可估得粗糙也不闪（已知取舍）。
+		cols() {
+			const left = []
+			const right = []
+			let hl = 0
+			let hr = 0
+			for (const img of this.images) {
+				const h = SHOT_H[img.kind] || 0.8
+				if (hl <= hr) {
+					left.push(img)
+					hl += h
+				} else {
+					right.push(img)
+					hr += h
+				}
+			}
+			return { left, right }
 		},
 
 		vcolLeft() {

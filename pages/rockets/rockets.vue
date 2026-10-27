@@ -200,6 +200,9 @@ import navMixin from '@/utils/nav-mixin.js'
 
 const STEP = 14
 
+// 导航栏变实色的滚动阈值（仅 JS 常量，不进模板，安全）
+const NAV_SOLID_SCROLL = 120
+
 // 可靠榜的准入门槛：只打过一两发的型号 100% 成功率没有说服力
 const MIN_LAUNCH_FOR_RELIABILITY = 5
 
@@ -406,7 +409,7 @@ export default {
 
 	// 滚过榜单头以后给顶栏加毛玻璃，标题不悬空在内容上
 	onPageScroll(e) {
-		const solid = (e && e.scrollTop ? e.scrollTop : 0) > 120
+		const solid = (e && e.scrollTop ? e.scrollTop : 0) > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 

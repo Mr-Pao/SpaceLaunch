@@ -151,6 +151,9 @@ export default {
 		// 匹配面见 search-match.js：name / nameZh / launchTitle（中文型号兜底）各自独立判断
 		const launchHit = (x) => launchMatch(x, kw)
 
+		// 机构搜索：name / abbrev / nameZh 任一命中关键词即收录
+		const hit = (field, k) => (field || '').toLowerCase().indexOf(k) !== -1
+
 			const launchRow = (x) => ({
 				id: x.id,
 				type: 'launch',

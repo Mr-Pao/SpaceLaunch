@@ -43,6 +43,8 @@ export const CDN_BASE = 'https://spacelaunch-1258113633.cos.ap-chengdu.myqcloud.
 //     并新增按需拉分片的 galleryChunk()。不升版本的话，
 //     老用户手里的单文件缓存 6 小时内不会刷新，全量页只翻得动第 0 片
 // v13: 宇航员 slim 新增 missions/evas/生卒/外链（3.1.15），旧缓存 key 失效强制重拉
+// v14: 缓存版本号升到 14（图库小版本随之变为 v14.1）；旧缓存 key 整体失效强制重拉。
+//      DATA_VERSION 在 utils/data.js / scripts/sync.js / scripts/images.js 三处必须一致（当前 14）。
 const DATA_VERSION = 14
 
 /**
@@ -169,7 +171,7 @@ const inflight = {}
 // ============ 缓存读写 ============
 
 function cacheKey(name) {
-	// 图库带自己的小版本（v13.1），其它数据集仍只有 DATA_VERSION
+	// 图库带自己的小版本（v14.1），其它数据集仍只有 DATA_VERSION
 	const v = name === 'gallery' ? DATA_VERSION + '.' + GALLERY_V : DATA_VERSION
 	return 'sl_data_' + name + '_v' + v
 }

@@ -29,7 +29,10 @@
 <script>
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
-import { stationName as stationNameOf } from '@/utils/format.js'
+import { stationName as stationNameOf, stationStatusZh as stationStatusZhOf } from '@/utils/format.js'
+
+// 导航栏变实色的滚动阈值（仅 JS 常量，不进模板，安全）
+const NAV_SOLID_SCROLL = 120
 
 export default {
 	mixins: [navMixin],
@@ -43,7 +46,7 @@ export default {
 	},
 
 	onPageScroll(e) {
-		const solid = e.scrollTop > 120
+		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
@@ -66,10 +69,7 @@ export default {
 		},
 
 		statusZh(s) {
-			if (s === 'Active') return '在役'
-			if (s === 'Retired') return '退役'
-			if (s === 'Under Construction') return '建造中'
-			return s || ''
+			return stationStatusZhOf(s)
 		},
 		go(s) {
 			uni.navigateTo({ url: '/pages/station/station?id=' + s.id })

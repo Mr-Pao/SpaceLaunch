@@ -99,7 +99,9 @@ function aggregateByYear(list) {
 		else if (BAD.indexOf(s) !== -1) row.fail++
 		else if (PARTIAL.indexOf(s) !== -1) row.partial++
 
-		if (f.orbit === 'Sub') row.sub++
+		// LL2 真实轨道值多为 "Suborbital"（首字母大写），单纯 === 'Sub' 永远不中，
+		// 亚轨道统计恒为 0。改为大小写不敏感地包含 'sub' 即可命中。
+		if (String(f.orbit || '').toLowerCase().includes('sub')) row.sub++
 
 		const m = at.getMonth()
 		if (m >= 0 && m < 12) row.months[m]++

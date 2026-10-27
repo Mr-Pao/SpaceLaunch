@@ -346,7 +346,9 @@ import {
 	coreStatus,
 	placeZh,
 	padShort,
-	flagSrc
+	flagSrc,
+	massText as massTextOf,
+	costText as costTextOf
 } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import { collectMedia } from '@/utils/media.js'
@@ -359,6 +361,8 @@ import { hasRocket, toggleRocket } from '@/utils/favorites.js'
 const FOLD = 3
 // 芯级列表默认露几枚。Falcon 9 在册 20+ 枚，全铺会把页面拉得很长
 const CORE_FOLD = 6
+// 导航栏变实色的滚动阈值（仅 JS 常量，不进模板，安全）
+const NAV_SOLID_SCROLL = 180
 
 export default {
 	mixins: [navMixin],
@@ -737,16 +741,12 @@ export default {
 	},
 
 	onShow() {
-		// 页面可能被复用（从机构页返回），开关状态必须跟手刷新
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-		})
 		// 收藏可能在「我的」里被取消，回来时以本地存储为准
 		this.isFav = hasRocket(this.rocketId)
 	},
 
 	onPageScroll(e) {
-		const solid = e.scrollTop > 180
+		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
@@ -990,23 +990,6 @@ function fmtInt(n) {
 	return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
-/** 运力：大于 1 吨用吨，小运力保留 kg 更直观 */
-function mass(kg) {
-	const v = Number(kg)
-	if (!isFinite(v) || v <= 0) return ''
-	if (v >= 1000) return fmt(v / 1000) + ' 吨'
-	return v + ' kg'
-}
-
-/** 研制成本：LL2 给的是美元整数 */
-function costText(usd) {
-	const v = Number(usd)
-	if (!isFinite(v) || v <= 0) return ''
-	if (v >= 1e8) return fmt(v / 1e8) + ' 亿美元'
-	if (v >= 1e4) return fmt(v / 1e4) + ' 万美元'
-	return v + ' 美元'
-}
-
 /**
  * 构型卡的六格参数。缺值直接不出现 —— 留一个「—」占位反而更乱。
  * 顺序按「看火箭最先想知道的」排：推力、粗细、运力。
@@ -1022,13 +1005,13 @@ function paramList(c) {
 	push('长度', c.length ? fmt(c.length) + ' m' : '')
 	push('直径', c.diameter ? fmt(c.diameter) + ' m' : '')
 	push('级数', c.max_stage ? c.max_stage + ' 级' : '')
-	push('LEO 运力', mass(c.leo_capacity))
-	push('GTO 运力', mass(c.gto_capacity))
-	push('GEO 运力', mass(c.geo_capacity))
-	push('SSO 运力', mass(c.sso_capacity))
+	push('LEO 运力', massTextOf(c.leo_capacity))
+	push('GTO 运力', massTextOf(c.gto_capacity))
+	push('GEO 运力', massTextOf(c.geo_capacity))
+	push('SSO 运力', massTextOf(c.sso_capacity))
 	push('首飞', c.maiden_flight || '')
 	push('起飞质量', c.launch_mass ? fmt(c.launch_mass) + ' 吨' : '')
-	push('造价', costText(c.launch_cost))
+	push('造价', costTextOf(c.launch_cost))
 
 	return out
 }

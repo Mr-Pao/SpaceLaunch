@@ -329,5 +329,8 @@ function getDebugInfo() {
 	}
 }
 
-// 开发者面板（火箭大全暗门）用：覆盖、刷新、现场信息不进常规 import 面
-export { setOverride, refreshRemote, getDebugInfo }
+// 审核态判定纯函数：接收配置对象与（可选的）模拟版本号，返回带 review 字段的解析结果。
+// 与 custom-tab-bar/index.js 的 matchVersionList/resolveReview 行为完全等价。
+// 注意：custom-tab-bar 是原生组件，uni-app 不打包、无法 import 本文件，
+// 故它自带一份同规则实现，改动任一边都必须同步另一边（scripts/verify-config.js 对拍）。
+export { setOverride, refreshRemote, getDebugInfo, applyVersionRule }

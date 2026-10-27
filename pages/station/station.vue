@@ -107,7 +107,17 @@
 <script>
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
-import { stationName as stationNameOf, expeditionName as expeditionNameOf } from '@/utils/format.js'
+import {
+	stationName as stationNameOf,
+	expeditionName as expeditionNameOf,
+	stationStatusZh as stationStatusZhOf,
+	dayOf as dayOfOf,
+	descText as descTextOf,
+	descNeedFold as descNeedFoldOf
+} from '@/utils/format.js'
+
+// 导航栏变实色的滚动阈值（约定1：模板只能见实例成员；这里只是 JS 常量，安全）
+const NAV_SOLID_SCROLL = 160
 
 export default {
 	mixins: [navMixin],
@@ -117,22 +127,23 @@ export default {
 			loading: true,
 			navSolid: false,
 			descOpen: false,
-			station: {},
+			// 默认给齐子数组，后端缺字段时 .length 不会 TypeError
+			station: { crew: [], expeditions: [], owners: [] },
 			dockings: []
 		}
 	},
 
 	computed: {
 		descText() {
-			return this.station.descZh || this.station.desc || ''
+			return descTextOf(this.station.descZh, this.station.desc)
 		},
 		descOver() {
-			return (this.descText || '').length > 120
+			return descNeedFoldOf(this.descText)
 		}
 	},
 
 	onPageScroll(e) {
-		const solid = e.scrollTop > 160
+		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
@@ -154,7 +165,8 @@ export default {
 		}
 		const list = (stations && stations.list) || []
 		const found = list.find((s) => String(s.id) === String(id)) || {}
-		this.station = found
+		// 后端缺子数组时不能整块覆盖掉默认结构，否则模板 station.crew.length 直接 TypeError
+		this.station = Object.assign({ crew: [], expeditions: [], owners: [] }, found)
 		const ds = (docks && docks.list) || []
 		this.dockings = ds
 			.filter((d) => String(d.stationId) === String(id))
@@ -173,10 +185,7 @@ export default {
 		},
 
 		statusZh(s) {
-			if (s === 'Active') return '在役'
-			if (s === 'Retired') return '退役'
-			if (s === 'Under Construction') return '建造中'
-			return s || ''
+			return stationStatusZhOf(s)
 		},
 		expRange(e) {
 			const s = this.dayOf(e.start)
@@ -184,8 +193,7 @@ export default {
 			return s + ' — ' + end
 		},
 		dayOf(v) {
-			const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v || ''))
-			return m ? m[1] : ''
+			return dayOfOf(v)
 		},
 		goAstro(m) {
 			if (m && m.id != null) uni.navigateTo({ url: '/pages/astronaut/astronaut?id=' + m.id })

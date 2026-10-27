@@ -13,8 +13,14 @@
  * 审核态判定 —— **规则必须与 utils/config.js 的 applyVersionRule 完全一致**。
  *
  * 为什么要在这里重复一份：custom-tab-bar 是原生组件，uni-app 编译器直接
- * 拷贝该目录、不做模块打包，所以 import 不到 utils/config.js。
+ * 拷贝该目录、不做模块打包，所以 import 不到 utils/config.js（ESM 在原生组件里
+ * 也无法被 require，强行 require(@/utils/config.js) 会在运行时报语法错）。
  * 两份一致性由 scripts/verify-config.js 用同一组真值表对拍（改一边必须同步另一边）。
+ *
+ * ⚠ 改动需同步两边：本文件的 matchVersionList / resolveReview 与 utils/config.js
+ * 的 applyVersionRule 必须保持完全等价。不要尝试用 require 复用，否则：
+ *   1) 原生组件加载 ESM 源文件会直接语法报错；
+ *   2) verify-config.js 靠字符串抠出本文件的函数做对拍，改名/删函数会让 17/17 直接失败。
  */
 function matchVersionList(raw, version) {
 	const cfg = raw || {}

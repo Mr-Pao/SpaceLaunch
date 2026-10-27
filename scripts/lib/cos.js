@@ -115,7 +115,21 @@ async function upload(localPath, key, cacheControl, contentType) {
  *   以前一律按 null 处理，增量脚本会拿着「空存量」只写入本轮几条
  *   就覆盖上传，线上几百条历史数据一次清零且不可自愈。
  */
-async function readCosJson(key) {
+/**
+ * 读 COS 上的 JSON。
+ *
+ * @param {string} key 对象键，例如 space-data/launches-previous.json
+ * @param {object} [opts]
+ * @param {boolean} [opts.notFoundIsNull=true]
+ *   404 是否当作「文件还不存在」返回 null（增量场景的默认正常态）；
+ *   若传 false，404 也会抛错。
+ *
+ * 语义说明（P2-17）：本函数与 scripts/sync.js 里的私有 readCosJson 是**两份独立实现**，
+ * 故意不共享——sync.js 那份是「非 200 即抛」的强依赖读取（拿不到终态就中止），
+ * 这里是「404→null、其余抛错」的增量读取。两者语义不同，改之前看清楚调用方要哪个，
+ * 不要为了消除重复把 sync.js 改去复用本函数，否则会破坏强依赖读取的失败中止行为。
+ */
+async function readCosJson(key, { notFoundIsNull = true } = {}) {
 	const { COS_BUCKET, COS_REGION } = process.env
 	if (!COS_BUCKET || !COS_REGION) return null
 	const url = `https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com/${key}`
@@ -126,7 +140,11 @@ async function readCosJson(key) {
 	} catch (e) {
 		throw new Error(`读取 ${key} 网络失败: ${e.message}`)
 	}
-	if (res.status === 404) return null
+	if (res.status === 404) {
+		// 默认把 404 当「还没有这个文件」处理（增量从零开始）；显式 notFoundIsNull=false 时抛错
+		if (notFoundIsNull) return null
+		throw new Error(`读取 ${key} 失败: HTTP 404（notFoundIsNull=false）`)
+	}
 	if (!res.ok) throw new Error(`读取 ${key} 失败: HTTP ${res.status}`)
 	return await res.json()
 }

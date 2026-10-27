@@ -1,5 +1,5 @@
 <template>
-	<!-- 薄壳：只管页面级生命周期（滚动转发、分享），内容全在 launch-detail 里。
+	<!-- 薄壳：只管页面级生命周期（导航栏变色、分享），内容全在 launch-detail 里。
 	     一个入口两种进入方式：从列表来直接是详情，从图片来先满屏看图 -->
 	<view class="shell">
 		<nav-bar :solid="navSolid" :title="navSolid ? '发射任务详情' : ''" />
@@ -29,9 +29,9 @@ export default {
 	},
 
 	// 看图态是整屏看图器，导航栏始终透明（无标题），不随滚动切切实色
+	// 组件里已经没有随滚动收缩的区块了（看图器恒满屏），这里只管导航栏变色
 	onPageScroll(e) {
 		const top = (e && e.scrollTop) || 0
-		const d = this.$refs.detail
 
 		// 看图态下导航保持透明：否则滚一下会露出顶栏，盖在图上
 		if (this.photoMode) {
@@ -42,9 +42,6 @@ export default {
 		const threshold = 200
 		const solid = top >= threshold
 		if (solid !== this.navSolid) this.navSolid = solid
-
-		// 普通详情页的滚动量转发给组件（看图态下组件已忽略）
-		if (d && d.setScroll) d.setScroll(top)
 	},
 
 	// 页面实例可能被复用（navigateBack 回来而不是重新 onLoad），

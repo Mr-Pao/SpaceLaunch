@@ -36,7 +36,7 @@ GitHub Actions（海外节点）        COS + CDN（成都）
 
 ## 数据版本
 
-`scripts/sync.js` 与 `utils/data.js` 里的 `DATA_VERSION` 必须一致（当前 **8**）。
+`scripts/sync.js` 与 `utils/data.js` 里的 `DATA_VERSION` 必须一致（当前 **14**）。
 改数据结构时两边一起 +1，旧缓存会因 key 带版本号而自动失效。
 
 ## 本地跑

@@ -59,7 +59,20 @@ const vFront = pickVersionIn(readText('utils/data.js'))
 const vSync = pickVersionIn(readText('scripts/sync.js'))
 const vImages = pickVersionIn(readText('scripts/images.js'))
 
-eq(vFront === vSync && vSync === vImages, true, `DATA_VERSION 三处一致（${vFront} / ${vSync} / ${vImages}）`)
+// videos.js / timeline.js 在 payload 里用 `v: <n>` 标记数据集版本，须与 DATA_VERSION 同步，
+// 之前硬编码过 13（P2-12 漂移），纳入对拍防止下次再漂。
+function pickPayloadVersionIn(text) {
+	const m = text.match(/\bv:\s*(\d+)/)
+	return m ? Number(m[1]) : null
+}
+const vVideos = pickPayloadVersionIn(readText('scripts/videos.js'))
+const vTimeline = pickPayloadVersionIn(readText('scripts/timeline.js'))
+
+eq(
+	vFront === vSync && vSync === vImages && vImages === vVideos && vVideos === vTimeline && vTimeline === vFront,
+	true,
+	`DATA_VERSION 五处一致（front=${vFront} sync=${vSync} images=${vImages} videos=${vVideos} timeline=${vTimeline}）`
+)
 
 const manifest = readText('manifest.json')
 const mName = (manifest.match(/"versionName"\s*:\s*"([^"]+)"/) || [])[1] || ''
@@ -100,7 +113,8 @@ const SLIM_STAT_LAUNCH = {
 	status: 'Failure',
 	rocket: 'Electron',
 	site: 'Mahia',
-	orbit: 'Sub',
+	// LL2 真实轨道值是 "Suborbital"（首字母大写），用真实值喂入，确保覆盖真实分支
+	orbit: 'Suborbital',
 	launch_service_provider: 'Rocket Lab'
 }
 
@@ -124,6 +138,28 @@ eq(row.failures[0].status, 'Failure', 'failures.status 取的是拍平后的字�
 eq(aggregateByYear([]), [], '空输入 → 空输出')
 eq(aggregateByYear([{ net: '不是日期' }]), [], '非法日期被跳过')
 eq(aggregateByYear([null, undefined]), [], 'null 条目被跳过')
+
+// 真实 LL2 轨道值 "Suborbital"（首字母大写）必须被大小写不敏感的包含匹配命中：
+// sub++ 且 orbital = total - 1。这一条专门防止 P1-6 那种「恒为 0」的回归。
+{
+	const subOnly = aggregateByYear([
+		{
+			id: 10,
+			net: '2025-01-01T00:00:00Z',
+			status: { abbrev: 'Success' },
+			mission: { orbit: { name: 'Suborbital' } }
+		},
+		{
+			id: 11,
+			net: '2025-02-01T00:00:00Z',
+			status: { abbrev: 'Success' },
+			mission: { orbit: { name: 'LEO' } }
+		}
+	])
+	eq(subOnly.length, 1, 'Suborbital + LEO 两条聚成一行')
+	eq(subOnly[0].sub, 1, '真实值 "Suborbital" 计入 sub')
+	eq(subOnly[0].orbital, subOnly[0].total - 1, 'suborbital 不计入 orbital（total - 1）')
+}
 
 // ---------- format.js（ESM，复制成 .mjs 动态 import）----------
 
@@ -233,10 +269,19 @@ async function testFormat() {
 	eq(f.countryOf(loc('Sea Launch')), '海上发射', '国家：海上平台不是国家')
 	eq(f.countryOf({ pad: { location: null } }), '', '国家：location 为 null 返回空串')
 	eq(f.countryOf(null), '', '国家：入参为空安全返回')
+	// 截断分支要用「真·未命中」的输入：国家表和发射场表 PLACE_ZH 都查不到才行。
+	// Zephyr Orbital Launch Basin 是虚构场地名，两表均无（placeZh 原样返回），才会走到截断。
+	eq(
+		f.countryOf(loc('Somewhere, Zephyr Orbital Launch Basin')),
+		'Zephyr Orbi…',
+		'国家：未命中映射时保留原文并截断'
+	)
+	// 末段是发射场名（不是国家名）时，用发射场中文表兜底：Semnan → 塞姆南。
+	// 这条守住 placeZh 兜底不被误删 —— 删了它就会退化成 "Velayat-e S…" 这种截断英文。
 	eq(
 		f.countryOf(loc('Somewhere, Velayat-e Semnan Space Center Province')),
-		'Velayat-e S…',
-		'国家：未命中映射时保留原文并截断'
+		'塞姆南',
+		'国家：末段命中发射场表时兜底为中文地名（Semnan → 塞姆南）'
 	)
 
 	// seriesKey：families 是「由粗到细」的层级，取第二层才是型号系列这一级。

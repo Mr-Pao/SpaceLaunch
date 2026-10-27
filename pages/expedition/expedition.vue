@@ -60,7 +60,10 @@
 <script>
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
-import { expeditionName as expeditionNameOf } from '@/utils/format.js'
+import { expeditionName as expeditionNameOf, dayOf as dayOfOf } from '@/utils/format.js'
+
+// 导航栏变实色的滚动阈值（仅 JS 常量，不进模板，安全）
+const NAV_SOLID_SCROLL = 120
 
 export default {
 	mixins: [navMixin],
@@ -69,7 +72,8 @@ export default {
 		return {
 			loading: true,
 			navSolid: false,
-			exp: {}
+			// 默认给齐子数组，后端缺字段时 .length 不会 TypeError
+			exp: { patches: [], crew: [] }
 		}
 	},
 
@@ -82,7 +86,7 @@ export default {
 	},
 
 	onPageScroll(e) {
-		const solid = e.scrollTop > 120
+		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
 	},
 
@@ -91,7 +95,9 @@ export default {
 		try {
 			const d = await spaceData.load('expeditions')
 			const list = (d && d.list) || []
-			this.exp = list.find((x) => String(x.id) === String(id)) || {}
+			// 同上：后端缺 patches / crew 时保留默认空数组，别让模板 .length 崩
+			const found = list.find((x) => String(x.id) === String(id)) || {}
+			this.exp = Object.assign({ patches: [], crew: [] }, found)
 		} catch (e) {
 			console.warn('[expedition] 加载失败', e)
 		}
@@ -104,8 +110,7 @@ export default {
 		},
 
 		dayOf(v) {
-			const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v || ''))
-			return m ? m[1] : ''
+			return dayOfOf(v)
 		},
 		preview(url) {
 			if (url) uni.previewImage({ urls: [url], current: url })

@@ -195,12 +195,21 @@ async function pruneStaleUpcoming(list, readCosJson) {
 	if (!stale.length) return
 
 	const prev = new Map()
+	let prevFailed = false
 	try {
 		const p = await readCosJson('space-data/launches-previous.json')
 		for (const x of (p && (p.list || p)) || []) prev.set(String(x.id), x)
 	} catch (e) {
-		// previous 读不到就只会走删除分支，不会误改状态
+		// previous 是真实终态来源。若读取瞬态失败（网络抖动 / 5xx / 非 200 即抛），
+		// prev 会是空 —— 若不拦截，下面循环对每个 "Go/In Flight 且超 3h" 的条目都走
+		// 删除分支，等于把一整批仍在飞的发射整体从 upcoming 抹掉。
+		// 安全做法：本轮直接放弃 prune，全部保留，等下一轮 previous 可读时再修。
+		prevFailed = true
+		console.warn(`  ! 读取 previous 失败，本轮跳过陈旧清理（保留全部）: ${e.message}`)
 	}
+
+	// previous 没读到就别动任何条目，宁可列表多挂几小时「飞行中」，也不误删活跃发射
+	if (prevFailed) return
 
 	let patched = 0
 	const drop = new Set()

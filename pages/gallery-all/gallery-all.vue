@@ -180,7 +180,9 @@ export default {
 .page {
 	min-height: 100vh;
 	background: #0a0e17;
-	/* 底部给加载提示留白，也避开 iPhone 底部横条 */
+	/* 底部给加载提示留白，也避开 iPhone 底部横条（裸值 + constant 兜底，安卓才不掉落） */
+	padding-bottom: 60rpx;
+	padding-bottom: calc(60rpx + constant(safe-area-inset-bottom));
 	padding-bottom: calc(60rpx + env(safe-area-inset-bottom));
 	box-sizing: border-box;
 }

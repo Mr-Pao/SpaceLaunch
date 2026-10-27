@@ -176,7 +176,8 @@ async function runVideos() {
 		.slice(0, KEEP)
 
 	const payload = {
-		v: 13,
+		// 须与 DATA_VERSION(=14) 同步：前端缓存/数据版本一致性依赖它
+		v: 14,
 		dataset: 'video',
 		generatedAt: new Date().toISOString(),
 		count: list.length,
