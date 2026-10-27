@@ -535,24 +535,6 @@ export default {
 			return out.filter((s) => s.value !== '0')
 		},
 
-		/**
-		 * 常用发射场。
-		 * 数据来自 CI 在型号库上做的全历史聚合（`pads`），
-		 * 这里只做展示层转换：工位名缩写 + 场地名中文。
-		 */
-		pads() {
-			const arr = (this.config && this.config.pads) || []
-			return arr
-				// LL2 里有一批工的位名就叫 "Unknown Pad"，聚出来是纯噪音
-				.filter((p) => p.name && !/unknown/i.test(p.name))
-				.map((p) => ({
-					name: p.name,
-					short: padShort(p.name) || p.name,
-					location: placeZh(p.location),
-					count: p.count || 0
-				}))
-		},
-
 		/** 发射机构：该系列全部发射记录里出现过的机构，去重拼接。
 		 *  注意 slimLaunch 里没有顶层 agency（那是统计裁剪 slimStatLaunch 的
 		 *  字段），launches 快照带的是 launch_service_provider 对象 */
@@ -683,11 +665,23 @@ export default {
 		},
 
 		/**
-		 * 发射场地：从发射记录里聚合。
-		 * 快照只到最近 100 条历史，所以多场地的型号这里可能不全，
-		 * 页面标题会标「基于近期记录」，不假装是全集。
+		 * 发射场地：优先用 CI 在型号库上聚合好的 `config.pads`（覆盖全历史），
+		 * 老缓存没有这个字段时，退回近期的发射记录现场聚合。
+		 * 两条路都只留 name / short / location / count 四个字段，模板直接用。
 		 */
 		pads() {
+			const pre = (this.config && this.config.pads) || []
+			if (pre.length) {
+				return pre
+					.filter((p) => p.name && !/unknown/i.test(p.name))
+					.map((p) => ({
+						name: p.name,
+						short: padShort(p.name) || p.name,
+						location: placeZh(p.location),
+						count: p.count || 0
+					}))
+			}
+
 			const map = {}
 			const order = []
 			for (const r of this.records) {
@@ -697,7 +691,12 @@ export default {
 				// LL2 里有一批工位名就叫 "Unknown Pad"，聚出来是纯噪音
 				if (/unknown/i.test(name)) continue
 				if (!map[name]) {
-					map[name] = { name, country: countryOf(r), count: 0 }
+					map[name] = {
+						name,
+						short: padShort(name) || name,
+						location: placeZh(p.location && p.location.name),
+						count: 0
+					}
 					order.push(name)
 				}
 				map[name].count++
