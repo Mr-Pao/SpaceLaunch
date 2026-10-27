@@ -64,7 +64,7 @@
 				<view class="card-title">远征队</view>
 				<view class="exp" v-for="e in station.expeditions" :key="e.id" @click="goExp(e)">
 					<view class="exp-info">
-						<text class="exp-name">{{ e.name }}</text>
+						<text class="exp-name">{{ expeditionName(e.name) }}</text>
 						<text class="exp-sub">{{ expRange(e) }}</text>
 					</view>
 					<text class="arrow">›</text>
@@ -104,7 +104,7 @@
 <script>
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
-import { stationName as stationNameOf } from '@/utils/format.js'
+import { stationName as stationNameOf, expeditionName as expeditionNameOf } from '@/utils/format.js'
 
 export default {
 	mixins: [navMixin],
@@ -163,6 +163,10 @@ export default {
 	methods: {
 		stationName(name) {
 			return stationNameOf(name)
+		},
+
+		expeditionName(name) {
+			return expeditionNameOf(name)
 		},
 
 		statusZh(s) {

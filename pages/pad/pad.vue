@@ -24,9 +24,9 @@
 
 			<!-- 标题区 -->
 			<view class="head">
-				<text class="title">{{ pad.name }}</text>
+				<text class="title">{{ padShort(pad.name) || pad.name }}</text>
 				<view class="tags">
-					<text class="tag" v-if="pad.location && pad.location.name">{{ pad.location.name }}</text>
+					<text class="tag" v-if="pad.location && pad.location.name">{{ placeZh(pad.location.name) }}</text>
 					<text class="tag" v-if="pad.country_code">{{ pad.country_code }}</text>
 					<text class="tag" :class="pad.active ? 'tag-on' : 'tag-off'">
 						{{ pad.active ? '现役' : '停用' }}
@@ -81,7 +81,7 @@
 				>
 					<text class="label">机构</text>
 					<view class="value-wrap">
-						<text class="value value-link">{{ a.name }}</text>
+						<text class="value value-link">{{ agencyLabel(a.name) }}</text>
 						<text class="value-arrow">›</text>
 					</view>
 				</view>
@@ -112,6 +112,7 @@
 import spaceData from '@/utils/data.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
+import { placeZh, agencyLabel as agencyLabelOf, padShort as padShortOf } from '@/utils/format.js'
 
 /**
  * 发射工位（pad）详情页。
@@ -179,6 +180,19 @@ export default {
 	},
 
 	methods: {
+		// 模板只能看见实例成员，模块函数要转一层
+		placeZh(loc) {
+			return placeZh(loc)
+		},
+
+		agencyLabel(name) {
+			return agencyLabelOf(name)
+		},
+
+		padShort(name) {
+			return padShortOf(name)
+		},
+
 		goAgency(id) {
 			if (!id) return
 			uni.navigateTo({ url: '/pages/agencies/agencies?id=' + id })

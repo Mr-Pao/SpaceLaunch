@@ -1106,3 +1106,11 @@ export function stationName(raw) {
 
 	return s
 }
+
+/** 远征队名：Expedition 70 → 第 70 次远征 */
+export function expeditionName(raw) {
+	const s = String(raw == null ? '' : raw).trim()
+	if (!s) return ''
+	const m = /^Expedition\s+(\d+)$/i.exec(s)
+	return m ? '第 ' + m[1] + ' 次远征' : s
+}

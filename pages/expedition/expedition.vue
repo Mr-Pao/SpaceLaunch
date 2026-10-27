@@ -12,7 +12,7 @@
 		<block v-else>
 			<!-- padding-top 动态让出状态栏+胶囊（fixed 导航不占位），写死会顶进胶囊区域 -->
 			<view class="head" :style="{ paddingTop: statusBarH + 52 + 'px' }">
-				<text class="name">{{ exp.name }}</text>
+				<text class="name">{{ expeditionName(exp.name) }}</text>
 				<view class="sub">
 					<text class="range">{{ rangeText }}</text>
 					<text class="state" :class="exp.end ? 'gone' : 'on'">{{ exp.end ? '已结束' : '进行中' }}</text>
@@ -59,6 +59,7 @@
 <script>
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
+import { expeditionName as expeditionNameOf } from '@/utils/format.js'
 
 export default {
 	mixins: [navMixin],
@@ -97,6 +98,10 @@ export default {
 	},
 
 	methods: {
+		expeditionName(name) {
+			return expeditionNameOf(name)
+		},
+
 		dayOf(v) {
 			const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(v || ''))
 			return m ? m[1] : ''
