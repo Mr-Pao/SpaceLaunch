@@ -1114,3 +1114,41 @@ export function expeditionName(raw) {
 	const m = /^Expedition\s+(\d+)$/i.exec(s)
 	return m ? '第 ' + m[1] + ' 次远征' : s
 }
+
+/**
+ * 活动名术语纠正。
+ *
+ * 机翻在几个航天专名上会翻车：
+ *   JUICE（木星冰月探测器）→ 「果汁」
+ *   Europa Clipper → 「欧罗巴快艇」（官方是「欧罗巴快船」）
+ *   Orbit Insertion → 「轨道插入」（应作「入轨」）
+ *   Reentry → 「重返」（应作「再入」）
+ * 数据层的 nameZh 是批量生成的，改一次要重跑整轮，所以在展示层做后处理，
+ * 新增活动也自动生效。
+ */
+const EVENT_TERM_FIX = [
+	// 顺序有讲究：先把 JUICE 修好，后面的「...冲击」才轮得到
+	[/果汁/g, 'JUICE '],
+	[/欧罗巴快艇/g, '欧罗巴快船'],
+	[/轨道插入/g, '入轨'],
+	[/释放和重返/g, '释放与再入'],
+	[/贝皮科伦坡(?!号)/g, '贝皮科伦坡号'],
+	[/隼鸟二号/g, '隼鸟 2 号'],
+	[/露西(?:·)?特洛伊/g, '露西号 · 特洛伊'],
+	[/波音\s*Starliner/g, '波音星际客机'],
+	[/SNC-1追梦者/g, 'SNC-1 追梦者'],
+	[/美国EVA/g, '美国 EVA'],
+	[/冲击$/g, '撞击']
+]
+
+function fixEventTerms(text) {
+	let s = String(text == null ? '' : text)
+	for (const pair of EVENT_TERM_FIX) s = s.replace(pair[0], pair[1])
+	return s
+}
+
+/** 活动显示名：中文名 + 术语纠正，没有中文名则用原文 */
+export function eventName(ev) {
+	if (!ev) return ''
+	return fixEventTerms(ev.nameZh || ev.name || '')
+}

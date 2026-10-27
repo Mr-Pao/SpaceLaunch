@@ -43,7 +43,7 @@
 							<text class="type">{{ (item.type && item.type.name) || '活动' }}</text>
 							<text class="date">{{ formatShort(item.date) }}</text>
 						</view>
-						<text class="title">{{ item.nameZh || item.name }}</text>
+						<text class="title">{{ eventName(item) }}</text>
 						<view class="tags" v-if="item.location">
 							<text class="tag">{{ placeName(item.location) }}</text>
 						</view>
@@ -70,7 +70,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { formatShort, truncate, stationName, placeZh } from '@/utils/format.js'
+import { formatShort, truncate, stationName, placeZh, eventName as eventNameOf } from '@/utils/format.js'
 
 /**
  * 首页底部的「近期活动」板块。
@@ -114,6 +114,10 @@ export default {
 
 	methods: {
 		formatShort,
+
+		eventName(ev) {
+			return eventNameOf(ev)
+		},
 
 		/**
 		 * 活动地点：可能是空间站、发射场或机构，两种表都试一遍。

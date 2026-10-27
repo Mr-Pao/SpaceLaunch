@@ -33,7 +33,7 @@
 						<text class="tag">{{ typeText }}</text>
 						<text class="tag tag-loc" v-if="ev.location">{{ placeName(ev.location) }}</text>
 					</view>
-					<text class="hero-name">{{ ev.nameZh || ev.name }}</text>
+					<text class="hero-name">{{ eventName(ev) }}</text>
 					<text class="hero-en" v-if="ev.nameZh && ev.name">{{ ev.name }}</text>
 				</view>
 			</view>
@@ -75,7 +75,7 @@
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
 // 导入改名：模板只能看见实例成员，想直接调就得在 methods 里挂一层
-import { formatDateTime, relativeTime, eventTypeName as eventTypeNameOf, stationName, placeZh } from '@/utils/format.js'
+import { formatDateTime, relativeTime, eventTypeName as eventTypeNameOf, stationName, placeZh, eventName as eventNameOf } from '@/utils/format.js'
 
 /**
  * 活动详情页。
@@ -136,6 +136,10 @@ export default {
 	},
 
 	methods: {
+		eventName(ev) {
+			return eventNameOf(ev)
+		},
+
 		// 活动地点可能是空间站或发射场，两张表都试，未命中保留原文
 		placeName(s) {
 			if (!s) return ''
