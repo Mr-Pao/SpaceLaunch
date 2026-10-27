@@ -95,7 +95,14 @@ const FILES = {
 	// 图库：CI 侧从发射列表顺路压好的「有图的发射」清单（缩略图 +
 	// 署名 + 时间），按 net 倒序。这是**索引 + 第 0 片**，
 	// 后面还有 gallery/1.json、gallery/2.json … 用 galleryChunk() 按需拉
-	gallery: 'gallery.json'
+	gallery: 'gallery.json',
+	// 航天器/卫星百科（GCAT 活跃子集，分片）。satellites.json 是**索引 + 第 0 片**
+	// （带 chunks/chunkSize/total），后面 satellites/1.json … 用 satelliteChunk() 按需拉
+	satellites: 'satellites.json',
+	// 全球在轨资产（GCAT 聚合统计）：total + byState/byOrbit/byDecade，无逐条 list
+	orbitStats: 'orbit-stats.json',
+	// 在轨解体 / 再入事件流（GCAT 已终结子集，按再入日期排序）
+	debrisEvents: 'debris-events.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"
@@ -127,7 +134,12 @@ const SOFT_TTL = {
 	videos: 6 * 60 * 60 * 1000,
 	// 图库每小时都在补图，6 小时太久 —— 一份索引才几十 KB，
 	// 超过 1 小时就顺手在后台换一次，页面不至于长期显示旧张数
-	gallery: 60 * 60 * 1000
+	gallery: 60 * 60 * 1000,
+	// GCAT 季度才更新一次，但数据集较大（satellites 数百条 × 多片），
+	// 与 launchers 同待遇：12 小时软 TTL，别每次进页都白拉
+	satellites: 12 * 60 * 60 * 1000,
+	orbitStats: 12 * 60 * 60 * 1000,
+	debrisEvents: 12 * 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。
@@ -148,6 +160,11 @@ const HARD_TTL = {
 	timelines: 2 * 24 * 60 * 60 * 1000,
 	videos: 2 * 24 * 60 * 60 * 1000,
 	gallery: 3 * 24 * 60 * 60 * 1000,
+	// GCAT 三数据集：satellites 单份几十～上百 KB 且多片，硬 TTL 设 2 天；
+	// 聚合统计与事件流极轻量，3 天足够
+	satellites: 2 * 24 * 60 * 60 * 1000,
+	orbitStats: 3 * 24 * 60 * 60 * 1000,
+	debrisEvents: 3 * 24 * 60 * 60 * 1000,
 	// 往年今日一天换一次，昨天的副本没有价值
 	onthisday: 12 * 60 * 60 * 1000
 }
@@ -209,7 +226,7 @@ function readStorage(name) {
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
 // onthisday 排在最后丢：它只有几 KB，首页首屏要用，丢了反而要等网络
-const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday', 'spacestations', 'expeditions', 'dockings']
+const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'satellites', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday', 'spacestations', 'expeditions', 'dockings']
 
 function writeStorage(name, data) {
 	try {
@@ -284,6 +301,11 @@ function fetchDataset(name) {
 			chunks: body.chunks,
 			chunkSize: body.chunkSize,
 			launchTotal: body.launchTotal,
+			// satellites 用 total（活跃总数），orbitStats 用 total + 三个聚合数组
+			total: body.total,
+			byState: body.byState,
+			byOrbit: body.byOrbit,
+			byDecade: body.byDecade,
 			list: body.list,
 			savedAt: Date.now()
 		}
@@ -374,13 +396,20 @@ function refreshInBackground(name, oldGeneratedAt, onUpdate) {
 function decorate(data, stale) {
 	return {
 		list: data.list,
-		count: typeof data.count === 'number' ? data.count : data.list.length,
-		served: data.served || data.list.length,
+		count: typeof data.count === 'number'
+			? data.count
+			: (typeof data.total === 'number' ? data.total : (data.list ? data.list.length : 0)),
+		served: data.served || (data.list ? data.list.length : 0),
 		generatedAt: data.generatedAt || '',
 		// 只有 gallery 会带这三个，其它数据集拿到的是兜底值
 		chunks: data.chunks || 1,
 		chunkSize: data.chunkSize || 0,
 		launchTotal: data.launchTotal || 0,
+		// satellites：活跃总数；orbitStats：聚合统计（无 list）
+		total: data.total || 0,
+		byState: data.byState || [],
+		byOrbit: data.byOrbit || [],
+		byDecade: data.byDecade || [],
 		stale: !!stale
 	}
 }
@@ -433,6 +462,44 @@ export function galleryChunk(i) {
 /** 丢掉已加载的分片（图库下拉刷新整库时用） */
 export function clearChunks() {
 	Object.keys(chunkMemory).forEach((k) => delete chunkMemory[k])
+}
+
+// 卫星分片与图库分片索引独立，不能共用同一张内存表（否则第 i 片互相覆盖）
+const satChunkMemory = {}
+const satChunkInflight = {}
+
+/**
+ * 拉卫星百科的第 i 片（i 从 1 开始）。第 0 片就是 satellites 数据集本身
+ * （索引文件带 list），不要再拉一遍。结构完全对齐 galleryChunk。
+ *
+ * @param {number} i 分片号
+ * @returns {Promise<{list:Array, chunk:number, count:number, chunks:number}>}
+ */
+export function satelliteChunk(i) {
+	i = Number(i) || 0
+	if (i <= 0) return Promise.resolve({ list: [], chunk: 0, count: 0, chunks: 1 })
+	if (satChunkMemory[i]) return Promise.resolve(satChunkMemory[i])
+	if (satChunkInflight[i]) return satChunkInflight[i]
+
+	const url = CDN_BASE + '/satellites/' + i + '.json?t=' + Math.floor(Date.now() / 3600000)
+
+	const p = request(url).then((body) => {
+		const d = {
+			list: body.list || [],
+			chunk: body.chunk != null ? body.chunk : i,
+			count: body.count || 0,
+			chunks: body.chunks || 0
+		}
+		satChunkMemory[i] = d
+		return d
+	})
+
+	satChunkInflight[i] = p
+	const clear = () => {
+		if (satChunkInflight[i] === p) delete satChunkInflight[i]
+	}
+	p.then(clear, clear)
+	return p
 }
 
 /**
@@ -560,5 +627,6 @@ export default {
 	clear,
 	galleryChunk,
 	clearChunks,
+	satelliteChunk,
 	CDN_BASE
 }

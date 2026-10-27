@@ -152,6 +152,13 @@
 				<view class="about-divider"></view>
 
 				<view class="about-row">
+					<text class="about-label">卫星编目</text>
+					<text class="about-value">GCAT</text>
+				</view>
+
+				<view class="about-divider"></view>
+
+				<view class="about-row">
 					<text class="about-label">同步频率</text>
 					<text class="about-value">每日自动</text>
 				</view>
@@ -170,7 +177,7 @@
 				</button>
 			</view>
 
-			<text class="about-note">发射与活动数据来自 Launch Library 2 API，活动信息以官方发布为准。</text>
+			<text class="about-note">发射与活动数据来自 Launch Library 2 API，活动信息以官方发布为准。卫星编目与在轨资产统计数据来自 GCAT (J. McDowell, planet4589.org/space/gcat)，采用 CC-BY 授权。</text>
 		</view>
 
 		<view class="footer">
@@ -205,11 +212,14 @@ export default {
 			favs: [],
 			rems: [],
 			rockets: [],
-			// 只留两个入口：空间站和机构都属于「点进去看一眼」的内容，
-			// 各自详情页也有反向链接，从「我的」进不划算，反而把这一页拉长
+			// 探索区：发射统计 / 图库是老入口；卫星百科 / 全球在轨 / 解体再入
+			// 来自 GCAT 季度编目（CC-BY），各详情页都带 GCAT 署名
 			entries: [
 				{ icon: '📊', name: '数据统计', desc: '历年发射量', url: '/pages/stats/stats' },
-				{ icon: '🖼️', name: '图库', desc: '发射现场照片', url: '/pages/gallery/gallery', tab: true }
+				{ icon: '🖼️', name: '图库', desc: '发射现场照片', url: '/pages/gallery/gallery', tab: true },
+				{ icon: '🛰️', name: '卫星百科', desc: '在轨航天器编目', url: '/pages/catalog/catalog' },
+				{ icon: '🌍', name: '全球在轨', desc: '在轨资产统计', url: '/pages/orbit/orbit' },
+				{ icon: '💥', name: '解体 / 再入', desc: '太空事件流', url: '/pages/debris/debris' }
 			]
 		}
 	},

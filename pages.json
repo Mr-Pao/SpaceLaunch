@@ -136,6 +136,25 @@
 			"style": {
 				"navigationBarTitleText": "图片库"
 			}
+		},
+		{
+			"path": "pages/catalog/catalog",
+			"style": {
+				"navigationBarTitleText": "航天器 / 卫星百科",
+				"onReachBottomDistance": 400
+			}
+		},
+		{
+			"path": "pages/orbit/orbit",
+			"style": {
+				"navigationBarTitleText": "全球在轨资产"
+			}
+		},
+		{
+			"path": "pages/debris/debris",
+			"style": {
+				"navigationBarTitleText": "解体 / 再入事件"
+			}
 		}
 	],
 	"tabBar": {
