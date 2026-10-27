@@ -72,6 +72,49 @@ async function readCosJson(key) {
 }
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
+/**
+ * 型号图兜底。
+ *
+ * LL2 的型号库里有一批现役型号根本没有 image_url（新构型、冷门型号，
+ * 量产前的 Starship、Gravity-2、Nebula-1 都在里面），前端只能显示占位火箭。
+ *
+ * 但只要有发射记录，发射快照里每条都带现场图 —— 用它最近一次发射的图填上，
+ * 比一个空占位有信息量得多。必须在 mirrorImages 之前跑：补进来的是原始 URL，
+ * 还要走一遍镜像才会变成 COS 地址。
+ */
+async function fillLauncherImages(list, readCosJson) {
+	const need = list.filter((x) => !x.image)
+	if (!need.length) return
+
+	const ids = new Set(need.map((x) => String(x.id)))
+	const snaps = await Promise.all([
+		readCosJson('space-data/launches-upcoming.json').catch(() => null),
+		readCosJson('space-data/launches-previous.json').catch(() => null)
+	])
+
+	// upcoming 先扫、previous 后扫，同一个 id 只取第一条 —— 也就是时间上最近的那次发射
+	const map = new Map()
+	for (const snap of snaps) {
+		for (const l of (snap && snap.list) || []) {
+			const cid = l.rocket && l.rocket.configuration && l.rocket.configuration.id
+			if (!cid) continue
+			const k = String(cid)
+			if (!ids.has(k) || map.has(k) || !l.image) continue
+			map.set(k, l.image)
+		}
+	}
+
+	let filled = 0
+	for (const x of need) {
+		const url = map.get(String(x.id))
+		if (url) {
+			x.image = url
+			filled++
+		}
+	}
+	console.log(`  · 型号补图 ${filled}/${need.length}`)
+}
+
 const DATASETS = {
 	/**
 	 * 发射工位（pad）全量：/pads/ 共 251 条，**必须翻页**。
@@ -234,6 +277,8 @@ const DATASETS = {
 		file: 'launchers.json',
 		cacheControl: 'public, max-age=86400',
 		images: ['image'],
+		// 型号库里缺图的，用该型号最近一次发射的现场图补
+		fillImages: fillLauncherImages,
 		// 型号简介回填中文：471 条，首轮 20 万字符，之后按原文哈希零命中。
 		// 详情页「简介」卡片只有这一段正文，不翻就永远是英文段落。
 		localize: localizeLaunchers,
@@ -537,6 +582,15 @@ async function runDataset(name) {
 			await enrichRockets(list, readCosJson)
 		} catch (e) {
 			console.warn(`  ! 火箭参数回填失败（详情页退化为只有型号名）: ${e.message}`)
+		}
+	}
+
+	// 型号图兜底：必须在 mirrorImages 之前，补进来的原始 URL 还要走一遍镜像
+	if (ds.fillImages) {
+		try {
+			await ds.fillImages(list, readCosJson)
+		} catch (e) {
+			console.warn(`  ! 型号补图失败（不影响其它字段）: ${e.message}`)
 		}
 	}
 
