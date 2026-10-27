@@ -58,9 +58,11 @@
 			<view class="hud-line"></view>
 		</view>
 
-		<!-- 墙下方的操作区：提示紧贴墙面，入口在它下面 -->
+		<!-- 墙的注解：紧贴图片墙下方，只说明怎么用，不掺别的入口 -->
+		<text class="wall-tip" v-if="!loading && rowsA.length">点任意一张查看发射详情</text>
+
+		<!-- 独立入口：和注解分开，各占一行 -->
 		<view class="dock" v-if="!loading && rowsA.length">
-			<text class="dock-tip">点任意一张查看发射详情</text>
 			<view class="all-btn" hover-class="all-btn-hover" @click="goAll">
 				<text class="all-text">看全部</text>
 				<text class="all-num">{{ total }}</text>
@@ -420,24 +422,23 @@ export default {
 }
 
 /* ---- 底部悬浮入口 ---- */
-/* 墙下方的操作区：不再 fixed 悬浮，跟着墙一起排在 tabBar 之上 */
-.dock {
-	position: relative;
-	z-index: 20;
+/* 墙的注解：紧贴墙面的一条说明，轻呼吸，不抢画面 */
+.wall-tip {
 	flex-shrink: 0;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	padding: 26rpx 0 0;
-}
-
-/* 点图提示：轻呼吸，不抢画面但看得见 */
-.dock-tip {
-	margin-bottom: 20rpx;
-	color: rgba(200, 214, 232, 0.62);
+	padding: 22rpx 0 0;
+	text-align: center;
+	color: rgba(200, 214, 232, 0.6);
 	font-size: 21rpx;
 	letter-spacing: 1rpx;
 	animation: tipBreath 3.4s ease-in-out infinite;
+}
+
+/* 独立入口行 */
+.dock {
+	flex-shrink: 0;
+	display: flex;
+	justify-content: center;
+	padding: 22rpx 0 0;
 }
 
 @keyframes tipBreath {

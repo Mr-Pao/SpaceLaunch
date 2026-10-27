@@ -75,8 +75,9 @@ ${css}
       <view class="hud-line"></view>
     </view>
 
+    <text class="wall-tip">点任意一张查看发射详情</text>
+
     <view class="dock">
-      <text class="dock-tip">点任意一张查看发射详情</text>
       <view class="all-btn">
         <text class="all-text">看全部</text>
         <text class="all-num">${total}</text>
