@@ -1090,6 +1090,7 @@ function byNetDesc(a, b) {
 /* 分享 / 收藏：磨砂胶囊，和「图片库」按钮同一套语言 */
 .hero-acts {
 	display: flex;
+	justify-content: flex-end;
 	margin-top: 16rpx;
 	/* .hero-body 整体屏蔽了事件，这里要单独收回来 —— 它是真要点的 */
 	pointer-events: auto;
@@ -1114,6 +1115,11 @@ function byNetDesc(a, b) {
 /* 原生 button 自带边框和默认横向留白，不清掉胶囊会变成双层 */
 .act-pill::after {
 	border: none;
+}
+
+/* 右对齐时最后一颗不能留右边距，否则整体往里缩 16rpx */
+.act-pill:last-child {
+	margin-right: 0;
 }
 
 .act-pill.on {
