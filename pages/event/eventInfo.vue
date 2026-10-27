@@ -51,7 +51,7 @@
 					</view>
 					<view class="row" v-if="ev.location">
 						<text class="label">地点</text>
-						<text class="value">{{ ev.location }}</text>
+						<text class="value">{{ placeName(ev.location) }}</text>
 					</view>
 					<view class="row" v-if="ev.type && ev.type.name">
 						<text class="label">类型</text>
@@ -75,7 +75,7 @@
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
 // 导入改名：模板只能看见实例成员，想直接调就得在 methods 里挂一层
-import { formatDateTime, relativeTime, eventTypeName as eventTypeNameOf, stationName, placeZh, eventName as eventNameOf } from '@/utils/format.js'
+import { formatDateTime, relativeTime, eventTypeName as eventTypeNameOf, eventPlace, eventName as eventNameOf } from '@/utils/format.js'
 
 /**
  * 活动详情页。
@@ -140,12 +140,9 @@ export default {
 			return eventNameOf(ev)
 		},
 
-		// 活动地点可能是空间站或发射场，两张表都试，未命中保留原文
+		// 活动地点可能是空间站、天体轨道或发射场，三种表统一在 eventPlace 里查
 		placeName(s) {
-			if (!s) return ''
-			const st = stationName(s)
-			if (st !== s) return st
-			return placeZh(s) || s
+			return eventPlace(s)
 		},
 		// 模板作用域：这三个必须在实例上
 		eventTypeName(v) {

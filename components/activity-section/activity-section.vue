@@ -70,7 +70,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { formatShort, truncate, stationName, placeZh, eventName as eventNameOf } from '@/utils/format.js'
+import { formatShort, truncate, eventPlace, eventName as eventNameOf } from '@/utils/format.js'
 
 /**
  * 首页底部的「近期活动」板块。
@@ -120,14 +120,11 @@ export default {
 		},
 
 		/**
-		 * 活动地点：可能是空间站、发射场或机构，两种表都试一遍。
+		 * 活动地点：空间站 / 天体轨道 / 发射场三张表统一在 eventPlace 里查。
 		 * 都没命中原样返回 —— 宁可不翻，也别把地点翻错。
 		 */
 		placeName(s) {
-			if (!s) return ''
-			const st = stationName(s)
-			if (st !== s) return st
-			return placeZh(s) || s
+			return eventPlace(s)
 		},
 
 		async load() {

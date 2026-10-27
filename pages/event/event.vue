@@ -77,7 +77,7 @@
 
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
-import { formatShort, truncate, stationName, placeZh, eventName as eventNameOf } from '@/utils/format.js'
+import { formatShort, truncate, eventPlace, eventName as eventNameOf } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
 
@@ -118,12 +118,9 @@ export default {
 			return eventNameOf(ev)
 		},
 
-		// 活动地点可能是空间站或发射场，两张表都试，未命中保留原文
+		// 活动地点可能是空间站、天体轨道或发射场，三种表统一在 eventPlace 里查
 		placeName(s) {
-			if (!s) return ''
-			const st = stationName(s)
-			if (st !== s) return st
-			return placeZh(s) || s
+			return eventPlace(s)
 		},
 		formatShort,
 

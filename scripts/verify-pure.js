@@ -177,6 +177,14 @@ async function testFormat() {
 	eq(f.stationName('International Space Station'), '国际空间站', '空间站：表内直译')
 	eq(f.stationName('Salyut 7'), '礼炮七号', '空间站：Salyut 走规则推导')
 	eq(f.stationName('Unknown Station'), 'Unknown Station', '空间站：未收录保留原文')
+
+	// 活动地点三类来源都要认：空间站 / 天体轨道 / 发射场
+	eq(f.eventPlace('Mercury'), '水星', '活动地点：天体名')
+	eq(f.eventPlace('Ganymede Orbit'), '木卫三轨道', '活动地点：天体轨道')
+	eq(f.eventPlace('International Space Station'), '国际空间站', '活动地点：空间站')
+	eq(f.eventPlace('Cape Canaveral SFS, FL, USA'), '卡纳维拉尔角', '活动地点：发射场')
+	eq(f.eventPlace('Unknown Place'), 'Unknown Place', '活动地点：未收录保留原文')
+	eq(f.eventTypeName('Orbital Insertion'), '入轨', '活动类型：Orbital Insertion 是入轨，不是轨道插入')
 	eq(f.rocketName({ name: 'Atlas V 551' }), '宇宙神 5 号 551', '长后缀：Atlas V 551 归到宇宙神 5 号并保留配置代号')
 	eq(f.rocketName({ name: 'Atlas V N22' }), '宇宙神 5 号', '长后缀：精确 key 优先于前缀匹配')
 	eq(

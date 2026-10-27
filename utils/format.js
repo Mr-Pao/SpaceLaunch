@@ -716,10 +716,24 @@ const DEST_ZH = {
 	'lunar surface': '月面',
 	mars: '火星',
 	'mars orbit': '火星轨道',
+	mercury: '水星',
+	'mercury orbit': '水星轨道',
+	venus: '金星',
+	'venus orbit': '金星轨道',
+	jupiter: '木星',
+	'jupiter orbit': '木星轨道',
+	saturn: '土星',
+	'saturn orbit': '土星轨道',
+	ganymede: '木卫三',
+	'ganymede orbit': '木卫三轨道',
+	europa: '木卫二',
+	'titan': '土卫六',
 	'sun-earth l1': '日地 L1 点',
 	'sun-earth l2': '日地 L2 点',
 	'trans-lunar injection': '地月转移轨道',
-	'low earth orbit': '近地轨道'
+	'low earth orbit': '近地轨道',
+	'suborbital trajectory': '亚轨道',
+	'heliocentric orbit': '日心轨道'
 }
 
 export function craftTypeName(value) {
@@ -748,7 +762,7 @@ const EVENT_TYPE_ZH = {
 	undocking: '分离',
 	landing: '着陆',
 	launch: '发射',
-	'orbital insertion': '轨道插入',
+	'orbital insertion': '入轨',
 	'spacecraft landing': '航天器着陆',
 	'spacecraft docking': '航天器对接',
 	'spacecraft undocking': '航天器分离',
@@ -770,6 +784,28 @@ export function destName(value) {
 	const s = zhValue(value)
 	if (!s) return ''
 	return DEST_ZH[s.toLowerCase()] || ORBIT_ZH[s.toLowerCase()] || s
+}
+
+/**
+ * 活动地点中文化。
+ *
+ * 活动的 location 是自由字符串，实测有三类来源：
+ *   空间站名（International Space Station）
+ *   天体 / 轨道（Mercury、Ganymede Orbit）
+ *   发射场（Cape Canaveral SFS, FL, USA）
+ * 三张表依次试，都不中就保留原文 —— 宁可显示英文，也不猜着翻。
+ *
+ * 之前事件页、活动列表、近期活动卡各写了一份 placeName，
+ * 都只查了「空间站 + 场地」，天体类的 Mercury 一条都认不出，所以统一到这里。
+ */
+export function eventPlace(loc) {
+	const s = String(loc == null ? '' : loc).trim()
+	if (!s) return ''
+	const st = stationName(s)
+	if (st !== s) return st
+	const dest = destName(s)
+	if (dest !== s) return dest
+	return placeZh(s) || s
 }
 
 /**
