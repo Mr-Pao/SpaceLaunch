@@ -93,20 +93,22 @@ function hanCount(s) {
 function inspect(en, zh) {
 	if (!zh || !zh.trim()) return null // 没译文不算错，前端会回退英文
 
-	// zh === en 多半是任务代号（NROL-195 / USSF-432 / Metop-SG B1），本来就不该翻。
-	// 只有看着像句子的（4 个词以上）才算「漏翻」。
+	// zh === en 多半是任务代号（NROL-195 / USSF-432 / OSE HS-01 & 02），本来就不该翻。
+	// 判定「像句子」要同时满足：4 个词以上，且含小写字母 —— 全大写的都是代号。
 	if (en === zh) {
 		const words = String(en).trim().split(/\s+/).length
-		if (words >= 4) return { level: 'error', reason: '未翻译（译文=原文）' }
+		if (words >= 4 && /[a-z]/.test(en)) return { level: 'error', reason: '未翻译（译文=原文）' }
 		return null
 	}
 
 	const hz = hanCount(zh)
 	// 短词（型号名、任务代号）本来就该留英文，只对长文本要求必须中文化
 	if (hz === 0 && en.length > 24) return { level: 'error', reason: '整段未翻译' }
-	// 中文占比过低：长句里只剩几个汉字，多半是翻了一半
+	// 中文占比过低：长句里只剩几个汉字。但专名密集的句子天然偏低
+	// （"Booster 推出了 Crew-1、Crew-2 和 IXPE"），汉字少到个位数才算真没翻完
 	if (en.length > 60 && hz > 0 && hz / en.length < 0.12) {
-		return { level: 'warn', reason: `中文占比过低（${hz} 字 / 原文 ${en.length} 字符）` }
+		const level = hz < 6 ? 'warn' : 'info'
+		return { level, reason: `中文占比偏低（${hz} 字 / 原文 ${en.length} 字符）` }
 	}
 
 	for (const pair of BAD_TERMS) {
