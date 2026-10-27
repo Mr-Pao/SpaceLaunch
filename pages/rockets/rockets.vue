@@ -1,15 +1,14 @@
 <template>
 	<view class="page">
 		<star-field />
-		<view class="nav-row" :class="{ solid: navSolid }" :style="{ paddingTop: statusBarH + 'px' }">
-			<!-- 连点 5 次呼出展示开关（静默切换）：入口隐藏，普通用户与审核不可见 -->
-			<text class="nav-title" @click="onTitleTap">火箭资料库</text>
-		</view>
+		<!-- 标题已去掉，只留一条等高顶栏：滚动时当毛玻璃遮罩。
+		     审核视角暗门改挂在榜单眉标上（连点 5 次） -->
+		<view class="nav-row" :class="{ solid: navSolid }" :style="{ paddingTop: statusBarH + 'px' }"></view>
 
 		<!-- 榜单头部：一句话说清「这是什么榜」，顺手给三个横向对比的极值 -->
 		<view class="hero">
 			<view class="hero-top">
-				<text class="hero-kicker">SPACEDALLY / LAUNCH INDEX</text>
+				<text class="hero-kicker" @click="onTitleTap">SPACEDALLY / LAUNCH INDEX</text>
 				<text class="hero-state">在役</text>
 			</view>
 
@@ -270,16 +269,33 @@ export default {
 		 * 同名只保留综合分最高的那条，其余构型在详情页的「同系列构型」里能看到。
 		 */
 		pool() {
-			const seen = new Map()
+			// 先按型号名分组，再在组内挑代表：分数最高者上榜
+			const groups = new Map()
 			for (const x of this.all) {
 				if (!x.active) continue
 				if (this.region !== 'all' && x.region !== this.region) continue
 
 				const k = x.name || x.zhName
-				const cur = seen.get(k)
-				if (!cur || x.score > cur.score) seen.set(k, x)
+				const arr = groups.get(k)
+				if (arr) arr.push(x)
+				else groups.set(k, [x])
 			}
-			return [...seen.values()]
+
+			const out = []
+			for (const arr of groups.values()) {
+				let best = arr[0]
+				for (const x of arr) if (x.score > best.score) best = x
+
+				// 最高分那条常常是数据最新、但还没镜像图的构型（Starship 就是），
+				// 从同名的其它构型借一张，别让榜首空着
+				if (!best.image) {
+					const withImg = arr.find((x) => x.image)
+					if (withImg) best = { ...best, image: withImg.image }
+				}
+
+				out.push(best)
+			}
+			return out
 		},
 
 		currentSort() {
