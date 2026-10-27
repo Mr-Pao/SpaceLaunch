@@ -1,16 +1,13 @@
 <template>
 	<view class="page">
-		<nav-bar :solid="true" title="图库" placeholder />
-
-		<!-- 四行横向缓慢漂流：方向交替、四行速度错开。
-		     图库从「瀑布流」改成这样，是为了打开就有动静 ——
-		     静止的网格再密也只是墙，会动的才像窗。 -->
+		<!-- 满屏漂流墙：不留导航条，图从屏幕最上沿开始，四面渐隐融进背景 -->
 		<view class="stage" v-if="!loading && rowsA.length">
 			<view class="bands">
 				<view class="band">
 					<view class="track t1">
 						<view class="cell wide" v-for="(img, i) in row1" :key="'a' + i" @click="preview(0, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<view class="cell-veil"></view>
 						</view>
 					</view>
 				</view>
@@ -19,6 +16,7 @@
 					<view class="track t2">
 						<view class="cell tall" v-for="(img, i) in row2" :key="'b' + i" @click="preview(1, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<view class="cell-veil"></view>
 						</view>
 					</view>
 				</view>
@@ -27,6 +25,7 @@
 					<view class="track t3">
 						<view class="cell wide" v-for="(img, i) in row3" :key="'c' + i" @click="preview(2, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<view class="cell-veil"></view>
 						</view>
 					</view>
 				</view>
@@ -35,23 +34,32 @@
 					<view class="track t4">
 						<view class="cell tall" v-for="(img, i) in row4" :key="'d' + i" @click="preview(3, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill"></image>
+							<view class="cell-veil"></view>
 						</view>
 					</view>
 				</view>
-
-				<!-- 左右边缘渐隐：图从两侧淡入淡出，比硬切好看，也暗示「还在滚」 -->
-				<view class="edge left"></view>
-				<view class="edge right"></view>
 			</view>
 
-			<view class="foot">
-				<text class="foot-count"><text class="foot-num">{{ total }}</text> 张在库里</text>
-				<text class="foot-tip">点任意一张看大图</text>
-			</view>
+			<!-- 四面渐隐：左右让图淡入淡出，上下把墙压进背景，不给硬边 -->
+			<view class="fade top"></view>
+			<view class="fade bottom"></view>
+			<view class="fade left"></view>
+			<view class="fade right"></view>
+		</view>
 
-			<!-- 横滚墙只能「看着流」，翻不到 1957 年。想看全就去全量页 -->
+		<!-- HUD：不叫标题，只贴一行极轻的标识，不占任何布局高度 -->
+		<view class="hud" :style="{ top: statusBarH + 10 + 'px' }">
+			<view class="hud-dot"></view>
+			<text class="hud-kicker">SPACE GALLERY</text>
+			<text class="hud-sep">/</text>
+			<text class="hud-count">{{ total }} 张</text>
+		</view>
+
+		<!-- 底部悬浮入口：半透明胶囊浮在墙上，不切断画面 -->
+		<view class="dock" v-if="!loading && rowsA.length">
 			<view class="all-btn" hover-class="all-btn-hover" @click="goAll">
-				<text class="all-text">看全部 {{ total }} 张</text>
+				<text class="all-text">看全部</text>
+				<text class="all-num">{{ total }}</text>
 				<text class="all-arrow">›</text>
 			</view>
 		</view>
@@ -65,8 +73,6 @@
 			<text class="empty-text">还没有图片</text>
 			<text class="empty-sub">历史图片正在由后台逐批补齐，过几个小时再来看看</text>
 		</view>
-
-		<!-- 点图直接进详情页的图片优先态，这里不再放大图弹层 -->
 	</view>
 </template>
 
@@ -85,10 +91,14 @@
  *
  * 为什么是 4 行而不是 3 行：三行 132px 高的大图铺不满一屏，上下各留一大块空白，
  * 看着像「三个相框」而不是「墙」。4 行、行高交替，才真的密不透风。
+ *
+ * 为什么不要标题：这一页要的是「一扇窗」而不是「一个列表页」，
+ * 顶部只留一行 HUD 标识（不占布局），墙面从状态栏下一直铺到底部 tabBar。
  */
 import spaceData from '@/utils/data.js'
 import { setAlbum } from '@/utils/album.js'
 import { syncTabBar } from '@/utils/tabbar.js'
+import navMixin from '@/utils/nav-mixin.js'
 
 // 每行取多少张（复制后翻倍就是这个数 ×2 的节点数）
 const PER_ROW = 12
@@ -96,6 +106,8 @@ const PER_ROW = 12
 const ROWS = 4
 
 export default {
+	mixins: [navMixin],
+
 	data() {
 		return {
 			loading: true,
@@ -182,32 +194,37 @@ export default {
 
 <style lang="scss" scoped>
 .page {
+	position: relative;
 	min-height: 100vh;
-	background: #0a0e17;
 	display: flex;
 	flex-direction: column;
 	/* 底部给悬浮胶囊 tabBar 让位 */
 	padding-bottom: 200rpx;
 	box-sizing: border-box;
-}
-
-.stage {
-	flex: 1;
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-}
-
-/* ---- 三行横滚 ---- */
-.bands {
-	position: relative;
 	overflow: hidden;
-	padding: 20rpx 0;
+	/* 冷色光晕压在黑底上：画面之外还有一层空间，而不是纯黑边框 */
+	background: radial-gradient(120% 50% at 50% 0%, rgba(56, 189, 248, 0.14) 0%, rgba(56, 189, 248, 0) 62%),
+		radial-gradient(90% 45% at 0% 100%, rgba(88, 120, 255, 0.1) 0%, rgba(88, 120, 255, 0) 60%),
+		#070b12;
+}
+
+/* 墙面铺满剩余高度，不再上下居中留空 */
+.stage {
+	position: relative;
+	flex: 1;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+}
+
+.bands {
+	width: 100%;
+	padding: 0;
 }
 
 .band {
 	overflow: hidden;
-	margin-bottom: 14rpx;
+	margin-bottom: 10rpx;
 }
 
 .band:last-child {
@@ -258,11 +275,12 @@ export default {
 }
 
 .cell {
+	position: relative;
 	flex-shrink: 0;
-	margin-right: 14rpx;
-	border-radius: 12rpx;
+	margin-right: 10rpx;
+	border-radius: 10rpx;
 	overflow: hidden;
-	background: #131a26;
+	background: #101722;
 }
 
 /* 行高交替：两「宽」两「矮」，四行叠起来才有层次；
@@ -283,75 +301,138 @@ export default {
 	height: 100%;
 }
 
-/* 左右渐隐：80rpx 刚好盖住一格的三分之一，看得到「有图进来」但读不出细节 */
-.edge {
+/* 每格底部压一点暗：墙面整体更沉，也压住亮图的刺眼感 */
+.cell-veil {
 	position: absolute;
-	top: 0;
+	left: 0;
+	right: 0;
 	bottom: 0;
-	width: 90rpx;
+	height: 46%;
+	background: linear-gradient(to top, rgba(4, 8, 14, 0.34) 0%, rgba(4, 8, 14, 0) 100%);
+	pointer-events: none;
+}
+
+/* ---- 四面渐隐 ---- */
+.fade {
+	position: absolute;
 	z-index: 5;
 	pointer-events: none;
 }
 
-.edge.left {
+/* 顶部压得最重：状态栏的时间和电量要能看清 */
+.fade.top {
 	left: 0;
-	background: linear-gradient(to right, #0a0e17, rgba(10, 14, 23, 0));
-}
-
-.edge.right {
 	right: 0;
-	background: linear-gradient(to left, #0a0e17, rgba(10, 14, 23, 0));
+	top: 0;
+	height: 26%;
+	background: linear-gradient(to bottom, rgba(7, 11, 18, 0.94) 0%, rgba(7, 11, 18, 0.5) 48%, rgba(7, 11, 18, 0) 100%);
 }
 
-/* ---- 底部说明 ---- */
-.foot {
+.fade.bottom {
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 30%;
+	background: linear-gradient(to top, rgba(7, 11, 18, 0.96) 0%, rgba(7, 11, 18, 0.52) 48%, rgba(7, 11, 18, 0) 100%);
+}
+
+/* 左右各 90rpx 刚好盖住一格的三分之一，看得到「有图进来」但读不出细节 */
+.fade.left {
+	top: 0;
+	bottom: 0;
+	left: 0;
+	width: 90rpx;
+	background: linear-gradient(to right, rgba(7, 11, 18, 0.92) 0%, rgba(7, 11, 18, 0) 100%);
+}
+
+.fade.right {
+	top: 0;
+	bottom: 0;
+	right: 0;
+	width: 90rpx;
+	background: linear-gradient(to left, rgba(7, 11, 18, 0.92) 0%, rgba(7, 11, 18, 0) 100%);
+}
+
+/* ---- HUD：不占布局的顶部标识 ---- */
+.hud {
+	position: fixed;
+	left: 32rpx;
+	z-index: 20;
 	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	padding: 30rpx 40rpx 0;
+	align-items: center;
+	pointer-events: none;
 }
 
-.foot-count {
-	color: #55637a;
-	font-size: 22rpx;
+.hud-dot {
+	width: 10rpx;
+	height: 10rpx;
+	margin-right: 12rpx;
+	border-radius: 50%;
+	background: #38bdf8;
+	box-shadow: 0 0 14rpx rgba(56, 189, 248, 0.9);
 }
 
-.foot-num {
-	color: #38bdf8;
-	font-size: 26rpx;
-	font-weight: 600;
+.hud-kicker {
+	color: #cfe6ff;
+	font-size: 20rpx;
+	letter-spacing: 3rpx;
 }
 
-.foot-tip {
+.hud-sep {
+	margin: 0 10rpx;
+	color: #3d4a5c;
+	font-size: 18rpx;
+}
+
+.hud-count {
 	color: #7d8ba0;
-	font-size: 21rpx;
+	font-size: 20rpx;
 }
 
-/* ---- 看全部 ---- */
+/* ---- 底部悬浮入口 ---- */
+.dock {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 210rpx;
+	z-index: 20;
+	display: flex;
+	justify-content: center;
+	pointer-events: none;
+}
+
 .all-btn {
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	align-self: center;
-	margin-top: 24rpx;
-	padding: 16rpx 34rpx;
+	padding: 16rpx 32rpx;
 	border-radius: 999rpx;
-	border: 1rpx solid #1e2b3d;
-	background: rgba(56, 189, 248, 0.06);
+	background: rgba(10, 16, 26, 0.55);
+	border: 1rpx solid rgba(56, 189, 248, 0.26);
+	-webkit-backdrop-filter: blur(24rpx) saturate(150%);
+	backdrop-filter: blur(24rpx) saturate(150%);
+	box-shadow: 0 14rpx 40rpx rgba(0, 0, 0, 0.45);
+	pointer-events: auto;
 }
 
 .all-btn-hover {
-	background: rgba(56, 189, 248, 0.16);
+	background: rgba(18, 30, 46, 0.7);
 }
 
 .all-text {
-	color: #38bdf8;
-	font-size: 25rpx;
+	color: #cfe6ff;
+	font-size: 24rpx;
 	letter-spacing: 1rpx;
 }
 
+.all-num {
+	margin-left: 10rpx;
+	color: #38bdf8;
+	font-size: 25rpx;
+	font-weight: 600;
+}
+
 .all-arrow {
-	margin-left: 8rpx;
+	margin-left: 10rpx;
 	color: #38bdf8;
 	font-size: 30rpx;
 	line-height: 1;
