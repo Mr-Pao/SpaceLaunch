@@ -157,53 +157,28 @@
 					</view>
 				</view>
 
-				<!-- 不同构型：同一个系列下的各型号，点了原地切换 -->
+				<!-- 切换构型：同系列的各型号横向排开，点一下原地换，不再每个都铺一张大卡 -->
 				<view class="section" v-if="variants.length > 1">
 					<view class="section-head">
-						<text class="section-title">不同构型</text>
+						<text class="section-title">切换构型</text>
 						<text class="section-note">{{ variants.length }} 型</text>
 					</view>
 
-					<view
-						class="vcard"
-						v-for="v in variants"
-						:key="v.id"
-						:class="{ 'vcard-cur': v.current }"
-						hover-class="vcard-hover"
-						@click="switchTo(v)"
-					>
-						<view class="vcard-top">
-							<text class="vcard-name">{{ v.name }}</text>
-							<text
-								class="vbadge"
-								:class="v.current ? 'vbadge-cur' : v.active ? 'vbadge-on' : 'vbadge-off'"
-							>{{ v.current ? '当前' : v.active ? '现役' : '退役' }}</text>
-						</view>
-
-						<view class="vcard-main">
-							<image v-if="v.image" class="vthumb" :src="v.image" mode="aspectFill" lazy-load></image>
-							<view v-else class="vthumb vthumb-ph">
-								<text class="vthumb-icon">🚀</text>
-							</view>
-
-							<view class="vbody">
-								<text class="vmaiden" v-if="v.maiden">首飞 {{ v.maiden }}</text>
-
-								<view class="vgrid" v-if="v.params.length">
-									<view class="vgrid-cell" v-for="p in v.params" :key="p.label">
-										<text class="vgrid-label">{{ p.label }}</text>
-										<text class="vgrid-value">{{ p.value }}</text>
-									</view>
-								</view>
-
-								<view class="vfoot" v-if="v.foot.length">
-									<text class="vfoot-item" v-for="(f, i) in v.foot" :key="f">
-										<text class="vfoot-dot" v-if="i">·</text>{{ f }}
-									</text>
-								</view>
+					<scroll-view class="vchips" scroll-x enable-flex :show-scrollbar="false">
+						<view class="vchips-inner">
+							<view
+								class="vchip"
+								v-for="v in variants"
+								:key="v.id"
+								:class="{ on: v.current, off: !v.active && !v.current }"
+								@click="v.current || switchTo(v)"
+							>
+								<text class="vchip-name">{{ v.chipName }}</text>
 							</view>
 						</view>
-					</view>
+					</scroll-view>
+
+					<text class="vchip-cur" v-if="config">{{ config.full_name || config.name }}</text>
 				</view>
 
 				<!-- 单构型的系列没有「不同构型」可列，参数直接铺开 -->
@@ -624,6 +599,7 @@ export default {
 
 				return {
 					id: x.id,
+					chipName: x.variant || rocketNameOf(x) || x.name,
 					name: rocketFullName(x) || x.name,
 					active: Boolean(x.active),
 					current: String(x.id) === curId,
@@ -1484,6 +1460,56 @@ function byNetDesc(a, b) {
 .section-note {
 	color: #6b7891;
 	font-size: 22rpx;
+}
+
+/* ---- 构型切换条 ---- */
+/* 横滑区必须有确定高度，否则 scroll-view 会塌陷 */
+.vchips {
+	width: 100%;
+	height: 76rpx;
+	white-space: nowrap;
+}
+
+.vchips-inner {
+	display: flex;
+	align-items: center;
+}
+
+.vchip {
+	flex-shrink: 0;
+	margin-right: 12rpx;
+	padding: 12rpx 26rpx;
+	border-radius: 999rpx;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.07);
+}
+
+.vchip.on {
+	background: rgba(56, 189, 248, 0.14);
+	border-color: rgba(56, 189, 248, 0.45);
+}
+
+/* 退役构型压暗，但仍然可点 */
+.vchip.off {
+	opacity: 0.5;
+}
+
+.vchip-name {
+	color: #9aa8ba;
+	font-size: 24rpx;
+}
+
+.vchip.on .vchip-name {
+	color: #38bdf8;
+	font-weight: 600;
+}
+
+/* 切完确认自己看的是哪一型 */
+.vchip-cur {
+	display: block;
+	margin-top: 14rpx;
+	color: #5d6a7e;
+	font-size: 21rpx;
 }
 
 .vcard {
