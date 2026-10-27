@@ -51,7 +51,7 @@ ${css}
 </style></head>
 <body>
 <div class="phone">
-  <view class="page" style="height:812px;padding-bottom:0">
+  <view class="page" style="height:812px;padding-bottom:100px">
     <view class="stage">
       <view class="bands">
         ${band(rows[0], 'wide', 't1')}
@@ -75,13 +75,13 @@ ${css}
       <view class="hud-line"></view>
     </view>
 
-    <view class="dock" style="bottom:105px">
+    <view class="dock">
+      <text class="dock-tip">点任意一张查看发射详情</text>
       <view class="all-btn">
         <text class="all-text">看全部</text>
         <text class="all-num">${total}</text>
         <text class="all-arrow">›</text>
       </view>
-      <text class="dock-tip">点任意一张查看发射详情</text>
     </view>
 
     <view class="sb"><text>21:12</text><view class="caps"></view></view>

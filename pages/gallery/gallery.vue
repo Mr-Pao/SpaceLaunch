@@ -58,14 +58,14 @@
 			<view class="hud-line"></view>
 		</view>
 
-		<!-- 底部悬浮入口：半透明胶囊浮在墙上，不切断画面 -->
+		<!-- 墙下方的操作区：提示紧贴墙面，入口在它下面 -->
 		<view class="dock" v-if="!loading && rowsA.length">
+			<text class="dock-tip">点任意一张查看发射详情</text>
 			<view class="all-btn" hover-class="all-btn-hover" @click="goAll">
 				<text class="all-text">看全部</text>
 				<text class="all-num">{{ total }}</text>
 				<text class="all-arrow">›</text>
 			</view>
-			<text class="dock-tip">点任意一张查看发射详情</text>
 		</view>
 
 		<view class="loading" v-if="loading">
@@ -420,25 +420,23 @@ export default {
 }
 
 /* ---- 底部悬浮入口 ---- */
+/* 墙下方的操作区：不再 fixed 悬浮，跟着墙一起排在 tabBar 之上 */
 .dock {
-	position: fixed;
-	left: 0;
-	right: 0;
-	bottom: 210rpx;
+	position: relative;
 	z-index: 20;
+	flex-shrink: 0;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	pointer-events: none;
+	padding: 26rpx 0 0;
 }
 
 /* 点图提示：轻呼吸，不抢画面但看得见 */
 .dock-tip {
-	margin-top: 16rpx;
-	color: rgba(200, 214, 232, 0.6);
-	font-size: 20rpx;
+	margin-bottom: 20rpx;
+	color: rgba(200, 214, 232, 0.62);
+	font-size: 21rpx;
 	letter-spacing: 1rpx;
-	text-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.7);
 	animation: tipBreath 3.4s ease-in-out infinite;
 }
 
