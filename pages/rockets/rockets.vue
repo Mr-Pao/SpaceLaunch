@@ -572,10 +572,10 @@ function leoText(kg) {
 	min-height: 100vh;
 	padding: 0 24rpx 200rpx;
 	box-sizing: border-box;
-	/* 顶部两团冷/暖光晕压在星空之上：暖色呼应榜单主色，冷色补纵深，
-	   比纯黑底更有「站在观测台往下看」的空间感 */
-	background: radial-gradient(120% 55% at 50% -8%, rgba(255, 106, 61, 0.16) 0%, rgba(255, 106, 61, 0) 62%),
-		radial-gradient(90% 45% at 100% 6%, rgba(64, 132, 255, 0.12) 0%, rgba(64, 132, 255, 0) 58%);
+	/* 顶部两团光晕压在星空之上：主色蓝压住上半屏对应榜单主色，
+	   右上再补一团更淡的同色光做纵深，比纯黑底更有「站在观测台往下看」的空间感 */
+	background: radial-gradient(120% 55% at 50% -8%, rgba(56, 189, 248, 0.15) 0%, rgba(56, 189, 248, 0) 62%),
+		radial-gradient(90% 45% at 100% 6%, rgba(56, 189, 248, 0.07) 0%, rgba(56, 189, 248, 0) 58%);
 }
 
 /* 顶栏不占位：只在滚动后浮出来挡一下内容，首屏把高度全留给榜单头 */
@@ -616,7 +616,7 @@ function leoText(kg) {
 	top: -58%;
 	width: 136%;
 	height: 130%;
-	background: radial-gradient(50% 50% at 50% 50%, rgba(255, 106, 61, 0.24) 0%, rgba(255, 106, 61, 0) 68%);
+	background: radial-gradient(50% 50% at 50% 50%, rgba(56, 189, 248, 0.24) 0%, rgba(56, 189, 248, 0) 68%);
 	pointer-events: none;
 }
 
@@ -628,7 +628,7 @@ function leoText(kg) {
 	right: 0;
 	bottom: 0;
 	height: 2rpx;
-	background: linear-gradient(90deg, rgba(255, 106, 61, 0) 0%, rgba(255, 106, 61, 0.55) 50%, rgba(255, 106, 61, 0) 100%);
+	background: linear-gradient(90deg, rgba(56, 189, 248, 0) 0%, rgba(56, 189, 248, 0.55) 50%, rgba(56, 189, 248, 0) 100%);
 }
 
 .hero-top {
@@ -679,7 +679,7 @@ function leoText(kg) {
 	font-weight: 700;
 	letter-spacing: 2rpx;
 	line-height: 1.22;
-	text-shadow: 0 6rpx 28rpx rgba(255, 106, 61, 0.34);
+	text-shadow: 0 6rpx 28rpx rgba(56, 189, 248, 0.34);
 }
 
 .hero-sub {
@@ -698,11 +698,11 @@ function leoText(kg) {
 
 .hero-num {
 	display: block;
-	color: #ff8a5c;
+	color: #38bdf8;
 	font-size: 66rpx;
 	font-weight: 700;
 	line-height: 1;
-	text-shadow: 0 0 30rpx rgba(255, 106, 61, 0.55);
+	text-shadow: 0 0 30rpx rgba(56, 189, 248, 0.55);
 }
 
 .hero-unit {
@@ -822,11 +822,11 @@ function leoText(kg) {
 }
 
 .sort-tab.on {
-	background: linear-gradient(135deg, #ff8a5c 0%, #ff5a2b 100%);
-	border-color: rgba(255, 138, 92, 0.9);
+	background: linear-gradient(135deg, #7dd3fc 0%, #0ea5e9 100%);
+	border-color: rgba(125, 211, 252, 0.9);
 	color: #14181f;
 	font-weight: 600;
-	box-shadow: 0 8rpx 24rpx rgba(255, 106, 61, 0.3);
+	box-shadow: 0 8rpx 24rpx rgba(56, 189, 248, 0.3);
 }
 
 /* 横滑区必须有确定高度，否则 scroll-view 会塌陷 */
@@ -891,7 +891,7 @@ function leoText(kg) {
 .board-count {
 	flex-shrink: 0;
 	margin-left: 12rpx;
-	color: #ff6a3d;
+	color: #38bdf8;
 	font-size: 22rpx;
 }
 
@@ -910,7 +910,7 @@ function leoText(kg) {
 
 /* 前三名：描边转暖，左侧加一条渐隐的主色竖线 */
 .rank-card.is-top {
-	border-color: rgba(255, 106, 61, 0.22);
+	border-color: rgba(56, 189, 248, 0.22);
 }
 
 .rank-card.is-top::before {
@@ -920,7 +920,7 @@ function leoText(kg) {
 	top: 22rpx;
 	bottom: 22rpx;
 	width: 3rpx;
-	background: linear-gradient(180deg, rgba(255, 138, 92, 0.95) 0%, rgba(255, 106, 61, 0) 100%);
+	background: linear-gradient(180deg, rgba(125, 211, 252, 0.95) 0%, rgba(56, 189, 248, 0) 100%);
 }
 
 .rank-card-hover {
@@ -982,18 +982,18 @@ function leoText(kg) {
 }
 
 .rank-no.lv1 {
-	background: linear-gradient(135deg, #ffa268 0%, #ff5a2b 100%);
+	background: linear-gradient(135deg, #7dd3fc 0%, #0ea5e9 100%);
 	color: #14181f;
-	box-shadow: 0 4rpx 18rpx rgba(255, 106, 61, 0.42);
+	box-shadow: 0 4rpx 18rpx rgba(56, 189, 248, 0.42);
 }
 
 .rank-no.lv2 {
-	background: linear-gradient(135deg, #eef3fa 0%, #b6c4d8 100%);
+	background: linear-gradient(135deg, #d6ecff 0%, #8fb3d4 100%);
 	color: #14181f;
 }
 
 .rank-no.lv3 {
-	background: linear-gradient(135deg, #eab68c 0%, #c4834f 100%);
+	background: linear-gradient(135deg, #a8c4dd 0%, #6d8aa8 100%);
 	color: #14181f;
 }
 
@@ -1039,9 +1039,9 @@ function leoText(kg) {
 	flex-shrink: 0;
 	margin-left: 10rpx;
 	padding: 2rpx 14rpx;
-	border: 1rpx solid rgba(255, 106, 61, 0.32);
+	border: 1rpx solid rgba(56, 189, 248, 0.32);
 	border-radius: 999rpx;
-	color: #ff8a5c;
+	color: #7dd3fc;
 	font-size: 19rpx;
 	line-height: 1.6;
 }
