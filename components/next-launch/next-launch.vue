@@ -188,13 +188,16 @@ export default {
 }
 
 .nl-meta {
+	/* 国旗和机构名必须同一行：这一行原来是纯文字块，
+	   加了图片后不改 flex 会让国旗独占一行 */
+	display: flex;
+	align-items: center;
 	margin-top: 10rpx;
 }
 
 .nl-meta-text {
-	/* text 默认是行内元素，不给 block 的话 text-overflow 不生效，会硬截断 */
-	display: block;
-	width: 100%;
+	flex: 1;
+	min-width: 0;
 	color: #6b7891;
 	font-size: 24rpx;
 	white-space: nowrap;
