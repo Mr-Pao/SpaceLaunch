@@ -56,6 +56,31 @@
 			</view>
 		</view>
 
+		<!-- 收藏的火箭：型号库反查名字与配图，查不到的不占位 -->
+		<view class="block" v-if="rockets.length">
+			<view class="block-head">
+				<text class="block-title">收藏的火箭</text>
+				<text class="block-sub">{{ rocketCount }} 个型号</text>
+			</view>
+			<view class="rows">
+				<view
+					class="row"
+					v-for="x in rockets"
+					:key="'rk' + x.id"
+					hover-class="row-hover"
+					@click="goRocket(x.id)"
+				>
+					<image v-if="x.image" class="row-img" :src="x.image" mode="aspectFill" lazy-load></image>
+					<view v-else class="row-img row-ph"><text class="row-ph-icon">🚀</text></view>
+					<view class="row-body">
+						<text class="row-name">{{ x.name }}</text>
+						<text class="row-meta">运载火箭</text>
+					</view>
+					<text class="arrow">›</text>
+				</view>
+			</view>
+		</view>
+
 		<view class="block" v-if="rems.length">
 			<view class="block-head">
 				<text class="block-title">我的提醒</text>
@@ -80,10 +105,10 @@
 			</view>
 		</view>
 
-		<!-- 两份清单都空时给一句引导，而不是什么都不放 -->
-		<view class="tips" v-if="!favs.length && !rems.length">
+		<!-- 三份清单都空时给一句引导，而不是什么都不放 -->
+		<view class="tips" v-if="!favs.length && !rems.length && !rockets.length">
 			<text class="tips-icon">☆</text>
-			<text class="tips-text">在发射详情页点「☆ 收藏」或「提醒」，你的清单会出现在这里</text>
+			<text class="tips-text">在详情页点「☆ 收藏」或「提醒」，你的清单会出现在这里</text>
 		</view>
 
 		<view class="block">
@@ -157,7 +182,7 @@
 import spaceData from '@/utils/data.js'
 import { CHANGELOG } from '@/utils/changelog.js'
 import { syncTabBar } from '@/utils/tabbar.js'
-import { snapshot as favSnapshot } from '@/utils/favorites.js'
+import { snapshot as favSnapshot, rocketSnapshot as rocketFavSnapshot } from '@/utils/favorites.js'
 import { formatShort, relativeTime } from '@/utils/format.js'
 import navMixin from '@/utils/nav-mixin.js'
 
@@ -174,8 +199,10 @@ export default {
 		return {
 			favCount: 0,
 			remCount: 0,
+			rocketCount: 0,
 			favs: [],
 			rems: [],
+			rockets: [],
 			// 只留两个入口：空间站和机构都属于「点进去看一眼」的内容，
 			// 各自详情页也有反向链接，从「我的」进不划算，反而把这一页拉长
 			entries: [
@@ -218,6 +245,11 @@ export default {
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + id })
 		},
 
+		goRocket(id) {
+			if (id == null) return
+			uni.navigateTo({ url: '/pages/rocket/rocket?id=' + id })
+		},
+
 		goVersion() {
 			uni.navigateTo({ url: '/pages/version/version' })
 		},
@@ -238,6 +270,9 @@ export default {
 		 * 不用逐条 findLaunchById —— 那是 N 次网络往返。
 		 */
 		async loadMine() {
+			// 火箭收藏是独立清单，和发射快照没有依赖，先并行拉起来
+			this.loadRockets()
+
 			let favIds = []
 			let remIds = []
 			try {
@@ -288,6 +323,46 @@ export default {
 
 			this.favs = pick(favIds)
 			this.rems = pick(remIds)
+		},
+
+		/**
+		 * 收藏的火箭：同样只存 id，靠 launchers 型号库反查名字和配图。
+		 * 型号库里查不到的（已下架构型）不占位，和发射收藏的处理一致。
+		 */
+		async loadRockets() {
+			let ids = []
+			try {
+				ids = Array.from(rocketFavSnapshot())
+			} catch (e) {
+				ids = []
+			}
+			// 计数按记录条数算（哪怕型号库里已经查不到这条）
+			this.rocketCount = ids.length
+			if (!ids.length) {
+				this.rockets = []
+				return
+			}
+
+			let list = []
+			try {
+				const d = await spaceData.load('launchers')
+				list = (d && d.list) || []
+			} catch (e) {
+				list = []
+			}
+
+			const map = new Map()
+			for (const x of list) map.set(String(x.id), x)
+
+			this.rockets = ids
+				.map((id) => map.get(String(id)))
+				.filter(Boolean)
+				.slice(0, SHOW_MAX)
+				.map((x) => ({
+					id: x.id,
+					name: x.name || x.full_name || '未知型号',
+					image: x.image || ''
+				}))
 		}
 	}
 }

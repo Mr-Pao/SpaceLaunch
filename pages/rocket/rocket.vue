@@ -90,6 +90,24 @@
 							<text class="hm-count">{{ mediaStats.images }}</text>
 						</view>
 					</view>
+
+					<!-- 分享 + 收藏：和发射详情页同一套语义。
+					     分享是原生 button（open-type=share），转发卡片自带本页 id -->
+					<view class="hero-acts" v-if="!reviewMode">
+						<button class="act-pill" open-type="share">
+							<text class="act-ico">⤴</text>
+							<text class="act-txt">分享</text>
+						</button>
+						<view
+							class="act-pill"
+							:class="{ on: isFav }"
+							hover-class="act-pill-hover"
+							@click="toggleFav"
+						>
+							<text class="act-ico">{{ isFav ? '★' : '☆' }}</text>
+							<text class="act-txt">{{ isFav ? '已收藏' : '收藏' }}</text>
+						</view>
+					</view>
 				</view>
 			</view>
 
@@ -326,6 +344,7 @@ import {
 import { getConfig } from '@/utils/config.js'
 import { collectMedia } from '@/utils/media.js'
 import navMixin from '@/utils/nav-mixin.js'
+import { hasRocket, toggleRocket } from '@/utils/favorites.js'
 
 // 同系列构型少于这个数就不当「系列」看：Falcon 家族里只有 Falcon 1 / Falcon Heavy
 // 两种互不相干的火箭，标题写「猎鹰」反而不如直接写型号名
@@ -352,6 +371,8 @@ export default {
 			openCore: null,
 			loading: true,
 			navSolid: false,
+			// 该型号是否已收藏（本地 Storage，独立于发射收藏）
+			isFav: false,
 			// 审核模式：隐藏外部资料、发射场地与发射列表
 			reviewMode: false,
 			descOpen: false,
@@ -636,6 +657,8 @@ export default {
 		getConfig().then((c) => {
 			this.reviewMode = Boolean(c && c.review)
 		})
+		// 收藏可能在「我的」里被取消，回来时以本地存储为准
+		this.isFav = hasRocket(this.rocketId)
 	},
 
 	onPageScroll(e) {
@@ -660,9 +683,40 @@ export default {
 		await this.loadRecords()
 		this.loadCores()
 		this.loading = false
+
+		// 数据到位后再定收藏态与转发卡片内容（系列名、首图都要读 records）
+		this.isFav = hasRocket(this.rocketId)
+		this.syncShare()
 	},
 
 	methods: {
+		/**
+		 * 收藏这个型号。
+		 * 火箭走独立命名空间（sl_fav_rockets_v1），不能和发射收藏混存 ——
+		 * 两边 id 形状一样，混在一个数组里就分不出类型了。
+		 */
+		toggleFav() {
+			if (!this.rocketId) return
+			this.isFav = toggleRocket(this.rocketId)
+			uni.showToast({
+				title: this.isFav ? '已收藏，可在「我的」查看' : '已取消收藏',
+				icon: 'none',
+				duration: 1500
+			})
+		},
+
+		/**
+		 * 定转发卡片的标题与封面。
+		 * path 由全局 share mixin 按「当前页路由 + onLoad 参数」拼，自带 id；
+		 * 这里只补有信息量的标题和首图，否则转发出去只有干巴巴的「太空发射任务」。
+		 */
+		syncShare() {
+			const name = this.seriesTitle || (this.config && this.config.name) || ''
+			if (name) this.shareTitle = name + ' · 太空发射任务'
+			const s = this.heroSlides && this.heroSlides[0]
+			if (s && s.thumb) this.shareImage = s.thumb
+		},
+
 		async loadConfig() {
 			try {
 				const d = await spaceData.load('launchers')
@@ -1031,6 +1085,54 @@ function byNetDesc(a, b) {
 
 .hero-media-hover {
 	background: rgba(255, 255, 255, 0.24);
+}
+
+/* 分享 / 收藏：磨砂胶囊，和「图片库」按钮同一套语言 */
+.hero-acts {
+	display: flex;
+	margin-top: 16rpx;
+	/* .hero-body 整体屏蔽了事件，这里要单独收回来 —— 它是真要点的 */
+	pointer-events: auto;
+}
+
+.act-pill {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0 16rpx 0 0;
+	padding: 8rpx 22rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.14);
+	-webkit-backdrop-filter: blur(20rpx) saturate(150%);
+	backdrop-filter: blur(20rpx) saturate(150%);
+	border: 1rpx solid rgba(255, 255, 255, 0.22);
+	font-size: 24rpx;
+	line-height: 1.4;
+	color: #dfe7f2;
+}
+
+/* 原生 button 自带边框和默认横向留白，不清掉胶囊会变成双层 */
+.act-pill::after {
+	border: none;
+}
+
+.act-pill.on {
+	background: rgba(255, 214, 10, 0.18);
+	border-color: rgba(255, 214, 10, 0.45);
+	color: #ffd60a;
+}
+
+.act-pill-hover {
+	background: rgba(255, 255, 255, 0.26);
+}
+
+.act-ico {
+	margin-right: 8rpx;
+	font-size: 26rpx;
+}
+
+.act-txt {
+	line-height: 1.4;
 }
 
 /* 2×2 小方格当图标，纯 CSS，比图片省一次请求。
