@@ -61,7 +61,6 @@ const topLeo = pool.filter((x) => x.leo_capacity > 0).sort((a, b) => b.leo_capac
 const topLaunch = pool.filter((x) => x.total_launch_count > 0).sort((a, b) => b.total_launch_count - a.total_launch_count)[0]
 const reusableCount = pool.filter((x) => x.reusable).length
 
-const nameOf = (x) => x.descriptionZh && x.descriptionZh.length ? x.name : x.name
 
 const card = (r, i) => `
 <view class="rank-card ${i < 3 ? 'is-top' : ''}">
@@ -72,14 +71,11 @@ const card = (r, i) => `
   </view>
   <view class="rank-body">
     <view class="rank-head">
-      <text class="rank-name">${nameOf(r)}</text>
+      <text class="rank-name">${fmt.rocketFullName(r)}</text>
       <text class="rank-more">详情</text>
     </view>
+    ${r.full_name && r.full_name !== fmt.rocketFullName(r) ? `<text class="rank-en">${r.full_name}</text>` : ''}
     <view class="rank-maker-row">${r.flag ? `<img class="flag" src="${r.flag}" style="object-fit:contain">` : ''}<text class="rank-maker">${r.makerZh || r.manufacturer || '未知制造商'}</text></view>
-    <view class="rank-tags">
-      ${r.families && r.families[0] ? `<text class="rtag">${r.families[0]}</text>` : ''}
-      ${r.variant ? `<text class="rtag">${r.variant}</text>` : ''}
-    </view>
     <view class="rank-metrics">
       <view class="metric"><text class="m-v">${leoText(r.leo_capacity)}</text><text class="m-k">LEO 运力</text></view>
       <view class="metric"><text class="m-v">${r.total_launch_count || 0}</text><text class="m-k">累计发射</text></view>

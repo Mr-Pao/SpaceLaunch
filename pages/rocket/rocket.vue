@@ -339,7 +339,6 @@ import {
 	rocketName as rocketNameOf,
 	rocketFullName,
 	seriesKey,
-	seriesName,
 	agencyLabel,
 	countryOf,
 	isStillUpcoming,
@@ -356,7 +355,6 @@ import { hasRocket, toggleRocket } from '@/utils/favorites.js'
 
 // 同系列构型少于这个数就不当「系列」看：Falcon 家族里只有 Falcon 1 / Falcon Heavy
 // 两种互不相干的火箭，标题写「猎鹰」反而不如直接写型号名
-const SERIES_MIN = 3
 // 发射列表默认露几条，其余收起来（参考页也是先给几条，想看再展开）
 const FOLD = 3
 // 芯级列表默认露几枚。Falcon 9 在册 20+ 枚，全铺会把页面拉得很长
@@ -443,10 +441,9 @@ export default {
 		seriesTitle() {
 			const c = this.config
 			if (!c) return ''
-			if (this.siblings.length >= SERIES_MIN) {
-				return seriesName(seriesKey(c)) || rocketNameOf(c) || c.name
-			}
-			return rocketNameOf(c) || c.name
+			// 一律用「中文名 + 构型」。原来构型多时用系列名，
+			// 结果标题是「猎鹰 9 号」、副标题却是「Falcon 9 Block 5」，中英对不上
+			return rocketFullName(c) || rocketNameOf(c) || c.name
 		},
 
 		subName() {

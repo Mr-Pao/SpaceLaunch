@@ -1119,7 +1119,14 @@ export function rocketFullName(config) {
 	}
 
 	const variant = String(config.variant || '').trim()
-	if (variant && zh.indexOf(variant) === -1) return zh + ' ' + variant
+	if (variant) {
+		// 基础名本身已经含这个后缀时不要再拼一遍：
+		// Falcon Heavy 的 variant 就是 "Heavy"，拼出来会变成「猎鹰重型 Heavy」
+		const base = String(config.name || config.full_name || '').toLowerCase()
+		const dupInBase = base.indexOf(variant.toLowerCase()) !== -1
+		const dupInZh = zh.indexOf(variant) !== -1
+		if (!dupInBase && !dupInZh) return zh + ' ' + variant
+	}
 	return zh
 }
 

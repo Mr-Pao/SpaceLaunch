@@ -174,6 +174,11 @@ async function testFormat() {
 		'完整名：中文名拼上构型后缀，同系列各构型才分得开'
 	)
 	eq(f.rocketFullName({ name: 'Starship', variant: '' }), '星舰', '完整名：无构型时只给中文名')
+	eq(
+		f.rocketFullName({ name: 'Falcon Heavy', full_name: 'Falcon Heavy', variant: 'Heavy' }),
+		'猎鹰重型',
+		'完整名：基础名已含该后缀时不重复拼（不出现「猎鹰重型 Heavy」）'
+	)
 	eq(f.stationName('International Space Station'), '国际空间站', '空间站：表内直译')
 	eq(f.stationName('Salyut 7'), '礼炮七号', '空间站：Salyut 走规则推导')
 	eq(f.stationName('Unknown Station'), 'Unknown Station', '空间站：未收录保留原文')

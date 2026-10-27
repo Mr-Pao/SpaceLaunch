@@ -489,10 +489,10 @@ export default {
 					maxLeo = Math.max(maxLeo, x.leo_capacity || 0)
 				}
 
-				this.all = list.map((x) => {					const zh = rocketName(x)
-					// 英文行用 name 而不是 full_name：full_name 带构型后缀太长，
-					// 一行放不下，而中文名已经对应到型号这一级了
-					const en = x.name || x.full_name || ''
+				this.all = list.map((x) => {
+					// 中英都带构型：中文只给基础名的话，同系列几个构型在榜上长得一模一样
+					const zh = rocketFullName(x)
+					const en = x.full_name || x.name || ''
 					const ok = x.successful_launches || 0
 					const bad = x.failed_launches || 0
 					const tried = ok + bad
