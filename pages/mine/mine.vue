@@ -8,7 +8,9 @@
 		<view class="hero" :style="{ paddingTop: statusBarH + 26 + 'px' }">
 			<view class="hero-glow"></view>
 			<image class="logo" src="/static/logo.png" mode="aspectFill"></image>
-			<text class="name">太空发射任务</text>
+			<!-- 品牌字标：Space 白 + Launch 青。两个 text 内联不换行，
+			     中间不能留空格/换行，否则会出现一道缝 -->
+			<view class="brand"><text class="brand-a">Space</text><text class="brand-b">Launch</text></view>
 			<text class="slogan">全球火箭发射 · 一站掌握</text>
 
 			<view class="stats">
@@ -420,19 +422,34 @@ export default {
 	border: 2rpx solid rgba(56, 189, 248, 0.3);
 }
 
-.name {
+/* 品牌字标：Space 白 + Launch 青，参考航天媒体的双色站标做法。
+   系统字体在 iOS 上 900 会落到 SF Pro Black，安卓多数机型只有 Bold，
+   退一级也不会塌 —— 所以字重比配色调得更激进一点才稳 */
+.brand {
 	position: relative;
-	margin-top: 24rpx;
+	display: flex;
+	align-items: baseline;
+	margin-top: 26rpx;
+	font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+	font-size: 56rpx;
+	font-weight: 900;
+	line-height: 1.16;
+	letter-spacing: -1rpx;
+}
+
+.brand-a {
 	color: #ffffff;
-	font-size: 38rpx;
-	font-weight: 600;
-	letter-spacing: 3rpx;
+}
+
+.brand-b {
+	color: #22d3ee;
+	text-shadow: 0 0 28rpx rgba(34, 211, 238, 0.42);
 }
 
 .slogan {
-	margin-top: 12rpx;
+	margin-top: 14rpx;
 	color: #7d8ba0;
-	font-size: 25rpx;
+	font-size: 24rpx;
 	letter-spacing: 1rpx;
 }
 
