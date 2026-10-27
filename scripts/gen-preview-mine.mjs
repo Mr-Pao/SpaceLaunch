@@ -77,7 +77,7 @@ const row = (x, icon) => `
     <view class="hero-glow ${V}"></view>
     <view class="logo ${V}" style="background:#0d1420;display:flex;align-items:center;justify-content:center;color:#38bdf8;font:600 13px sans-serif">LOGO</view>
     <view class="brand ${V}" style="display:flex;align-items:baseline"><text class="brand-a ${V}">Space</text><text class="brand-b ${V}">Launch</text></view>
-    <text class="slogan ${V}">全球火箭发射 · 一站掌握</text>
+    <text class="slogan ${V}">记录人类成为多星球物种的进程</text>
     ${stats(withData ? favs.length : 0, withData ? rems.length : 0)}
   </view>
 

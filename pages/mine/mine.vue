@@ -11,7 +11,7 @@
 			<!-- 品牌字标：Space 白 + Launch 青。两个 text 内联不换行，
 			     中间不能留空格/换行，否则会出现一道缝 -->
 			<view class="brand"><text class="brand-a">Space</text><text class="brand-b">Launch</text></view>
-			<text class="slogan">全球火箭发射 · 一站掌握</text>
+			<text class="slogan">记录人类成为多星球物种的进程</text>
 
 			<view class="stats">
 				<view class="stat">
