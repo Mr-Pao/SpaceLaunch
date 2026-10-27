@@ -94,7 +94,7 @@ export default {
 			return agencyLabel(n)
 		},
 		status() {
-			return statusInfo(this.item.status)
+			return statusInfo(this.item.status, this.item.net)
 		}
 	}
 }

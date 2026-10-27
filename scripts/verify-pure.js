@@ -185,6 +185,16 @@ async function testFormat() {
 	eq(f.eventPlace('Cape Canaveral SFS, FL, USA'), '卡纳维拉尔角', '活动地点：发射场')
 	eq(f.eventPlace('Unknown Place'), 'Unknown Place', '活动地点：未收录保留原文')
 	eq(f.eventTypeName('Orbital Insertion'), '入轨', '活动类型：Orbital Insertion 是入轨，不是轨道插入')
+
+	// 发射状态的时间兜底：LL2 的 In Flight 会滞后几小时，不能一直挂着
+	{
+		const ago = (h) => new Date(Date.now() - h * 3600e3).toISOString()
+		const fly = { abbrev: 'In Flight' }
+		eq(f.statusInfo(fly, ago(7)).cls, 'pending', '发射状态：In Flight 但已过 7 小时 → 待更新')
+		eq(f.statusInfo(fly, ago(0.2)).cls, 'flying', '发射状态：In Flight 且刚起飞 → 飞行中')
+		eq(f.statusInfo(fly).cls, 'flying', '发射状态：没有 net 时不误判')
+		eq(f.statusInfo({ abbrev: 'Success' }, ago(7)).cls, 'success', '发射状态：终态不受时间影响')
+	}
 	eq(f.rocketName({ name: 'Atlas V 551' }), '宇宙神 5 号 551', '长后缀：Atlas V 551 归到宇宙神 5 号并保留配置代号')
 	eq(f.rocketName({ name: 'Atlas V N22' }), '宇宙神 5 号', '长后缀：精确 key 优先于前缀匹配')
 	eq(

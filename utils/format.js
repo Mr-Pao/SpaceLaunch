@@ -77,7 +77,15 @@ export function truncate(text, max) {
  * 状态 -> 展示文案与样式类
  * 优先用同步阶段写入的 nameZh，缺失时回退英文缩写
  */
-export function statusInfo(status) {
+/**
+ * 发射状态 → 文案 + 配色类名。
+ *
+ * 第二个参数 net 是兜底用的：真实飞行阶段只有十几分钟到几小时，
+ * 如果状态还是 In Flight 但 net 已经过去大半天，那一定是数据没跟上
+ * （LL2 的 upcoming 快照会滞后几小时），不能一直把「飞行中」挂在列表上。
+ * 数据层已经会清这类陈旧状态，这里是冷缓存和旧快照的最后一道。
+ */
+export function statusInfo(status, net) {
 	if (!status) return { text: '未知', cls: 'normal' }
 
 	const text = status.nameZh || status.name || status.abbrev || '未知'
@@ -85,7 +93,11 @@ export function statusInfo(status) {
 
 	if (a === 'Success' || a === 'Deployed') return { text, cls: 'success' }
 	if (a === 'Failure' || a === 'Partial') return { text, cls: 'failure' }
-	if (a === 'In Flight') return { text, cls: 'flying' }
+	if (a === 'In Flight') {
+		const t = net ? new Date(net).getTime() : 0
+		if (t > 0 && Date.now() - t > 6 * 3600 * 1000) return { text: '状态待更新', cls: 'pending' }
+		return { text, cls: 'flying' }
+	}
 	if (a === 'Go') return { text, cls: 'go' }
 	return { text, cls: 'pending' }
 }

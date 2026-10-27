@@ -169,6 +169,61 @@ async function enrichLaunchersFromLaunches(list, readCosJson) {
 	)
 }
 
+/**
+ * 清掉「已经飞完、状态却卡在半路」的条目。
+ *
+ * LL2 的 upcoming 端点按理会在发射结束后把条目移出列表，但状态同步有滞后：
+ * 实测发射结束 3 小时后，upcoming 里仍然写着 "In Flight"，前端列表就一直
+ * 挂着「飞行中」；而 previous 那边同一个 id 早就变成 Success 了。
+ *
+ * 处理：net 过去超过 3 小时、状态仍是 In Flight / Go 的，
+ *   1) previous 有同 id 且已是终态 → 用它的状态和 net 顶上（显示「成功」）；
+ *   2) previous 也还没有 → 整条删掉（它已经不属于「即将发射」，
+ *      下一轮 previous 就会出现，列表不会长时间缺这一条）。
+ *
+ * 必须跑在 localize 之前：换上去的 status 要一起中文化。
+ */
+async function pruneStaleUpcoming(list, readCosJson) {
+	const LIMIT = 3 * 3600 * 1000
+	const now = Date.now()
+	const stale = list.filter((x) => {
+		const a = (x.status && x.status.abbrev) || ''
+		if (a !== 'In Flight' && a !== 'Go') return false
+		const t = x.net ? new Date(x.net).getTime() : 0
+		return t > 0 && now - t > LIMIT
+	})
+	if (!stale.length) return
+
+	const prev = new Map()
+	try {
+		const p = await readCosJson('space-data/launches-previous.json')
+		for (const x of (p && (p.list || p)) || []) prev.set(String(x.id), x)
+	} catch (e) {
+		// previous 读不到就只会走删除分支，不会误改状态
+	}
+
+	let patched = 0
+	const drop = new Set()
+	for (const x of stale) {
+		const p = prev.get(String(x.id))
+		const a = (p && p.status && p.status.abbrev) || ''
+		if (a && a !== 'In Flight' && a !== 'Go') {
+			x.status = p.status
+			if (p.net) x.net = p.net
+			patched++
+		} else {
+			drop.add(String(x.id))
+		}
+	}
+
+	if (drop.size) {
+		for (let i = list.length - 1; i >= 0; i--) {
+			if (drop.has(String(list[i].id))) list.splice(i, 1)
+		}
+	}
+	console.log(`  · 陈旧状态：修正 ${patched} 条 / 剔除 ${drop.size} 条`)
+}
+
 const DATASETS = {
 	/**
 	 * 发射工位（pad）全量：/pads/ 共 251 条，**必须翻页**。
@@ -205,6 +260,9 @@ const DATASETS = {
 		file: 'launches-upcoming.json',
 		cacheControl: 'public, max-age=300',
 		localize: localizeLaunches,
+		// 发射结束后 LL2 的状态会滞后几小时，「飞行中」会一直挂在列表上，
+		// 先清一遍陈旧状态再走中文化
+		prune: pruneStaleUpcoming,
 		// pad.map_image 是详情页「发射场地」卡的地图，按 750px 单独一档压。
 		// imageThumb / pad.image / pad.imageThumb 三个字段以前没列进来，
 		// 结果一直指向 LL2 海外域名 —— 而媒体聚合（火箭页轮播、媒体页、发射页
@@ -617,6 +675,16 @@ async function runDataset(name) {
 	const { count, list } = await ds.fetch()
 
 	validate(name, list)
+
+	// 陈旧状态清理：必须在 localize 之前 —— 从 previous 顶上来的 status
+	// 是英文对象，还要走一遍中文化
+	if (ds.prune) {
+		try {
+			await ds.prune(list, readCosJson)
+		} catch (e) {
+			console.warn(`  ! 陈旧状态清理失败（不影响其它字段）: ${e.message}`)
+		}
+	}
 
 	// 中文化必须在写 JSON 之前完成，这样 COS 上的快照本身就带中文，
 	// 小程序端不需要任何翻译逻辑，也没有额外请求

@@ -52,7 +52,7 @@ export default {
 			return launchTitle(this.item)
 		},
 		status() {
-			return statusInfo(this.item.status)
+			return statusInfo(this.item.status, this.item.net)
 		},
 		provider() {
 			const n = (this.item.launch_service_provider && this.item.launch_service_provider.name) || ''
