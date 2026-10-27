@@ -86,33 +86,55 @@ async function fillLauncherImages(list, readCosJson) {
 	const need = list.filter((x) => !x.image)
 	if (!need.length) return
 
-	const ids = new Set(need.map((x) => String(x.id)))
-	const snaps = await Promise.all([
-		readCosJson('space-data/launches-upcoming.json').catch(() => null),
-		readCosJson('space-data/launches-previous.json').catch(() => null)
-	])
+	const want = new Map(need.map((x) => [String(x.id), x]))
 
-	// upcoming 先扫、previous 后扫，同一个 id 只取第一条 —— 也就是时间上最近的那次发射
-	const map = new Map()
-	for (const snap of snaps) {
-		for (const l of (snap && snap.list) || []) {
-			const cid = l.rocket && l.rocket.configuration && l.rocket.configuration.id
-			if (!cid) continue
+	// 扫一份快照，命中的就从待找集合里摘掉，返回还剩几个
+	const apply = (snap) => {
+		const arr = snap && (snap.list || snap)
+		if (!Array.isArray(arr)) return want.size
+		for (const l of arr) {
+			if (!l || !l.rocket) continue
+			const cid = l.rocket.configuration && l.rocket.configuration.id
+			if (cid == null) continue
 			const k = String(cid)
-			if (!ids.has(k) || map.has(k) || !l.image) continue
-			map.set(k, l.image)
+			const target = want.get(k)
+			if (!target || !l.image) continue
+			target.image = l.image
+			want.delete(k)
+		}
+		return want.size
+	}
+
+	// 1) 最近两批快照：两次读取，先捞近期型号
+	for (const key of ['space-data/launches-upcoming.json', 'space-data/launches-previous.json']) {
+		if (!want.size) break
+		try {
+			apply(await readCosJson(key))
+		} catch (e) {
+			// 快照缺失不影响后面走归档
 		}
 	}
 
-	let filled = 0
-	for (const x of need) {
-		const url = map.get(String(x.id))
-		if (url) {
-			x.image = url
-			filled++
+	// 2) 剩下的都是冷门型号（Safir / Minotaur-C / Shavit…），近期快照里没有，
+	//    扫历史归档分片。76 片约 7600 条，全命中就提前停，读的是自家 COS 不耗 LL2 配额
+	if (want.size) {
+		try {
+			const idx = await readCosJson('space-data/history/index.json')
+			for (const p of (idx && idx.pages) || []) {
+				if (!want.size) break
+				if (!p || !p.file) continue
+				try {
+					apply(await readCosJson('space-data/history/' + p.file))
+				} catch (e) {
+					// 单片失败跳过，别让一片坏掉整轮补图
+				}
+			}
+		} catch (e) {
+			console.warn(`  ! 历史归档不可读，补图跳过: ${e.message}`)
 		}
 	}
-	console.log(`  · 型号补图 ${filled}/${need.length}`)
+
+	console.log(`  · 型号补图 ${need.length - want.size}/${need.length}`)
 }
 
 const DATASETS = {
