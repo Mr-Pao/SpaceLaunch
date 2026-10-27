@@ -487,7 +487,9 @@ export default {
 
 				this.all = list.map((x) => {
 					const zh = rocketName(x)
-					const en = x.full_name || x.name || ''
+					// 英文行用 name 而不是 full_name：full_name 带构型后缀太长，
+					// 一行放不下，而中文名已经对应到型号这一级了
+					const en = x.name || x.full_name || ''
 					const ok = x.successful_launches || 0
 					const bad = x.failed_launches || 0
 					const tried = ok + bad

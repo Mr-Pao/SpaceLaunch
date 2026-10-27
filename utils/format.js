@@ -259,7 +259,78 @@ export function astroName(a) {
  * 型号名属于固定枚举，走本地查表，不占翻译额度。
  */
 const ROCKET_ZH = {
-	// 长征五号B 的 B 是构型而不是「乙」，官方写法就是 5B，规则推导会推错，单独钉住
+	// ---- 美国 ----
+	'Falcon 9': '猎鹰 9 号',
+	'Falcon Heavy': '猎鹰重型',
+	'Falcon 1': '猎鹰 1 号',
+	Starship: '星舰',
+	'Space Launch System (SLS)': '太空发射系统',
+	'Space Launch System': '太空发射系统',
+	Electron: '电子号',
+	'Atlas V': '宇宙神 5 号',
+	'Atlas V N22': '宇宙神 5 号',
+	'Atlas III': '宇宙神 3 号',
+	'Delta IV': '德尔塔 4 号',
+	'Delta IV Heavy': '德尔塔 4 重型',
+	'Delta II': '德尔塔 2 号',
+	Vulcan: '火神',
+	'Vulcan VC2S': '火神',
+	'Vulcan VC4L': '火神',
+	'New Glenn': '新格伦',
+	Antares: '心宿二',
+	Pegasus: '飞马座',
+	'Minotaur I': '牛头怪 1 号',
+	'Minotaur IV': '牛头怪 4 号',
+	'Minotaur V': '牛头怪 5 号',
+	'Minotaur-C': '牛头怪 C',
+	Alpha: '阿尔法',
+	'Terran 1': '人族 1 号',
+	Neutron: '中子',
+	SpaceShipTwo: '太空船二号',
+	'Space Shuttle': '航天飞机',
+	'Saturn V': '土星五号',
+	Titan: '泰坦',
+
+	// ---- 欧洲 ----
+	'Ariane 1': '阿丽亚娜 1 号',
+	'Ariane 2': '阿丽亚娜 2 号',
+	'Ariane 3': '阿丽亚娜 3 号',
+	'Ariane 4': '阿丽亚娜 4 号',
+	'Ariane 5': '阿丽亚娜 5 号',
+	'Ariane 6': '阿丽亚娜 6 号',
+	'Ariane 62': '阿丽亚娜 62',
+	'Ariane 64': '阿丽亚娜 64',
+	Vega: '织女星',
+	'Vega-C': '织女星 C',
+
+	// ---- 俄罗斯 ----
+	Soyuz: '联盟号',
+	'Soyuz 2': '联盟 2 号',
+	'Soyuz-FG': '联盟 FG',
+	'Soyuz-U': '联盟 U',
+	'Proton-M': '质子 M',
+	'Proton-M Briz-M': '质子 M',
+	Proton: '质子号',
+	'Angara A5': '安加拉 A5',
+	'Angara A5/Briz-M': '安加拉 A5',
+	Angara: '安加拉',
+	'Soyuz 2.1a': '联盟 2.1a',
+	'Soyuz 2.1b': '联盟 2.1b',
+	'Soyuz-5': '联盟 5 号',
+	'Soyuz-2': '联盟 2 号',
+	Zenit: '天顶号',
+	Rokot: '轰鸣',
+	Energia: '能源号',
+
+	// ---- 日本 ----
+	Epsilon: '艾普西龙',
+
+	// ---- 印度 ----
+	PSLV: '极地卫星运载火箭',
+	'LVM-3 (GSLV Mk III)': 'LVM-3',
+	GSLV: '地球同步卫星运载火箭',
+
+	// ---- 中国商业航天（长征走 zhLongMarch 规则推导，这里只钉特例）----
 	'Long March 5B': '长征五号B',
 	'Long March 5B/YZ-2': '长征五号B/YZ-2',
 
@@ -270,7 +341,23 @@ const ROCKET_ZH = {
 	'Ceres-1': '谷神星一号',
 	'Ceres-1S': '谷神星一号S',
 	'Kuaizhou 1A': '快舟一号甲',
-	'Kuaizhou 11': '快舟十一号'
+	'Kuaizhou 11': '快舟十一号',
+	'Hyperbola-1': '双曲线一号',
+	'Hyperbola-2': '双曲线二号',
+	'Hyperbola-3': '双曲线三号',
+	'Gravity-1': '引力一号',
+	'Gravity-2': '引力二号',
+	'Tianlong-2': '天龙二号',
+	'Tianlong-3': '天龙三号',
+	'Lijian-1': '力箭一号',
+	'Kinetica-1': '力箭一号',
+	'Kinetica 2': '力箭二号',
+	'Kaituo-1A': '开拓一号甲',
+	'Jielong-3': '捷龙三号',
+	'Smart Dragon 1': '捷龙一号',
+	'Smart Dragon 3': '捷龙三号',
+	'Pallas-1': '帕拉斯一号',
+	'Nebula-1': '星云一号'
 }
 
 const CN_NUM = {
@@ -322,9 +409,27 @@ function zhLongMarch(raw) {
 /** 火箭型号名，中国型号换成中文，其余保留原文 */
 export function rocketName(config) {
 	if (!config) return ''
-	const raw = config.full_name || config.name || ''
-	if (!raw) return ''
-	return ROCKET_ZH[raw] || zhLongMarch(raw) || raw
+	const full = config.full_name || config.name || ''
+	const base = config.name || full
+	if (!full) return ''
+
+	// 查表顺序有讲究：LL2 的 full_name 常带构型后缀（Falcon 9 Block 5），
+	// 中文名却是钉在基础型号上的（猎鹰 9 号），所以先用 name 查。
+	// 再剥掉 "Block 5 / V3" 这类后缀兜一次，覆盖 name 自己就带后缀的情况。
+	const bare = String(base).replace(/\s+(V\d+|Block\s*\d+)$/i, '')
+	// 上面级写法（Soyuz 2.1b/Fregat-M、Angara A5/Briz-M）剥掉斜杠后半段再查
+	const noUpper = String(base).split('/')[0].trim()
+
+	return (
+		ROCKET_ZH[full] ||
+		ROCKET_ZH[base] ||
+		ROCKET_ZH[bare] ||
+		ROCKET_ZH[noUpper] ||
+		zhLongMarch(base) ||
+		zhLongMarch(noUpper) ||
+		zhLongMarch(full) ||
+		full
+	)
 }
 
 /**
