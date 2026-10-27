@@ -1027,3 +1027,35 @@ export function rocketFullName(config) {
 	if (variant && zh.indexOf(variant) === -1) return zh + ' ' + variant
 	return zh
 }
+
+/**
+ * 空间站中文名。
+ *
+ * LL2 的空间站数据只有简介（descZh）中文化了，名称本身没有译文字段，
+ * 一共 15 个站，手写对照表最准：Salyut 1-7 用规则推导，其余逐个钉住。
+ */
+const STATION_ZH = {
+	'International Space Station': '国际空间站',
+	'Tiangong space station': '中国空间站',
+	'Tiangong 1': '天宫一号',
+	'Tiangong 2': '天宫二号',
+	Mir: '和平号空间站',
+	Skylab: '天空实验室',
+	'Genesis I': '创世纪一号',
+	'Genesis II': '创世纪二号'
+}
+
+export function stationName(raw) {
+	const s = String(raw == null ? '' : raw).trim()
+	if (!s) return ''
+	if (STATION_ZH[s]) return STATION_ZH[s]
+
+	// Salyut 1-7 → 礼炮一~七号
+	const m = /^Salyut\s+(\d+)$/i.exec(s)
+	if (m) {
+		const cn = CN_NUM[Number(m[1])]
+		if (cn) return '礼炮' + cn + '号'
+	}
+
+	return s
+}

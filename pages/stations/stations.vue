@@ -15,7 +15,7 @@
 				<view v-else class="thumb thumb-ph"><text>🛰️</text></view>
 				<view class="info">
 					<view class="row1">
-						<text class="name">{{ s.name }}</text>
+						<text class="name">{{ stationName(s.name) }}</text>
 						<text class="badge" :class="s.status === 'Active' ? 'on' : 'dim'">{{ statusZh(s.status) }}</text>
 					</view>
 					<text class="meta">{{ s.orbit || '未知轨道' }}<text v-if="s.onboardCrew"> · 在轨 {{ s.onboardCrew }} 人</text></text>
@@ -29,6 +29,7 @@
 <script>
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
+import { stationName as stationNameOf } from '@/utils/format.js'
 
 export default {
 	mixins: [navMixin],
@@ -60,6 +61,10 @@ export default {
 	},
 
 	methods: {
+		stationName(name) {
+			return stationNameOf(name)
+		},
+
 		statusZh(s) {
 			if (s === 'Active') return '在役'
 			if (s === 'Retired') return '退役'

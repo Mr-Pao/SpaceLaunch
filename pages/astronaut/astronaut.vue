@@ -77,7 +77,7 @@
 			<view class="card-title">所属空间站</view>
 			<view class="link-row" v-for="s in myStations" :key="s.id" @click="goStation(s)">
 				<view class="link-main">
-					<text class="link-name">{{ s.name }}</text>
+					<text class="link-name">{{ stationName(s.name) }}</text>
 					<text class="link-sub" v-if="s.status">{{ stationStatusZh(s.status) }}</text>
 				</view>
 				<text class="arrow">›</text>
@@ -163,7 +163,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { agencyLabel, nationZh } from '@/utils/format.js'
+import { agencyLabel, nationZh, stationName as stationNameOf } from '@/utils/format.js'
 import navMixin from '@/utils/nav-mixin.js'
 
 /**
@@ -296,6 +296,11 @@ export default {
 	},
 
 	methods: {
+		// 模板只能看见实例成员，模块作用域的函数要转一层
+		stationName(name) {
+			return stationNameOf(name)
+		},
+
 		preview(url) {
 			if (!url) return
 			uni.previewImage({ urls: [url], current: url })

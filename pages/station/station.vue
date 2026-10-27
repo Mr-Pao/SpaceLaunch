@@ -1,6 +1,6 @@
 <template>
 	<view class="page">
-		<nav-bar :solid="navSolid" :title="navSolid ? station.name : ''" />
+		<nav-bar :solid="navSolid" :title="navSolid ? stationName(station.name) : ''" />
 
 		<view class="loading" v-if="loading">
 			<text class="hint-text">加载中...</text>
@@ -15,7 +15,7 @@
 				<view v-else class="hero-img hero-ph"><text>🛰️</text></view>
 				<view class="hero-mask"></view>
 				<view class="hero-bar">
-					<text class="h-name">{{ station.name }}</text>
+					<text class="h-name">{{ stationName(station.name) }}</text>
 					<text class="badge" :class="station.status === 'Active' ? 'on' : 'dim'">{{ statusZh(station.status) }}</text>
 				</view>
 			</view>
@@ -104,6 +104,7 @@
 <script>
 import spaceData from '@/utils/data.js'
 import navMixin from '@/utils/nav-mixin.js'
+import { stationName as stationNameOf } from '@/utils/format.js'
 
 export default {
 	mixins: [navMixin],
@@ -160,6 +161,10 @@ export default {
 	},
 
 	methods: {
+		stationName(name) {
+			return stationNameOf(name)
+		},
+
 		statusZh(s) {
 			if (s === 'Active') return '在役'
 			if (s === 'Retired') return '退役'

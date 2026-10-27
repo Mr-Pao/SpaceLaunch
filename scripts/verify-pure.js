@@ -174,6 +174,9 @@ async function testFormat() {
 		'完整名：中文名拼上构型后缀，同系列各构型才分得开'
 	)
 	eq(f.rocketFullName({ name: 'Starship', variant: '' }), '星舰', '完整名：无构型时只给中文名')
+	eq(f.stationName('International Space Station'), '国际空间站', '空间站：表内直译')
+	eq(f.stationName('Salyut 7'), '礼炮七号', '空间站：Salyut 走规则推导')
+	eq(f.stationName('Unknown Station'), 'Unknown Station', '空间站：未收录保留原文')
 	eq(
 		f.rocketFullName({ name: 'Vulcan VC2S', full_name: 'Vulcan VC2S', variant: 'VC2S' }),
 		'火神 VC2S',
