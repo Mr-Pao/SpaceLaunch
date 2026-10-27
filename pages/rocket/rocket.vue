@@ -90,34 +90,36 @@
 							<text class="hm-count">{{ mediaStats.images }}</text>
 						</view>
 					</view>
-
-					<!-- 分享 + 收藏：和发射详情页同一套语义。
-					     分享是原生 button（open-type=share），转发卡片自带本页 id -->
-					<view class="hero-acts" v-if="!reviewMode">
-						<button class="act-pill" open-type="share">
-							<text class="act-ico">⤴</text>
-							<text class="act-txt">分享</text>
-						</button>
-						<view
-							class="act-pill"
-							:class="{ on: isFav }"
-							hover-class="act-pill-hover"
-							@click="toggleFav"
-						>
-							<text class="act-ico">{{ isFav ? '★' : '☆' }}</text>
-							<text class="act-txt">{{ isFav ? '已收藏' : '收藏' }}</text>
-						</view>
-					</view>
 				</view>
 			</view>
 
 			<view class="body">
 				<!-- 简介 -->
-				<view class="card" v-if="descText">
+				<view class="card" v-if="descText || !reviewMode">
 					<view class="card-head">
 						<text class="card-title">简介</text>
+
+						<!-- 分享 + 收藏：和发射详情页同一套语义。
+						     分享是原生 button（open-type=share），转发卡片自带本页 id -->
+						<view class="head-acts" v-if="!reviewMode">
+							<button class="head-pill" open-type="share">
+								<text class="head-ico">⤴</text>
+								<text class="head-txt">分享</text>
+							</button>
+							<view
+								class="head-pill"
+								:class="{ on: isFav }"
+								hover-class="head-pill-hover"
+								@click="toggleFav"
+							>
+								<text class="head-ico">{{ isFav ? '★' : '☆' }}</text>
+								<text class="head-txt">{{ isFav ? '已收藏' : '收藏' }}</text>
+							</view>
+						</view>
 					</view>
-					<text class="desc" :class="{ 'desc-fold': needFold && !descOpen }">{{ descText }}</text>
+					<text class="desc" v-if="descText" :class="{ 'desc-fold': needFold && !descOpen }">{{ descText }}</text>
+					<!-- 约 11% 的型号没有简介：卡片还得在，否则分享/收藏入口跟着消失 -->
+					<text class="desc-empty" v-else>暂无简介</text>
 					<view class="desc-more" v-if="needFold" @click="descOpen = !descOpen">
 						<text class="desc-more-text">{{ descOpen ? '收起' : '展开全部' }}</text>
 						<view class="desc-more-arrow" :class="{ up: descOpen }"></view>
@@ -1087,58 +1089,55 @@ function byNetDesc(a, b) {
 	background: rgba(255, 255, 255, 0.24);
 }
 
-/* 分享 / 收藏：磨砂胶囊，和「图片库」按钮同一套语言 */
-.hero-acts {
+/* 分享 / 收藏：放进简介卡片的标题行靠右，卡片底色下用低对比胶囊 */
+.head-acts {
 	display: flex;
-	justify-content: flex-end;
-	margin-top: 16rpx;
-	/* .hero-body 整体屏蔽了事件，这里要单独收回来 —— 它是真要点的 */
-	pointer-events: auto;
+	align-items: center;
+	flex-shrink: 0;
+	margin-left: 16rpx;
 }
 
-.act-pill {
+.head-pill {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	margin: 0 16rpx 0 0;
-	padding: 8rpx 22rpx;
+	margin: 0 12rpx 0 0;
+	padding: 4rpx 16rpx;
 	border-radius: 999rpx;
-	background: rgba(255, 255, 255, 0.14);
-	-webkit-backdrop-filter: blur(20rpx) saturate(150%);
-	backdrop-filter: blur(20rpx) saturate(150%);
-	border: 1rpx solid rgba(255, 255, 255, 0.22);
-	font-size: 24rpx;
-	line-height: 1.4;
-	color: #dfe7f2;
+	background: rgba(255, 255, 255, 0.07);
+	border: 1rpx solid rgba(255, 255, 255, 0.12);
+	font-size: 22rpx;
+	line-height: 1.5;
+	color: #a8b6c8;
 }
 
 /* 原生 button 自带边框和默认横向留白，不清掉胶囊会变成双层 */
-.act-pill::after {
+.head-pill::after {
 	border: none;
 }
 
-/* 右对齐时最后一颗不能留右边距，否则整体往里缩 16rpx */
-.act-pill:last-child {
+/* 右对齐时最后一颗不能留右边距，否则整体往里缩 12rpx */
+.head-pill:last-child {
 	margin-right: 0;
 }
 
-.act-pill.on {
-	background: rgba(255, 214, 10, 0.18);
-	border-color: rgba(255, 214, 10, 0.45);
+.head-pill.on {
+	background: rgba(255, 214, 10, 0.14);
+	border-color: rgba(255, 214, 10, 0.4);
 	color: #ffd60a;
 }
 
-.act-pill-hover {
-	background: rgba(255, 255, 255, 0.26);
+.head-pill-hover {
+	background: rgba(255, 255, 255, 0.16);
 }
 
-.act-ico {
-	margin-right: 8rpx;
-	font-size: 26rpx;
+.head-ico {
+	margin-right: 6rpx;
+	font-size: 22rpx;
 }
 
-.act-txt {
-	line-height: 1.4;
+.head-txt {
+	line-height: 1.5;
 }
 
 /* 2×2 小方格当图标，纯 CSS，比图片省一次请求。
@@ -1267,6 +1266,14 @@ function byNetDesc(a, b) {
 	color: #cbd5e0;
 	font-size: 27rpx;
 	line-height: 1.78;
+}
+
+/* 没有简介时的空态：比正文更淡，不抢注意力 */
+.desc-empty {
+	display: block;
+	color: #6b7891;
+	font-size: 26rpx;
+	line-height: 1.7;
 }
 
 .desc-fold {
