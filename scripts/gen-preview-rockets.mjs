@@ -111,16 +111,15 @@ ${css}
   <view class="page" style="padding-top:50px">
     <view class="nav-mask" style="height:44px"></view>
 
-    <view class="hero">
-      <view class="hero-top">
+    <view class="hero">      <view class="hero-top">
         <text class="hero-kicker">SPACEDALLY / LAUNCH INDEX</text>
+      </view>
+      <view class="hero-title-row">
+        <text class="hero-title">全球火箭实力榜</text>
         <text class="hero-state">在役</text>
       </view>
       <view class="hero-main">
-        <view class="hero-left">
-          <text class="hero-title">全球火箭实力榜</text>
-          <text class="hero-sub">基于运力、可靠性、发射活跃度</text>
-        </view>
+        <text class="hero-sub">基于运力、可靠性、发射活跃度</text>
         <view class="hero-count">
           <text class="hero-num">${pool.length}</text>
           <text class="hero-unit">型号火箭</text>

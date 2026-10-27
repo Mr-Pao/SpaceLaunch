@@ -13,14 +13,17 @@
 		<view class="hero">
 			<view class="hero-top">
 				<text class="hero-kicker" @click="onTitleTap">SPACEDALLY / LAUNCH INDEX</text>
+			</view>
+
+			<!-- 标题和「在役」排在胶囊左侧的安全区，能一直顶到屏幕上部；
+			     数字与副标题整体落到胶囊下方，不会被压住 -->
+			<view class="hero-title-row">
+				<text class="hero-title">全球火箭实力榜</text>
 				<text class="hero-state">在役</text>
 			</view>
 
 			<view class="hero-main">
-				<view class="hero-left">
-					<text class="hero-title">全球火箭实力榜</text>
-					<text class="hero-sub">基于运力、可靠性、发射活跃度</text>
-				</view>
+				<text class="hero-sub">基于运力、可靠性、发射活跃度</text>
 				<view class="hero-count">
 					<text class="hero-num">{{ pool.length }}</text>
 					<text class="hero-unit">型号火箭</text>
@@ -584,9 +587,8 @@ function leoText(kg) {
 .hero {
 	position: relative;
 	margin-top: 0;
-	/* 顶上这 44px 是给微信胶囊让位的：留白放进卡片里，卡片背景仍顶到屏幕顶部，
-	   既不被胶囊压住，也不会在卡外留一条黑边 */
-	padding: 44px 26rpx 0;
+	/* 只让出状态栏那一点：胶囊在右侧，标题走左侧安全区就能顶上去 */
+	padding: 20rpx 26rpx 0;
 	background: linear-gradient(158deg, rgba(30, 39, 58, 0.96) 0%, rgba(18, 24, 36, 0.94) 58%, rgba(15, 20, 31, 0.96) 100%);
 	border: 1rpx solid rgba(255, 255, 255, 0.08);
 	border-radius: 26rpx;
@@ -619,9 +621,14 @@ function leoText(kg) {
 
 .hero-top {
 	position: relative;
+}
+
+/* 标题行整体在胶囊左侧的安全区内，所以能贴着屏幕上部走 */
+.hero-title-row {
+	position: relative;
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
+	margin-top: 8rpx;
 }
 
 .hero-kicker {
@@ -632,6 +639,8 @@ function leoText(kg) {
 
 .hero-state {
 	position: relative;
+	flex-shrink: 0;
+	margin-left: 16rpx;
 	padding: 3rpx 12rpx;
 	border: 1rpx solid rgba(255, 77, 79, 0.55);
 	border-radius: 6rpx;
@@ -643,19 +652,16 @@ function leoText(kg) {
 }
 
 .hero-main {
+	position: relative;
 	display: flex;
 	align-items: flex-end;
 	justify-content: space-between;
-	margin-top: 16rpx;
-}
-
-.hero-left {
-	flex: 1;
-	min-width: 0;
+	margin-top: 10rpx;
 }
 
 .hero-title {
-	display: block;
+	flex: 1;
+	min-width: 0;
 	color: #ffffff;
 	font-size: 48rpx;
 	font-weight: 700;
@@ -665,10 +671,11 @@ function leoText(kg) {
 }
 
 .hero-sub {
-	display: block;
-	margin-top: 8rpx;
+	flex: 1;
+	min-width: 0;
 	color: #6b7891;
 	font-size: 22rpx;
+	line-height: 1.5;
 }
 
 .hero-count {
