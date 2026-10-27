@@ -140,12 +140,10 @@
 						<text class="rank-more">详情</text>
 					</view>
 
-					<text class="rank-maker">{{ r.manufacturer || '未知制造商' }}</text>
+					<!-- 中文在上、英文在下：中文名没有对应词条时两者相同，就不重复 -->
+					<text class="rank-en" v-if="r.enName">{{ r.enName }}</text>
 
-					<view class="rank-tags" v-if="r.family || r.variant">
-						<text class="rtag" v-if="r.family">{{ r.family }}</text>
-						<text class="rtag" v-if="r.variant">{{ r.variant }}</text>
-					</view>
+					<text class="rank-maker">{{ r.makerZh || '未知制造商' }}</text>
 
 					<view class="rank-metrics">
 						<view class="metric">
@@ -191,7 +189,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { rocketName } from '@/utils/format.js'
+import { rocketName, agencyLabel } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { setOverride, getDebugInfo } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -489,6 +487,7 @@ export default {
 
 				this.all = list.map((x) => {
 					const zh = rocketName(x)
+					const en = x.full_name || x.name || ''
 					const ok = x.successful_launches || 0
 					const bad = x.failed_launches || 0
 					const tried = ok + bad
@@ -503,6 +502,10 @@ export default {
 					return {
 						...x,
 						zhName: zh,
+						// 英文名和中文名不同才占一行
+						enName: en && en !== zh ? en : '',
+						// 机构优先用中文名（中国航天科技 / 蓝箭航天…），没词条就回原文
+						makerZh: agencyLabel(x.manufacturer) || '',
 						region: regionOf(x),
 						rate,
 						rateText: tried > 0 ? (rate * 100).toFixed(1) + '%' : '—',
@@ -1034,30 +1037,26 @@ function leoText(kg) {
 	line-height: 1.6;
 }
 
-.rank-maker {
+/* 英文名：中文名与它相同时不显示，所以不用考虑占位 */
+.rank-en {
 	display: block;
-	margin-top: 6rpx;
-	color: #6b7891;
-	font-size: 21rpx;
+	margin-top: 4rpx;
+	color: #7d8ba0;
+	font-size: 20rpx;
+	letter-spacing: 0.3rpx;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
-.rank-tags {
-	display: flex;
-	flex-wrap: wrap;
-	margin-top: 8rpx;
-}
-
-.rtag {
-	margin: 0 8rpx 4rpx 0;
-	padding: 2rpx 12rpx;
-	background: rgba(255, 255, 255, 0.055);
-	border: 1rpx solid rgba(255, 255, 255, 0.06);
-	border-radius: 4rpx;
-	color: #97a4b6;
-	font-size: 18rpx;
+.rank-maker {
+	display: block;
+	margin-top: 10rpx;
+	color: #8fa0b6;
+	font-size: 21rpx;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* 三项指标平铺在卡片底部，数值大、标签小 */

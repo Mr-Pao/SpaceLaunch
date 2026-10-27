@@ -833,3 +833,63 @@ export function costText(usd) {
 	if (v >= 1e4) return Math.round(v / 1e4) + ' 万美元'
 	return Math.round(v) + ' 美元'
 }
+
+/**
+ * 发射场地名中文化。
+ *
+ * pad.location 是「场地, 州, 国」的整串（"Cape Canaveral SFS, FL, USA"），
+ * 和机构那种精确 key 不同，只能拿已知地名的子串去比。
+ * 命不中就原样返回 —— 宁可不翻，也不要把地点翻错。
+ */
+const PLACE_ZH = [
+	['cape canaveral', '卡纳维拉尔角'],
+	['kennedy space center', '肯尼迪航天中心'],
+	['vandenberg', '范登堡'],
+	['starbase', '星际基地'],
+	['boca chica', '博卡奇卡'],
+	['wallops', '沃洛普斯'],
+	['pacific spaceport', '太平洋航天港'],
+	['mojave', '莫哈韦'],
+	['jiuquan', '酒泉卫星发射中心'],
+	['taiyuan', '太原卫星发射中心'],
+	['xichang', '西昌卫星发射中心'],
+	['wenchang', '文昌航天发射场'],
+	['hainan commercial', '海南商业航天发射场'],
+	['baikonur', '拜科努尔航天发射场'],
+	['plesetsk', '普列谢茨克航天发射场'],
+	['vostochny', '东方航天发射场'],
+	['kapustin yar', '卡普斯京亚尔'],
+	['kourou', '库鲁航天中心'],
+	['tanegashima', '种子岛宇宙中心'],
+	['uchinoura', '内之浦宇宙空间观测所'],
+	['satish dhawan', '萨迪什·达万航天中心'],
+	['sriharikota', '斯里哈里科塔'],
+	['mahia', '马希亚半岛'],
+	['naro', '罗老宇宙中心'],
+	['semnan', '塞姆南'],
+	['imam khomeini', '伊玛目霍梅尼航天中心'],
+	['palmachim', '帕勒马希姆'],
+	['alcantara', '阿尔坎塔拉发射中心'],
+	['esrange', '埃斯兰奇'],
+	['andoya', '安岛航天港'],
+	['woomera', '伍默拉'],
+	['sutherland', '萨瑟兰']
+]
+
+export function placeZh(loc) {
+	const s = String(loc == null ? '' : loc)
+	if (!s) return ''
+	const low = s.toLowerCase()
+	for (const pair of PLACE_ZH) {
+		if (low.indexOf(pair[0]) !== -1) return pair[1]
+	}
+	return s
+}
+
+/** 工位名缩写：Space Launch Complex 40 → SLC-40，Launch Complex 39A → LC-39A */
+export function padShort(name) {
+	return String(name == null ? '' : name)
+		.replace(/^Space Launch Complex\s+/i, 'SLC-')
+		.replace(/^Launch Complex\s+/i, 'LC-')
+		.replace(/^Launch Pad\s+/i, 'LP-')
+}

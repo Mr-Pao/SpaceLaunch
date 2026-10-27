@@ -249,7 +249,7 @@
 					>
 						<text class="pad-idx">{{ i + 1 }}</text>
 						<view class="pad-body">
-							<text class="pad-name">{{ p.name }}</text>
+							<text class="pad-name">{{ p.short }}</text>
 							<text class="pad-loc" v-if="p.location">{{ p.location }}</text>
 						</view>
 						<text class="arrow">›</text>
@@ -380,7 +380,9 @@ import {
 	countryOf,
 	isStillUpcoming,
 	textUnits,
-	coreStatus
+	coreStatus,
+	placeZh,
+	padShort
 } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import { collectMedia } from '@/utils/media.js'
@@ -556,7 +558,12 @@ export default {
 
 		/** 常用发射场：CI 从该型号的发射记录里聚合，按次数取前 3 */
 		pads() {
-			return (this.config && this.config.pads) || []
+			const arr = (this.config && this.config.pads) || []
+			return arr.map((p) => ({
+				name: p.name,
+				short: padShort(p.name) || p.name,
+				location: placeZh(p.location)
+			}))
 		},
 
 		/** 发射机构：该系列全部发射记录里出现过的机构，去重拼接。
