@@ -145,7 +145,7 @@
 
 					<!-- 制造商 + 国旗：国籍靠机构名认，认不出的不显示国旗也不留空位 -->
 					<view class="rank-maker-row">
-						<text class="flag" v-if="r.flag">{{ r.flag }}</text>
+						<image class="flag" v-if="r.flag" :src="r.flag" mode="aspectFit"></image>
 						<text class="rank-maker">{{ r.makerZh || '未知制造商' }}</text>
 					</view>
 
@@ -193,7 +193,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { rocketName, rocketFullName, agencyLabel, countryFlag } from '@/utils/format.js'
+import { rocketName, rocketFullName, agencyLabel, flagSrc } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { setOverride, getDebugInfo } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -511,7 +511,7 @@ export default {
 						enName: en && en !== zh ? en : '',
 						// 机构优先用中文名（中国航天科技 / 蓝箭航天…），没词条就回原文
 						makerZh: agencyLabel(x.manufacturer) || '',
-						flag: countryFlag(x.manufacturer),
+						flag: flagSrc(x.manufacturer),
 						region: regionOf(x),
 						rate,
 						rateText: tried > 0 ? (rate * 100).toFixed(1) + '%' : '—',
@@ -1073,9 +1073,10 @@ function leoText(kg) {
 
 .flag {
 	flex-shrink: 0;
+	width: 34rpx;
+	height: 24rpx;
 	margin-right: 8rpx;
-	font-size: 22rpx;
-	line-height: 1;
+	border-radius: 3rpx;
 }
 
 .rank-maker {

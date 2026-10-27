@@ -35,7 +35,7 @@ const scored = list
 			...x,
 			rate,
 			makerZh: fmt.agencyLabel(x.manufacturer) || '',
-			flag: fmt.countryFlag(x.manufacturer),
+			flag: fmt.flagSrc(x.manufacturer),
 			score: 0.45 * ((x.total_launch_count || 0) / maxL) + 0.35 * rate + 0.2 * ((x.leo_capacity || 0) / maxC)
 		}
 	})
@@ -75,7 +75,7 @@ const card = (r, i) => `
       <text class="rank-name">${nameOf(r)}</text>
       <text class="rank-more">详情</text>
     </view>
-    <view class="rank-maker-row">${r.flag ? `<text class="flag">${r.flag}</text>` : ''}<text class="rank-maker">${r.makerZh || r.manufacturer || '未知制造商'}</text></view>
+    <view class="rank-maker-row">${r.flag ? `<img class="flag" src="${r.flag}" style="object-fit:contain">` : ''}<text class="rank-maker">${r.makerZh || r.manufacturer || '未知制造商'}</text></view>
     <view class="rank-tags">
       ${r.families && r.families[0] ? `<text class="rtag">${r.families[0]}</text>` : ''}
       ${r.variant ? `<text class="rtag">${r.variant}</text>` : ''}
@@ -185,6 +185,11 @@ ${css}
 </div>
 </body></html>`
 
-fs.writeFileSync(path.join(ROOT, 'preview-rockets.html'), html, 'utf8')
+// 小程序里是 /static/... 绝对路径，本地 HTML 要改成相对路径才找得到图
+fs.writeFileSync(
+	path.join(ROOT, 'preview-rockets.html'),
+	html.replace(/src="\/static\//g, 'src="static/'),
+	'utf8'
+)
 console.log('已生成 preview-rockets.html；榜单条数', pool.length)
 console.log('Top6：', top.slice(0, 6).map((x) => x.name).join(' | '))

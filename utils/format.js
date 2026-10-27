@@ -1224,32 +1224,47 @@ export function eventName(ev) {
  *   · "Rocket Lab USA" 要在中国 / 美国组里先拦掉，剩下的 Rocket Lab 才是新西兰。
  */
 const FLAG_RULES = [
-	[/china|casc|casic|land ?space|galactic energy|i-?space|cas space|expace|orienspace|space pioneer|deep blue|one ?space|kuaizhou|zhuque|ceres|hyperbola|gravity|tianlong|jielong|kinetica|pallas|lijian|kaituo|chinese/i, '🇨🇳'],
-	[/spacex|united launch|\bula\b|blue origin|northrop|orbital (sciences|atk)|firefly|astra space|relativity|stoke|masten|lockheed|martin marietta|mcdonnell|convair|vought|chrysler|boeing|general dynamics|nasa|national aeronautics|air force|virgin (orbit|galactic)|abl space|phantom space|kodiak|rocket lab usa|space systems|spacex/i, '🇺🇸'],
-	[/yuzhnoye|yuzhmash|ukrain/i, '🇺🇦'],
-	[/khrunichev|progress rocket|energia|roskosmos|russian|makeyev|strategic rocket|soviet|moscow institute|chemical automatics/i, '🇷🇺'],
-	[/dprk|north korea|korean committee of space/i, '🇰🇵'],
-	[/korea|kari|innospace|perigee/i, '🇰🇷'],
-	[/mitsubishi|jaxa|japan aerospace|isas|institute of space and astronautical|interstellar technologies|ihi|japanese/i, '🇯🇵'],
-	[/indian space|isro|skyroot|agnikul|dhruva|india/i, '🇮🇳'],
-	[/rocket lab/i, '🇳🇿'],
-	[/israel|\biai\b/i, '🇮🇱'],
-	[/iran/i, '🇮🇷'],
-	[/brazil|conae|argentina/i, '🇧🇷'],
-	[/aérospatiale|aerospatiale|latitude|maia space|hyprspace/i, '🇫🇷'],
-	[/hyimpulse|isar aerospace|rocket factory|ohb|augsburg/i, '🇩🇪'],
-	[/avio/i, '🇮🇹'],
-	[/skyrora|orbex/i, '🇬🇧'],
-	[/pld space|payload aerospace/i, '🇪🇸'],
-	[/swedish space|andøya|andoya|esrange/i, '🇸🇪'],
-	[/\besa\b|european (space|launcher)|arianespace|arianegroup|eldo/i, '🇪🇺']
+	[/china|casc|casic|land ?space|galactic energy|i-?space|cas space|expace|orienspace|space pioneer|deep blue|one ?space|kuaizhou|zhuque|ceres|hyperbola|gravity|tianlong|jielong|kinetica|pallas|lijian|kaituo|chinese/i, 'cn'],
+	[/spacex|united launch|\bula\b|blue origin|northrop|orbital (sciences|atk)|firefly|astra space|relativity|stoke|masten|lockheed|martin marietta|mcdonnell|convair|vought|chrysler|boeing|general dynamics|nasa|national aeronautics|air force|virgin (orbit|galactic)|abl space|phantom space|kodiak|rocket lab usa|space systems/i, 'us'],
+	[/yuzhnoye|yuzhmash|ukrain/i, 'ua'],
+	[/khrunichev|progress rocket|energia|roskosmos|russian|makeyev|strategic rocket|soviet|moscow institute|chemical automatics/i, 'ru'],
+	[/dprk|north korea|korean committee of space/i, 'kp'],
+	[/korea|kari|innospace|perigee/i, 'kr'],
+	[/mitsubishi|jaxa|japan aerospace|isas|institute of space and astronautical|interstellar technologies|ihi|japanese/i, 'jp'],
+	[/indian space|isro|skyroot|agnikul|dhruva|india/i, 'in'],
+	[/rocket lab/i, 'nz'],
+	[/israel|\biai\b/i, 'il'],
+	[/iran/i, 'ir'],
+	[/brazil|conae|argentina/i, 'br'],
+	[/aérospatiale|aerospatiale|latitude|maia space|hyprspace/i, 'fr'],
+	[/hyimpulse|isar aerospace|rocket factory|ohb|augsburg/i, 'de'],
+	[/avio/i, 'it'],
+	[/skyrora|orbex/i, 'gb'],
+	[/pld space|payload aerospace/i, 'es'],
+	[/andøya|andoya|nammo/i, 'no'],
+	[/swedish space|esrange/i, 'se'],
+	[/\besa\b|european (space|launcher)|arianespace|arianegroup|eldo/i, 'eu']
 ]
 
-export function countryFlag(name) {
+/** 机构 → ISO 国家代码（两位小写）。认不出返回空串 */
+export function countryCode(name) {
 	const s = String(name == null ? '' : name).trim()
 	if (!s) return ''
-	for (const [re, flag] of FLAG_RULES) {
-		if (re.test(s)) return flag
+	for (const [re, code] of FLAG_RULES) {
+		if (re.test(s)) return code
 	}
 	return ''
+}
+
+/**
+ * 国旗图标路径。
+ *
+ * 图放在 static/flags/ 下（20 面，w80 PNG，合计不到 10KB），随主包打包，
+ * 不走网络也没有加载空窗 —— 比 emoji 稳：emoji 在部分安卓 ROM 上会被
+ * 系统字体替换成两个字母（US / CN），观感很差。
+ * 认不出的机构返回空串，模板 v-if 不渲染节点。
+ */
+export function flagSrc(name) {
+	const c = countryCode(name)
+	return c ? '/static/flags/' + c + '.png' : ''
 }

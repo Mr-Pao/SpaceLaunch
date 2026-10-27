@@ -187,13 +187,14 @@ async function testFormat() {
 	eq(f.eventTypeName('Orbital Insertion'), '入轨', '活动类型：Orbital Insertion 是入轨，不是轨道插入')
 
 	// 国旗：靠机构名认国别，顺序错就会串旗
-	eq(f.countryFlag('SpaceX'), '🇺🇸', '国旗：SpaceX')
-	eq(f.countryFlag('China Aerospace Science and Technology Corporation'), '🇨🇳', '国旗：CASC')
-	eq(f.countryFlag('Rocket Lab'), '🇳🇿', '国旗：Rocket Lab 归新西兰')
-	eq(f.countryFlag('Rocket Lab USA'), '🇺🇸', '国旗：Rocket Lab USA 归美国')
-	eq(f.countryFlag('Yuzhnoye Design Bureau'), '🇺🇦', '国旗：乌克兰不被俄罗斯规则吃掉')
-	eq(f.countryFlag('Korean Committee of Space Technology'), '🇰🇵', '国旗：朝鲜先于韩国匹配')
-	eq(f.countryFlag('Unknown Corp'), '', '国旗：认不出返回空串')
+	eq(f.countryCode('SpaceX'), 'us', '国旗：SpaceX')
+	eq(f.countryCode('China Aerospace Science and Technology Corporation'), 'cn', '国旗：CASC')
+	eq(f.countryCode('Rocket Lab'), 'nz', '国旗：Rocket Lab 归新西兰')
+	eq(f.countryCode('Rocket Lab USA'), 'us', '国旗：Rocket Lab USA 归美国')
+	eq(f.countryCode('Yuzhnoye Design Bureau'), 'ua', '国旗：乌克兰不被俄罗斯规则吃掉')
+	eq(f.countryCode('Korean Committee of Space Technology'), 'kp', '国旗：朝鲜先于韩国匹配')
+	eq(f.countryCode('Unknown Corp'), '', '国旗：认不出返回空串')
+	eq(f.flagSrc('SpaceX'), '/static/flags/us.png', '国旗：图标路径指向 static/flags')
 
 	// 发射状态的时间兜底：LL2 的 In Flight 会滞后几小时，不能一直挂着
 	{

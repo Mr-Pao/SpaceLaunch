@@ -15,6 +15,7 @@
 			<text class="nl-title">{{ title }}</text>
 
 			<view class="nl-meta" v-if="provider || padName">
+				<image class="nl-flag" v-if="providerFlag" :src="providerFlag" mode="aspectFit"></image>
 				<text class="nl-meta-text">{{ metaText }}</text>
 			</view>
 
@@ -36,7 +37,7 @@
 </template>
 
 <script>
-import { formatDateTime, statusInfo, launchTitle, agencyLabel, placeZh, countryFlag } from '@/utils/format.js'
+import { formatDateTime, statusInfo, launchTitle, agencyLabel, placeZh, flagSrc } from '@/utils/format.js'
 
 export default {
 	name: 'next-launch',
@@ -66,11 +67,10 @@ export default {
 		},
 		// 国旗用英文原名认；接在机构前面，仍用「·」和场地分开
 		providerFlag() {
-			return countryFlag(this.item.launch_service_provider && this.item.launch_service_provider.name)
+			return flagSrc(this.item.launch_service_provider && this.item.launch_service_provider.name)
 		},
 		metaText() {
-			const p = this.providerFlag ? this.providerFlag + ' ' + this.provider : this.provider
-			return [p, this.padName].filter(Boolean).join(' · ')
+			return [this.provider, this.padName].filter(Boolean).join(' · ')
 		},
 		timeText() {
 			const abs = formatDateTime(this.item.net)
@@ -177,6 +177,14 @@ export default {
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
 	overflow: hidden;
+}
+
+.nl-flag {
+	flex-shrink: 0;
+	width: 34rpx;
+	height: 24rpx;
+	margin-right: 10rpx;
+	border-radius: 3rpx;
 }
 
 .nl-meta {

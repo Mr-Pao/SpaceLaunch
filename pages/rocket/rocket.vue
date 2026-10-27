@@ -181,7 +181,7 @@
 						@click="goAgency(agencyNames.split('、')[0])"
 					>
 						<text class="agency-label">发射机构</text>
-						<text class="agency-flag" v-if="agencyFlag">{{ agencyFlag }}</text>
+						<image class="agency-flag" v-if="agencyFlag" :src="agencyFlag" mode="aspectFit"></image>
 						<text class="agency-name">{{ agencyNamesZh }}</text>
 						<view class="agency-arrow"></view>
 					</view>
@@ -347,7 +347,7 @@ import {
 	coreStatus,
 	placeZh,
 	padShort,
-	countryFlag
+	flagSrc
 } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
 import { collectMedia } from '@/utils/media.js'
@@ -557,7 +557,7 @@ export default {
 		// 只取第一个机构的国旗：一行里挂三面旗会糊成一片
 		agencyFlag() {
 			const first = (this.agencyNames || '').split('、')[0]
-			return countryFlag(first)
+			return flagSrc(first)
 		},
 
 		/**
@@ -1368,9 +1368,10 @@ function byNetDesc(a, b) {
 
 .agency-flag {
 	flex-shrink: 0;
+	width: 36rpx;
+	height: 25rpx;
 	margin-left: 10rpx;
-	font-size: 26rpx;
-	line-height: 1.2;
+	border-radius: 3rpx;
 }
 
 .agency-name {
