@@ -392,6 +392,9 @@ function slimLauncher(c) {
 		// 运力单位 kg
 		leo_capacity: num(c.leo_capacity),
 		gto_capacity: num(c.gto_capacity),
+		// 高轨 / 太阳同步轨道：详情页参数表补齐这两档，免得只有 LEO/GTO 半张表
+		geo_capacity: num(c.geo_capacity),
+		sso_capacity: num(c.sso_capacity),
 		maiden_flight: str(c.maiden_flight),
 		min_stage: num(c.min_stage),
 		max_stage: num(c.max_stage),
@@ -404,6 +407,16 @@ function slimLauncher(c) {
 		successful_launches: num(c.successful_launches),
 		failed_launches: num(c.failed_launches),
 		pending_launches: num(c.pending_launches),
+		// 连续成功次数：和「累计成功」是两个口径，榜单卡片和详情页都用得上
+		consecutive_successful_launches: num(c.consecutive_successful_launches),
+
+		// 回收记录：只有可复用型号有值，其余为 0
+		attempted_landings: num(c.attempted_landings),
+		successful_landings: num(c.successful_landings),
+		failed_landings: num(c.failed_landings),
+		consecutive_successful_landings: num(c.consecutive_successful_landings),
+		// 最快周转（天），回收复用的硬指标
+		fastest_turnaround: num(c.fastest_turnaround),
 
 		description: str(c.description),
 		// 中文由 backfill 任务慢慢补，前端回退英文

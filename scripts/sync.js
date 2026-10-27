@@ -73,68 +73,100 @@ async function readCosJson(key) {
 
 // 各数据集的抓取策略。limit 与 mode 都是实测调优的结果，改之前先看规划文档第七节。
 /**
- * 型号图兜底。
+ * 用发射记录反哺型号数据。
  *
- * LL2 的型号库里有一批现役型号根本没有 image_url（新构型、冷门型号，
- * 量产前的 Starship、Gravity-2、Nebula-1 都在里面），前端只能显示占位火箭。
+ * 两件事一起做，只扫一遍：
+ *   1. **补配图**：LL2 型号库里有一批型号没有 image_url（新构型、冷门型号），
+ *      用它最近一次发射的现场图填上，比空占位有信息量。
+ *   2. **聚合常用发射场**：型号表没有 pad 字段，但每条发射都带
+ *      pad.name（工位）+ pad.location.name（发射场），按出现次数取前 3。
  *
- * 但只要有发射记录，发射快照里每条都带现场图 —— 用它最近一次发射的图填上，
- * 比一个空占位有信息量得多。必须在 mirrorImages 之前跑：补进来的是原始 URL，
- * 还要走一遍镜像才会变成 COS 地址。
+ * 必须在 mirrorImages 之前跑：补进来的图是原始 URL，还要走一遍镜像。
+ * 近期快照只覆盖最近 100 多条，冷门型号和完整发射场统计都要翻历史归档
+ * （76 片 × 100 条）。读的是自家 COS，不耗 LL2 配额。
  */
-async function fillLauncherImages(list, readCosJson) {
-	const need = list.filter((x) => !x.image)
-	if (!need.length) return
+async function enrichLaunchersFromLaunches(list, readCosJson) {
+	const wantImg = new Map(list.filter((x) => !x.image).map((x) => [String(x.id), x]))
+	// 发射场只给现役型号聚合：退役型号没人看，省掉三分之二数据量
+	const wantPad = new Set(list.filter((x) => x.active).map((x) => String(x.id)))
+	const padAgg = new Map()
+	let scanned = 0
 
-	const want = new Map(need.map((x) => [String(x.id), x]))
-
-	// 扫一份快照，命中的就从待找集合里摘掉，返回还剩几个
 	const apply = (snap) => {
 		const arr = snap && (snap.list || snap)
-		if (!Array.isArray(arr)) return want.size
+		if (!Array.isArray(arr)) return
+		scanned += arr.length
+
 		for (const l of arr) {
 			if (!l || !l.rocket) continue
-			const cid = l.rocket.configuration && l.rocket.configuration.id
-			if (cid == null) continue
-			const k = String(cid)
-			const target = want.get(k)
-			if (!target || !l.image) continue
-			target.image = l.image
-			want.delete(k)
+			const cfg = l.rocket.configuration
+			if (!cfg || cfg.id == null) continue
+			const k = String(cfg.id)
+
+			if (wantImg.size) {
+				const target = wantImg.get(k)
+				if (target && l.image) {
+					target.image = l.image
+					wantImg.delete(k)
+				}
+			}
+
+			if (!wantPad.has(k)) continue
+			const padName = l.pad && l.pad.name
+			if (!padName) continue
+
+			let bucket = padAgg.get(k)
+			if (!bucket) {
+				bucket = new Map()
+				padAgg.set(k, bucket)
+			}
+			const cur = bucket.get(padName) || { name: padName, location: '', count: 0 }
+			cur.count++
+			if (!cur.location && l.pad.location && l.pad.location.name) {
+				cur.location = l.pad.location.name
+			}
+			bucket.set(padName, cur)
 		}
-		return want.size
 	}
 
-	// 1) 最近两批快照：两次读取，先捞近期型号
+	// 1) 近期两批快照
 	for (const key of ['space-data/launches-upcoming.json', 'space-data/launches-previous.json']) {
-		if (!want.size) break
 		try {
 			apply(await readCosJson(key))
 		} catch (e) {
-			// 快照缺失不影响后面走归档
+			// 快照缺失不影响归档那一轮
 		}
 	}
 
-	// 2) 剩下的都是冷门型号（Safir / Minotaur-C / Shavit…），近期快照里没有，
-	//    扫历史归档分片。76 片约 7600 条，全命中就提前停，读的是自家 COS 不耗 LL2 配额
-	if (want.size) {
-		try {
-			const idx = await readCosJson('space-data/history/index.json')
-			for (const p of (idx && idx.pages) || []) {
-				if (!want.size) break
-				if (!p || !p.file) continue
-				try {
-					apply(await readCosJson('space-data/history/' + p.file))
-				} catch (e) {
-					// 单片失败跳过，别让一片坏掉整轮补图
-				}
+	// 2) 历史归档：冷门型号的配图和长尾发射场都在这里
+	try {
+		const idx = await readCosJson('space-data/history/index.json')
+		for (const p of (idx && idx.pages) || []) {
+			if (!p || !p.file) continue
+			try {
+				apply(await readCosJson('space-data/history/' + p.file))
+			} catch (e) {
+				// 单片坏掉就跳过，别让一片拖垮整轮
 			}
-		} catch (e) {
-			console.warn(`  ! 历史归档不可读，补图跳过: ${e.message}`)
 		}
+	} catch (e) {
+		console.warn(`  ! 历史归档不可读，发射场与补图跳过: ${e.message}`)
 	}
 
-	console.log(`  · 型号补图 ${need.length - want.size}/${need.length}`)
+	let padFilled = 0
+	for (const x of list) {
+		const bucket = padAgg.get(String(x.id))
+		if (!bucket) continue
+		x.pads = [...bucket.values()]
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 3)
+			.map((p) => ({ name: p.name, location: p.location }))
+		padFilled++
+	}
+
+	console.log(
+		`  · 扫发射 ${scanned} 条 → 发射场 ${padFilled} 个型号，仍缺图 ${wantImg.size} 个`
+	)
 }
 
 const DATASETS = {
@@ -299,8 +331,8 @@ const DATASETS = {
 		file: 'launchers.json',
 		cacheControl: 'public, max-age=86400',
 		images: ['image'],
-		// 型号库里缺图的，用该型号最近一次发射的现场图补
-		fillImages: fillLauncherImages,
+		// 用发射记录补型号数据：缺图的补图，并把常用发射场聚合进来
+		fromLaunches: enrichLaunchersFromLaunches,
 		// 型号简介回填中文：471 条，首轮 20 万字符，之后按原文哈希零命中。
 		// 详情页「简介」卡片只有这一段正文，不翻就永远是英文段落。
 		localize: localizeLaunchers,
@@ -607,12 +639,12 @@ async function runDataset(name) {
 		}
 	}
 
-	// 型号图兜底：必须在 mirrorImages 之前，补进来的原始 URL 还要走一遍镜像
-	if (ds.fillImages) {
+	// 型号数据反哺：必须在 mirrorImages 之前，补进来的原始 URL 还要走一遍镜像
+	if (ds.fromLaunches) {
 		try {
-			await ds.fillImages(list, readCosJson)
+			await ds.fromLaunches(list, readCosJson)
 		} catch (e) {
-			console.warn(`  ! 型号补图失败（不影响其它字段）: ${e.message}`)
+			console.warn(`  ! 发射记录反哺失败（不影响其它字段）: ${e.message}`)
 		}
 	}
 
