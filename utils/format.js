@@ -286,8 +286,8 @@ const ROCKET_ZH = {
 	'Delta IV Heavy': '德尔塔 4 重型',
 	'Delta II': '德尔塔 2 号',
 	Vulcan: '火神',
-	'Vulcan VC2S': '火神',
-	'Vulcan VC4L': '火神',
+	'Vulcan VC2S': '火神 VC2S',
+	'Vulcan VC4L': '火神 VC4L',
 	'New Glenn': '新格伦',
 	Antares: '心宿二',
 	Pegasus: '飞马座',
@@ -1119,15 +1119,24 @@ export function rocketFullName(config) {
 	}
 
 	const variant = String(config.variant || '').trim()
-	if (variant) {
-		// 基础名本身已经含这个后缀时不要再拼一遍：
-		// Falcon Heavy 的 variant 就是 "Heavy"，拼出来会变成「猎鹰重型 Heavy」
-		const base = String(config.name || config.full_name || '').toLowerCase()
-		const dupInBase = base.indexOf(variant.toLowerCase()) !== -1
-		const dupInZh = zh.indexOf(variant) !== -1
-		if (!dupInBase && !dupInZh) return zh + ' ' + variant
+	if (!variant) return zh
+
+	const rawName = String(config.name || '')
+	const nameHasVariant = rawName.toLowerCase().indexOf(variant.toLowerCase()) !== -1
+	const zhHasVariant = zh.indexOf(variant) !== -1
+
+	if (nameHasVariant) {
+		// 名称本身已经带着构型（Falcon Heavy / Vulcan VC2S / Long March 2D），
+		// 要判断中文名是否也已经译到了构型这一级：
+		//   · 完整名有词条（Falcon Heavy → 猎鹰重型）→ 已译到，别再拼出「猎鹰重型 Heavy」
+		//   · 长征系列走编号规则，规则本身含构型（2D → 丁）→ 已译到
+		//   · 都没有（Vulcan VC2S 只匹配到前缀 Vulcan → 火神）→ 说明构型丢了，补回来
+		const named = ROCKET_ZH[rawName] || ROCKET_ZH[String(config.full_name || '')]
+		if (named || zhLongMarch(rawName)) return zh
+		return zhHasVariant ? zh : zh + ' ' + variant
 	}
-	return zh
+
+	return zhHasVariant ? zh : zh + ' ' + variant
 }
 
 /**
