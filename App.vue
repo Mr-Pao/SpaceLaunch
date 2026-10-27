@@ -19,6 +19,19 @@ export default {
 		getConfig().catch(() => {})
 		// 预热各 tab 的数据集（错开时间片，不挤占启动）
 		this.warmData()
+
+		// 锁死 WebView 窗口底色为深色，消除 iOS 自定义导航栏页面
+		// 转场（详情页 navigateBack）时偶尔闪一下的白底/透明底。
+		// 仅微信小程序需要；其他端忽略。
+		// #ifdef MP-WEIXIN
+		try {
+			uni.setBackgroundColor({
+				backgroundColor: '#0a0e17',
+				backgroundColorTop: '#0a0e17',
+				backgroundColorBottom: '#0a0e17'
+			})
+		} catch (e) {}
+		// #endif
 	},
 
 	onShow() {
