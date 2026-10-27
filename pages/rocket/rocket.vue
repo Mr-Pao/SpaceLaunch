@@ -234,28 +234,6 @@
 					</view>
 				</view>
 
-				<!-- 常用发射场：按该型号历史发射次数取前三个 -->
-				<view class="card" v-if="pads.length">
-					<view class="card-head">
-						<text class="card-title">常用发射场</text>
-						<text class="card-note">按发射次数</text>
-					</view>
-					<view
-						class="pad-line"
-						v-for="(p, i) in pads"
-						:key="p.name"
-						hover-class="pad-line-hover"
-						@click="goPad(p.name)"
-					>
-						<text class="pad-idx">{{ i + 1 }}</text>
-						<view class="pad-body">
-							<text class="pad-name">{{ p.short }}</text>
-							<text class="pad-loc" v-if="p.location">{{ p.location }}</text>
-						</view>
-						<text class="arrow">›</text>
-					</view>
-				</view>
-
 				<!-- 芯级：这个型号真实飞过的第一级硬件，编号 + 战绩。
 				     数据来自芯级库（CI 每天全量抓），按型号 id 聚合 -->
 				<view class="section" v-if="cores.length">
@@ -301,16 +279,16 @@
 					<view class="section" v-if="pads.length">
 						<view class="section-head">
 							<text class="section-title">发射场地</text>
-							<text class="section-note" v-if="padsPartial">基于近期记录</text>
+							<text class="section-note">按发射次数</text>
 						</view>
 
 						<view class="pad-card">
 							<view class="pad-row" v-for="p in pads" :key="p.name" hover-class="pad-hover" @click="goPad(p.name)">
 								<view class="pad-body">
-									<text class="pad-name">{{ p.name }}</text>
+									<text class="pad-name">{{ p.short }}</text>
 									<view class="pad-meta">
-										<text class="pad-country" v-if="p.country">{{ p.country }}</text>
-										<text class="pad-count">{{ p.count }} 次</text>
+										<text class="pad-country" v-if="p.location">{{ p.location }}</text>
+										<text class="pad-count" v-if="p.count">{{ p.count }} 次</text>
 									</view>
 								</view>
 								<view class="pad-arrow"></view>
@@ -556,13 +534,18 @@ export default {
 			return out.filter((s) => s.value !== '0')
 		},
 
-		/** 常用发射场：CI 从该型号的发射记录里聚合，按次数取前 3 */
+		/**
+		 * 常用发射场。
+		 * 数据来自 CI 在型号库上做的全历史聚合（`pads`），
+		 * 这里只做展示层转换：工位名缩写 + 场地名中文。
+		 */
 		pads() {
 			const arr = (this.config && this.config.pads) || []
 			return arr.map((p) => ({
 				name: p.name,
 				short: padShort(p.name) || p.name,
-				location: placeZh(p.location)
+				location: placeZh(p.location),
+				count: p.count || 0
 			}))
 		},
 
@@ -1649,53 +1632,6 @@ function byNetDesc(a, b) {
 
 .param-row:first-child {
 	border-top: none;
-}
-
-/* ---- 常用发射场 ---- */
-.pad-line {
-	display: flex;
-	align-items: center;
-	padding: 16rpx 0;
-	border-top: 1rpx solid rgba(255, 255, 255, 0.04);
-}
-
-.pad-line:first-of-type {
-	border-top: none;
-}
-
-.pad-line-hover {
-	background: rgba(255, 255, 255, 0.03);
-}
-
-.pad-idx {
-	width: 40rpx;
-	flex-shrink: 0;
-	color: #4a5568;
-	font-size: 22rpx;
-}
-
-.pad-body {
-	flex: 1;
-	min-width: 0;
-}
-
-.pad-name {
-	display: block;
-	color: #e6edf6;
-	font-size: 26rpx;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.pad-loc {
-	display: block;
-	margin-top: 4rpx;
-	color: #6b7891;
-	font-size: 21rpx;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 .param-label {

@@ -159,8 +159,8 @@ async function enrichLaunchersFromLaunches(list, readCosJson) {
 		if (!bucket) continue
 		x.pads = [...bucket.values()]
 			.sort((a, b) => b.count - a.count)
-			.slice(0, 3)
-			.map((p) => ({ name: p.name, location: p.location }))
+			.slice(0, 5)
+			.map((p) => ({ name: p.name, location: p.location, count: p.count }))
 		padFilled++
 	}
 
