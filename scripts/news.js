@@ -110,22 +110,25 @@ function bjTime(iso) {
 /**
  * 抓一路文章。SNAPI 偶发超时（实测首次请求失败、重试即成功），
  * 所以给 3 次退避重试。
+ *
+ * timeout 给到 60s：limit=30 的响应体不小，网络差的时候 30s 经常刚好卡在边界上，
+ * 表现为「每次都失败、重试也没用」，其实只是等得不够久。
  */
 async function fetchArticles(query) {
   const url = `${API}?${query}&limit=${FETCH_LIMIT}`
   let lastErr
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     try {
       const res = await fetch(url, {
         headers: { 'User-Agent': UA, Accept: 'application/json' },
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.timeout(60000)
       })
       if (!res.ok) throw new Error('HTTP ' + res.status)
       const body = await res.json()
       return Array.isArray(body.results) ? body.results : []
     } catch (e) {
       lastErr = e
-      if (i < 1) {
+      if (i < 2) {
         console.warn(`  ! 抓取失败，3s 后重试: ${e.message}`)
         await sleep(3000)
       }
@@ -159,13 +162,66 @@ function badSummary(text) {
   return max >= 4 && max / words.length > 0.12
 }
 
+/**
+ * 源站导航条特征串。
+ *
+ * NASA 系站点（尤其 APOD）会把整页导航当成摘要返回，形式高度固定。
+ * 这类文本的词频不一定够高（APOD 只占 9%，撞不到 badSummary 的 12% 阈值），
+ * 但它本身就是一份固定的样板串，直接认串比算命准。
+ */
+const NAV_NOISE = [
+  /Today[’'`]s APOD Archive/i,
+  /Submissions Index Search Calendar/i,
+  /Discover the cosmos!\s*Each day a different image/i,
+  /Astronomy Picture of the Day\s+Discover/i,
+  /\bRSS\s+Education\s+About\s+Discuss\b/i
+]
+
+/**
+ * 媒体站的尾部样板：「The post X appeared first on Y.」
+ * 中文机翻出来是「……首先出现在 NASASpaceFlight.com 上。」垃圾又碍眼。
+ */
+const TAIL_RE =
+  /\s*(?:The\s+)?(?:post|article|story|piece)?[^.!?]{0,80}?(?:first\s+appeared|appeared\s+first|originally\s+appeared)\s+on\s+[^.!?]*\.?\s*$/i
+
+/**
+ * 摘要在**翻译之前**的清洗（顺序很重要：先洗后翻）。
+ *
+ * 为什么必须在翻译前处理：译文进的是按原文哈希索引的缓存，
+ * 一旦把垃圾翻完存进去，以后每轮都要靠 getZh 出口再兜一次，永远清不干净。
+ *
+ * 返回空串表示「这条没有可用摘要」，前端自动不渲染摘要行。
+ */
+function cleanSummary(text) {
+  let s = String(text || '').trim()
+  if (!s) return ''
+
+  // 1. 尾部样板直接切掉，前面如果有正文就留着
+  const tail = TAIL_RE.exec(s)
+  if (tail && tail.index > 0) s = s.slice(0, tail.index).trim()
+
+  // 2. 整段就是导航条 —— 没有正文可救，整条丢弃
+  if (NAV_NOISE.some((re) => re.test(s))) return ''
+
+  // 3. 剩下的再跑词频兜底
+  if (badSummary(s)) return ''
+
+  return s
+}
+
 /** 把 SNAPI 原始条目裁成前端用的精简结构（不含译文，译文后补） */
 function slim(raw) {
   const title = plain(raw.title)
   if (!title) return null
-  let summary = plain(raw.summary)
-  if (badSummary(summary)) summary = ''
-  summary = summary.slice(0, SUMMARY_MAX)
+  // 摘要：先清洗（切尾部样板 / 丢导航条），再按词边界截断，
+  // 避免 slice 把单词拦腰砍断（出现「…未来通」这种半截词）
+  let summary = cleanSummary(plain(raw.summary))
+  if (summary.length > SUMMARY_MAX) {
+    let cut = summary.slice(0, SUMMARY_MAX)
+    const at = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf(' '))
+    if (at > SUMMARY_MAX * 0.6) cut = cut.slice(0, at)
+    summary = cut.trim().replace(/[,;:，；：]$/, '') + '…'
+  }
   if (BLOCK_RE.test(title) || BLOCK_RE.test(summary)) {
     console.log(`  · 跳过（合规过滤）: ${title.slice(0, 40)}`)
     return null
@@ -241,14 +297,41 @@ async function main() {
   }
   console.log(`  · 新增 ${fresh.length} 条`)
 
-  // ---- 3. 翻译标题与摘要（只翻新增的，缓存自动跳过重复）----
-  if (fresh.length) {
-    await translate.loadCache()
-    const texts = []
-    for (const it of fresh) {
-      texts.push(it.title)
-      if (it.summary) texts.push(it.summary)
-    }
+  // ---- 2.5 旧条目重洗 ----
+  // 清洗规则是会长大的：某天发现一个新站点的摘要带样板尾巴，加条规则，
+  // 但已入库的条目不会重抓 —— 它们会一直带着脏摘要躺到被 KEEP 挤掉为止。
+  // 所以每轮对旧条目重跑一遍清洗；摘要一旦被改动，旧译文立刻作废（原文变了）。
+  //
+  // 还有个细节：库里的摘要可能是上一轮按 300 字符硬截断的半截句，
+  // 只要这一轮还抓得到同一条，就用新抓的清洗版覆盖掉，让格式自己升级。
+  const incomingById = new Map()
+  for (const it of incoming) incomingById.set(it.id, it)
+
+  const reTexts = []
+  let reClean = 0
+  for (const it of old) {
+    if (!it || it.id == null) continue
+    const nx = incomingById.get(it.id)
+    const next = nx ? nx.summary : cleanSummary(it.summary)
+    // 只比 trim 后的结果：尾部空格差异不算改动，否则会白白丢掉已有译文
+    if (next.trim() === (it.summary || '').trim()) continue
+    it.summary = next
+    it.summaryZh = ''
+    if (next) reTexts.push(next)
+    reClean++
+  }
+  if (reClean) console.log(`  · 旧条目摘要重洗 ${reClean} 条`)
+
+  // ---- 3. 翻译（新增条目 + 被重洗的旧摘要）----
+  await translate.loadCache()
+  const texts = []
+  for (const it of fresh) {
+    texts.push(it.title)
+    if (it.summary) texts.push(it.summary)
+  }
+  texts.push(...reTexts)
+
+  if (texts.length) {
     await translate.translateTexts(texts)
     for (const it of fresh) {
       it.titleZh = translate.getZh(it.title)
@@ -269,6 +352,27 @@ async function main() {
       }
     }
   }
+
+  // ---- 3.5 旧条目译文回填 ----
+  // 只查缓存与人工表，不发新请求：术语表改一个词（比如 Sols → 火星日），
+  // 历史条目的译文就能在下一轮同步里自动改对，不用清缓存也不用重翻。
+  let refilled = 0
+  for (const it of old) {
+    if (!it || it.id == null) continue
+    const tz = translate.getZh(it.title)
+    if (tz && tz !== it.titleZh) {
+      it.titleZh = tz
+      refilled++
+    }
+    if (it.summary) {
+      const sz = translate.getZh(it.summary)
+      if (sz && sz !== it.summaryZh) {
+        it.summaryZh = sz
+        refilled++
+      }
+    }
+  }
+  if (refilled) console.log(`  · 旧条目译文回填 ${refilled} 处`)
 
   // ---- 4. 封面图镜像（只处理新增，旧条目已是 COS 地址）----
   if (fresh.length) {
