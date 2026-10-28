@@ -313,11 +313,15 @@ function fetchDataset(name) {
 			chunks: body.chunks,
 			chunkSize: body.chunkSize,
 			launchTotal: body.launchTotal,
-			// satellites 用 total（活跃总数），orbitStats 用 total + 三个聚合数组
+			// satellites 用 total（活跃总数），orbitStats 用 total + 四个聚合数组
 			total: body.total,
 			byState: body.byState,
 			byOrbit: body.byOrbit,
+			byClass: body.byClass,
 			byDecade: body.byDecade,
+			// debrisEvents：解体事件数与总条数
+			breakupCount: body.breakupCount,
+			count: body.count,
 			list: body.list,
 			savedAt: Date.now()
 		}
@@ -421,7 +425,9 @@ function decorate(data, stale) {
 		total: data.total || 0,
 		byState: data.byState || [],
 		byOrbit: data.byOrbit || [],
+		byClass: data.byClass || [],
 		byDecade: data.byDecade || [],
+		breakupCount: data.breakupCount || 0,
 		stale: !!stale
 	}
 }

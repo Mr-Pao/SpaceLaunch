@@ -21,10 +21,6 @@
 			<view class="chip" :class="{on: stateCat===''}" @click="setState('')">全部国家</view>
 			<view class="chip" v-for="c in stateCats" :key="c" :class="{on: stateCat===c}" @click="setState(c)">{{ c }}</view>
 		</scroll-view>
-		<scroll-view class="chips" scroll-x>
-			<view class="chip" :class="{on: statusCat===''}" @click="setStatus('')">全部状态</view>
-			<view class="chip" v-for="c in statusCats" :key="c.key" :class="{on: statusCat===c.key}" @click="setStatus(c.key)">{{ c.label }}</view>
-		</scroll-view>
 
 		<view class="loading" v-if="loading">
 			<text class="hint-text">加载中...</text>
@@ -40,7 +36,7 @@
 				<view class="info">
 					<view class="row1">
 						<text class="name">{{ s.name }}</text>
-						<text class="badge" :class="badgeClass(s)">{{ s.statusZh }}</text>
+						<text class="badge" :class="badgeClass(s)" v-if="s.status !== 'O'">{{ s.statusZh }}</text>
 					</view>
 					<text class="meta">{{ s.ownerZh || s.owner }}<text v-if="s.intl"> · {{ s.intl }}</text></text>
 					<text class="meta">{{ s.orbitZh || '未知轨道' }}<text v-if="s.launch"> · {{ s.launch }} 入轨</text></text>
@@ -101,15 +97,6 @@ const ORBIT_CATS = [
 	{ key: 'deep', label: '深空 / 月球', test: (o) => o.includes('深空') || o.includes('太阳') || o.includes('月') }
 ]
 
-// 状态大类
-const STATUS_CATS = [
-	{ key: 'crew', label: '载人', test: (s) => s.status === 'P M' },
-	{ key: 'cargo', label: '货运', test: (s) => s.status === 'P C' },
-	{ key: 'payload', label: '载荷', test: (s) => /^P/.test(s.status) && s.status !== 'P M' && s.status !== 'P C' },
-	{ key: 'active', label: '活跃', test: (s) => ['A', 'AR', 'AO', 'XP'].indexOf(s.status) >= 0 },
-	{ key: 'other', label: '其它', test: (s) => ['P M', 'P C', 'A', 'AR', 'AO', 'XP'].indexOf(s.status) < 0 && !/^P/.test(s.status) }
-]
-
 // 主要航天实体（国家/地区筛选用，stateZh 精确匹配）
 const STATE_CATS = ['美国', '中国', '俄罗斯', '欧空局', '日本', '印度']
 
@@ -123,7 +110,6 @@ export default {
 			q: '',
 			orbitCat: '',
 			stateCat: '',
-			statusCat: '',
 			allList: [],
 			total: 0,
 			totalChunks: 1,
@@ -136,8 +122,7 @@ export default {
 			detail: null,
 			// 供模板迭代的静态选项（数组本身不进模板作用域守卫，安全）
 			orbitCats: ORBIT_CATS,
-			stateCats: STATE_CATS,
-			statusCats: STATUS_CATS
+			stateCats: STATE_CATS
 		}
 	},
 
@@ -145,9 +130,8 @@ export default {
 		displayList() {
 			const q = this.q.trim().toLowerCase()
 			const orbit = this.orbitCat ? ORBIT_CATS.find((c) => c.key === this.orbitCat) : null
-			const status = this.statusCat ? STATUS_CATS.find((c) => c.key === this.statusCat) : null
 			const state = this.stateCat
-			if (!q && !orbit && !status && !state) return this.allList
+			if (!q && !orbit && !state) return this.allList
 			const out = []
 			for (const s of this.allList) {
 				if (q) {
@@ -156,7 +140,6 @@ export default {
 				}
 				if (orbit && !orbit.test(s.orbitZh || '')) continue
 				if (state && s.stateZh !== state) continue
-				if (status && !status.test(s)) continue
 				out.push(s)
 			}
 			return out
@@ -171,8 +154,7 @@ export default {
 		// 筛选变化时窗口回到顶部，并自动续拉命中片（与之前行为一致）
 		q() { this.onFilter() },
 		orbitCat() { this.onFilter() },
-		stateCat() { this.onFilter() },
-		statusCat() { this.onFilter() }
+		stateCat() { this.onFilter() }
 	},
 
 	onPageScroll(e) {
@@ -199,15 +181,15 @@ export default {
 	},
 
 	methods: {
+		// 绝大多数载荷都是「在轨(O)」，卡片默认不显示徽标；只有失联/已对接/深空等例外才有意义
 		badgeClass(s) {
-			if (s.status === 'P M' || s.status === 'P C' || s.status === 'A') return 'on'
-			if (/^P/.test(s.status)) return 'hot'
+			if (s.status === 'OX') return 'hot'
+			if (s.status === 'DK' || s.status === 'DSO' || s.status === 'DSA') return 'on'
 			return 'dim'
 		},
 
 		setOrbit(k) { this.orbitCat = k },
 		setState(k) { this.stateCat = k },
-		setStatus(k) { this.statusCat = k },
 
 		// 筛选变化：窗口回到顶部，并自动续拉命中片（沿用旧 autoExpand 逻辑）
 		onFilter() {

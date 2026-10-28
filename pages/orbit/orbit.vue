@@ -32,6 +32,18 @@
 				</view>
 			</view>
 
+			<!-- 按对象类型 -->
+			<view class="card" v-if="topClasses.length">
+				<view class="card-title">按对象类型</view>
+				<view class="bar" v-for="c in topClasses" :key="c.k">
+					<text class="bar-name">{{ c.k }}</text>
+					<view class="bar-track">
+						<view class="bar-fill fill-gold" :style="{ width: c.pct + '%' }"></view>
+					</view>
+					<text class="bar-count">{{ c.v }}</text>
+				</view>
+			</view>
+
 			<!-- 按轨道类型 -->
 			<view class="card" v-if="topOrbits.length">
 				<view class="card-title">按轨道类型</view>
@@ -92,6 +104,7 @@ export default {
 			total: 0,
 			freshText: '',
 			topStates: [],
+			topClasses: [],
 			topOrbits: [],
 			decades: []
 		}
@@ -113,6 +126,7 @@ export default {
 				this.total = d.total || 0
 				this.freshText = spaceData.freshnessText(d.generatedAt)
 				this.topStates = withPct(d.byState, 'k')
+				this.topClasses = withPct(d.byClass, 'k')
 				this.topOrbits = withPct(d.byOrbit, 'k')
 				this.decades = withDecadePct(d.byDecade)
 			} catch (e) {
@@ -230,6 +244,9 @@ function withDecadePct(rows) {
 }
 .bar-fill.fill-green {
 	background: linear-gradient(to right, #2f6f4f, #34c759);
+}
+.bar-fill.fill-gold {
+	background: linear-gradient(to right, #7a5a20, #e0b64a);
 }
 .bar-count {
 	flex-shrink: 0;

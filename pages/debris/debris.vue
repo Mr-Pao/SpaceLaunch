@@ -4,7 +4,7 @@
 
 		<view class="hero">
 			<text class="hero-title">在轨解体 / 再入事件</text>
-			<text class="hero-sub">火箭残骸、太空垃圾与解体记录 · 共 {{ total }} 起</text>
+			<text class="hero-sub">解体爆炸与再入记录 · 共 {{ total }} 起（含解体 {{ breakupCount }}）</text>
 		</view>
 
 		<view class="search">
@@ -12,6 +12,10 @@
 			<input class="search-in" v-model="q" placeholder="搜名称 / 国际编号 / 国家" placeholder-class="ph" confirm-type="search" />
 			<text v-if="q" class="search-clear" @click="q=''">✕</text>
 		</view>
+
+		<scroll-view class="chips" scroll-x>
+			<view class="chip" v-for="c in kindCats" :key="c.key" :class="{on: kindCat===c.key}" @click="setKind(c.key)">{{ c.label }}</view>
+		</scroll-view>
 
 		<scroll-view class="chips" scroll-x>
 			<view class="chip" :class="{on: stateCat===''}" @click="setState('')">全部国家</view>
@@ -29,16 +33,16 @@
 		<view class="timeline" v-else>
 			<view class="item" v-for="(e, i) in visibleList" :key="e.id + '-' + i">
 				<view class="rail">
-					<view class="dot" :class="e.status === 'DSO' ? 'boom' : 'fall'"></view>
+					<view class="dot" :class="dotClass(e)"></view>
 					<view class="line" v-if="i < visibleList.length - 1"></view>
 				</view>
 				<view class="card">
 					<view class="row1">
-						<text class="date">{{ e.reentry }}</text>
-						<text class="badge" :class="e.status === 'DSO' ? 'boom' : 'fall'">{{ e.statusZh }}</text>
+						<text class="date">{{ e.reentry || '日期未知' }}</text>
+						<text class="badge" :class="dotClass(e)">{{ e.statusZh }}</text>
 					</view>
 					<text class="name">{{ e.name }}</text>
-					<text class="meta" v-if="e.intl || e.stateZh || e.orbitZh">{{ [e.intl, e.stateZh, e.orbitZh].filter(Boolean).join(' · ') }}</text>
+					<text class="meta" v-if="e.intl || e.stateZh || e.orbitZh">{{ [e.clsZh, e.intl, e.stateZh, e.orbitZh].filter(Boolean).join(' · ') }}</text>
 				</view>
 			</view>
 
@@ -56,6 +60,14 @@ import navMixin from '@/utils/nav-mixin.js'
 
 const NAV_SOLID_SCROLL = 120
 const STATE_CATS = ['美国', '中国', '俄罗斯', '欧空局', '日本', '印度']
+// 事件分型（与 gcat.js 的 kind 字段对应）
+const KIND_CATS = [
+	{ key: '', label: '全部' },
+	{ key: 'breakup', label: '解体' },
+	{ key: 'reentry', label: '再入' },
+	{ key: 'deorbit', label: '离轨' },
+	{ key: 'landing', label: '落地' }
+]
 
 export default {
 	mixins: [navMixin],
@@ -66,11 +78,14 @@ export default {
 			navSolid: false,
 			q: '',
 			stateCat: '',
+			kindCat: '',
 			events: [],
 			total: 0,
+			breakupCount: 0,
 			freshAt: '',
 			stateCats: STATE_CATS,
-			// 渲染窗口：事件有 2000+ 条，一次性渲染所有卡片会卡死首屏，
+			kindCats: KIND_CATS,
+			// 渲染窗口：事件有 1600 条，一次性渲染所有卡片会卡死首屏，
 			// 只先画前 80 条，滑到底 / 点「加载更多」再增量展开
 			renderCount: 80
 		}
@@ -80,7 +95,9 @@ export default {
 		displayList() {
 			const q = this.q.trim().toLowerCase()
 			const state = this.stateCat
+			const kind = this.kindCat
 			return this.events.filter((e) => {
+				if (kind && e.kind !== kind) return false
 				if (state && e.stateZh !== state) return false
 				if (q) {
 					const hay = (e.name + ' ' + e.intl + ' ' + e.stateZh).toLowerCase()
@@ -89,7 +106,7 @@ export default {
 				return true
 			})
 		},
-		// 真正渲染用裁剪后的窗口，避免 2000+ 节点一次性进 DOM
+		// 真正渲染用裁剪后的窗口，避免 1600+ 节点一次性进 DOM
 		visibleList() {
 			return this.displayList.slice(0, this.renderCount)
 		}
@@ -98,7 +115,8 @@ export default {
 	watch: {
 		// 筛选条件变化时窗口回到顶部，避免残留一大段已筛选掉的旧列表
 		q() { this.renderCount = 80 },
-		stateCat() { this.renderCount = 80 }
+		stateCat() { this.renderCount = 80 },
+		kindCat() { this.renderCount = 80 }
 	},
 
 	onPageScroll(e) {
@@ -113,9 +131,10 @@ export default {
 	async onLoad() {
 		try {
 			const d = await spaceData.load('debrisEvents')
-			// 数据按再入日期升序，倒过来让最新事件在顶部
-			this.events = ((d && d.list) || []).slice().reverse()
+			// gcat.js 产出时已按再入日期倒序（最新在前），直接使用
+			this.events = (d && d.list) || []
 			this.total = d.count || this.events.length
+			this.breakupCount = d.breakupCount || 0
 			this.freshAt = d.generatedAt
 		} catch (e) {
 			console.warn('[debris] 加载失败', e)
@@ -125,6 +144,14 @@ export default {
 
 	methods: {
 		setState(k) { this.stateCat = k },
+		setKind(k) { this.kindCat = k },
+
+		// 解体=红（爆炸），落地/离轨=绿，普通再入=蓝
+		dotClass(e) {
+			if (e.kind === 'breakup') return 'boom'
+			if (e.kind === 'landing' || e.kind === 'deorbit') return 'land'
+			return 'fall'
+		},
 
 		// 增量展开渲染窗口（最多再露 60 条），数据全在内存里，只是少画几张卡
 		grow() {
@@ -229,6 +256,7 @@ export default {
 }
 .dot.boom { background: #ff6b6b; box-shadow: 0 0 12rpx rgba(255, 107, 107, 0.6); }
 .dot.fall { background: #38bdf8; }
+.dot.land { background: #34c759; }
 .line {
 	width: 2rpx;
 	flex: 1;
@@ -253,6 +281,7 @@ export default {
 }
 .badge.boom { background: rgba(255, 107, 107, 0.14); color: #ff8a8a; }
 .badge.fall { background: rgba(56, 189, 248, 0.14); color: #38bdf8; }
+.badge.land { background: rgba(52, 199, 89, 0.14); color: #34c759; }
 .name {
 	display: block;
 	margin-top: 10rpx;
