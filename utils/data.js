@@ -187,9 +187,17 @@ const inflight = {}
 
 // ============ 缓存读写 ============
 
+// GCAT 三数据集的独立小版本：3.2.7 修正了数据口径（在轨 66781→34925 等），
+// 老缓存里是错数字，靠这个小版本强制重拉一次。不动全局 DATA_VERSION，
+// 否则会把 videos/timeline 等载荷的 v 一起顶掉、逼它们的缓存也全部作废。
+const GCAT_V = 2
+const GCAT_NAMES = { satellites: 1, orbitStats: 1, debrisEvents: 1 }
+
 function cacheKey(name) {
-	// 图库带自己的小版本（v14.1），其它数据集仍只有 DATA_VERSION
-	const v = name === 'gallery' ? DATA_VERSION + '.' + GALLERY_V : DATA_VERSION
+	// 图库带自己的小版本（v14.x），GCAT 三数据集带 v14.y，其它数据集仍只有 DATA_VERSION
+	let v = DATA_VERSION
+	if (name === 'gallery') v = DATA_VERSION + '.' + GALLERY_V
+	else if (GCAT_NAMES[name]) v = DATA_VERSION + '.' + GCAT_V
 	return 'sl_data_' + name + '_v' + v
 }
 
