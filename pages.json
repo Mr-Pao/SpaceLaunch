@@ -160,7 +160,10 @@
 			"path": "pages/news/news",
 			"style": {
 				"navigationBarTitleText": "航天资讯",
-				"onReachBottomDistance": 300
+				"onReachBottomDistance": 300,
+				"enablePullDownRefresh": true,
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#04060a"
 			}
 		}
 	],

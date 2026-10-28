@@ -68,7 +68,7 @@
 					<view class="act primary" @click="copyUrl">
 						<text class="act-text">复制原文链接</text>
 					</view>
-					<view v-if="detail.launches && detail.launches.length" class="act" @click="goLaunch">
+					<view v-if="launchLink === 'ok'" class="act" @click="goLaunch">
 						<text class="act-text">查看相关发射</text>
 					</view>
 				</view>
@@ -98,6 +98,9 @@ export default {
 			total: 0,
 			freshAt: '',
 			detail: null,
+			// 「查看相关发射」入口的三态：'' 无关联 / checking 判定中 / ok 可跳。
+			// 见 open() 与方法区的 checkLaunch 注释
+			launchLink: '',
 			// 渲染窗口：最多 200 条，一次性全画会拖慢首屏，先 30 条
 			renderCount: RENDER_STEP
 		}
@@ -134,6 +137,12 @@ export default {
 		this.grow()
 	},
 
+	// 资讯是全站唯一「会变」的内容源，用户看到旧数据的可能性最大，
+	// 必须给一个手动拉新的手势（getData(true) 绕过 TTL 直接打 CDN）
+	onPullDownRefresh() {
+		this.getData(true).then(() => uni.stopPullDownRefresh())
+	},
+
 	/**
 	 * 带 ?id= 进来是「从今日页卡片点进来的」：直接弹出那一条的详情。
 	 * getData 是 await 的，这里能保证 items 已就绪。
@@ -146,7 +155,7 @@ export default {
 		if (!wantId) return
 
 		const hit = this.items.find((x) => x && String(x.id) === String(wantId))
-		if (hit) this.detail = hit
+		if (hit) this.open(hit)
 	},
 
 	methods: {
@@ -174,10 +183,53 @@ export default {
 
 		open(n) {
 			this.detail = n
+			this.checkLaunch(n)
+		},
+
+		/**
+		 * 判断这条报道的「相关发射」能不能打开。
+		 *
+		 * SNAPI 只给 launch_id（UUID），不给发射时间；而本地快照只有
+		 * upcoming 100 条 + previous 100 条，归档查找又限深 12 片。
+		 * 实测 28 条带关联的资讯里只有 5 条真能跳，剩下的多是十几年前的
+		 * 老任务（好奇号 2011、Rosetta 2004 这类 —— SNAPI 的「关联」
+		 * 其实是「文中提到过」，并不等于「这篇在讲它」）。
+		 *
+		 * 所以抽屉打开时就判一次：跳得了才显示按钮。与其让用户点进去
+		 * 看一屏「未找到该发射任务」，不如这个入口根本别出现。
+		 */
+		async checkLaunch(n) {
+			const id = n && n.launches && n.launches[0]
+			if (!id) {
+				this.launchLink = ''
+				return
+			}
+
+			// 缓存里有就立即定案：正常使用路径下都在这里结束
+			if (spaceData.peekLaunchById(id)) {
+				this.launchLink = 'ok'
+				return
+			}
+
+			const seq = (this._linkSeq = (this._linkSeq || 0) + 1)
+			this.launchLink = 'checking'
+
+			// 缓存没有：交给 findLaunchById 走一次网络再判（它内部先扫缓存）
+			let hit = null
+			try {
+				hit = await spaceData.findLaunchById(id)
+			} catch (e) {
+				// 网络失败按「打不开」处理：宁可少一个入口，也不要跳过去报错
+			}
+
+			// 用户可能已经滑到下一条，过期结果直接丢掉
+			if (this._linkSeq !== seq) return
+			this.launchLink = hit ? 'ok' : ''
 		},
 
 		closeDetail() {
 			this.detail = null
+			this.launchLink = ''
 		},
 
 		copyUrl() {

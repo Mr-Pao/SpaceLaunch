@@ -595,9 +595,35 @@ export async function findLaunchById(id) {
 	return null
 }
 
+/**
+ * 只查缓存、不发请求地找一条发射（同步）。
+ *
+ * 用途：进详情页之前先判断「这条到底能不能打开」。
+ * 资讯的「关联发射」来自 SNAPI，它只给 UUID 不给发射时间，
+ * 而快照只覆盖 upcoming 100 条 + previous 100 条，剩下的大多是
+ * 十几年前的老任务（好奇号 2011、Rosetta 2004 之类），
+ * 归档查找又限深 12 片，翻不到就等于打不开。
+ *
+ * 与其让用户点进去看一屏「未找到该发射任务」，不如在这里先把话说清楚：
+ * 返回 null 就代表「现在这份缓存里没有」，调用方据此收敛入口。
+ *
+ * 注意这是**快照缓存**，不含历史归档分片 —— 归档要一片片下载，不能同步判断。
+ */
+export function peekLaunchById(id) {
+	if (id === undefined || id === null || id === '') return null
+	const target = String(id)
+
+	for (const name of ['upcoming', 'previous']) {
+		const hit = memory[name] || readStorage(name)
+		if (!hit) continue
+		const found = hit.data.list.find((x) => String(x.id) === target)
+		if (found) return found
+	}
+	return null
+}
+
 /** 下拉刷新：绕过缓存重新拉 */
-export function refresh(name) {
-	return load(name, { force: true })
+export function refresh(name) {	return load(name, { force: true })
 }
 
 /**
@@ -656,6 +682,7 @@ export default {
 	getById,
 	getAgencyById,
 	findLaunchById,
+	peekLaunchById,
 	refresh,
 	freshnessText,
 	clear,

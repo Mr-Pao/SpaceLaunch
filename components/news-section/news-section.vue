@@ -101,9 +101,13 @@ export default {
 	},
 
 	methods: {
-		async load() {
+		/**
+		 * @param {boolean} force 下拉刷新时传 true，绕过 TTL 缓存真去拉。
+		 *   不传就只读缓存 —— 首次进首页不该为了「可能没变」的资讯空跑一次网络。
+		 */
+		async load(force) {
 			try {
-				const d = await spaceData.load('news')
+				const d = await spaceData.load('news', { force: !!force })
 				this.items = (d && d.list) || []
 				this.shown = Math.min(this.limit, this.items.length)
 			} catch (e) {
@@ -127,10 +131,13 @@ export default {
 		 * 已展开的条数要保留 —— 用户滚到第 9 条时下拉一下，
 		 * 列表被收回 3 条会显得「刷新把我位置弄丢了」。
 		 * 也不重开骨架屏：有旧内容在，闪一下占位比不闪更糟。
+		 *
+		 * 必须传 force：不传的话 load 只读 TTL 缓存，
+		 * 用户下拉了却看到一模一样的内容，等于这个手势没反应。
 		 */
 		async reload() {
 			const keep = this.shown
-			await this.load()
+			await this.load(true)
 			this.shown = Math.max(this.limit, Math.min(keep, this.items.length))
 		},
 
