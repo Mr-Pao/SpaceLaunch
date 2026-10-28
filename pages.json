@@ -157,6 +157,13 @@
 			}
 		},
 		{
+			"path": "pages/space-assets/space-assets",
+			"style": {
+				"navigationBarTitleText": "太空资产",
+				"enablePullDownRefresh": true
+			}
+		},
+		{
 			"path": "pages/environment/environment",
 			"style": {
 				"navigationBarTitleText": "太空环境"
