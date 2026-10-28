@@ -60,6 +60,11 @@
 
 				<launch-poster ref="poster" :detail="detail" :review-mode="reviewMode" />
 
+				<!-- 相关报道的详情就地弹，不跳去资讯页：
+				     一条报道只值半屏内容，没必要为它另开一页。
+				     curLaunchId 让「查看相关发射」在已经看着这一条时只关弹窗 -->
+				<news-detail :article="newsDetail" :cur-launch-id="curId" @close="newsDetail = null" />
+
 				<view class="footer-hint">
 					<text>数据来源 The Space Devs · 中文翻译由同步任务生成</text>
 				</view>
@@ -140,6 +145,8 @@ export default {
 			craft: null,
 			// 提到过这次发射的报道（来自资讯流），绝大多数任务没有 → 空数组
 			news: [],
+			// 正在看详情的那篇报道（null 即弹窗关闭）
+			newsDetail: null,
 			// 时间线是展开全部还是只给接下来几步
 			tlOpen: false,
 			// 审核模式：隐藏任务描述 / 天气顾虑 / 失败原因等长文，只留参数
@@ -278,6 +285,7 @@ export default {
 			this.craft = null
 			// 换任务进来时先把上一个任务的报道清掉，避免串台
 			this.news = []
+			this.newsDetail = null
 			this.isFav = fav.has(id)
 			this.isReminded = this._hasReminded(id)
 			// 换一个任务进来时描述回到折叠态
@@ -360,7 +368,7 @@ export default {
 		// 点报道 → 资讯页并直接展开那一条（news 页的 onLoad 支持 ?id=）
 		openNews(a) {
 			if (!a || a.id == null) return
-			uni.navigateTo({ url: '/pages/news/news?id=' + a.id })
+			this.newsDetail = a
 		},
 
 		/** 分享路径里的 net 参数：知道大致时间才能在归档里直达目标分片 */

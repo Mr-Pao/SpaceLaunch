@@ -54,6 +54,10 @@
 			<text>查看全部资讯</text>
 			<text class="news-arrow">›</text>
 		</view>
+
+		<!-- 点某一条就地弹详情，不跳资讯页：首页看一眼标题就想读摘要，
+		     为这点内容另开一页再退出，来回两个整页动画不划算 -->
+		<news-detail :article="detail" @close="detail = null" />
 	</view>
 </template>
 
@@ -68,8 +72,8 @@ import spaceData from '@/utils/data.js'
  * （每 3 小时一轮，近七成能回连发射详情）。所以把它提到今日页底部，
  * 和「近期活动」对调：活动是要照做的日程，放探索当资料更合适。
  *
- * 这里只做「预览」：默认露 3 条，滚到底自动续，点卡片直接打开资讯页
- * 并弹出那一条的详情抽屉，不另外做一套阅读界面。
+ * 这里只做「预览」：默认露 3 条，滚到底自动续，点卡片就地弹出那一条的
+ * 详情（components/news-detail），不另开阅读页。
  */
 export default {
 	// limit 是「首屏露几条」，同时也是每次下拉追加的步长
@@ -84,7 +88,9 @@ export default {
 			shown: 0,
 			// 首次拉取期间显示骨架屏：今日页其它块都是「数据没到就先占位」，
 			// 这一块如果真空白，滚到这儿会以为页面断了
-			loading: true
+			loading: true,
+			// 正在看详情的那一条（null 即弹窗关闭）
+			detail: null
 		}
 	},
 
@@ -142,10 +148,10 @@ export default {
 			this.shown = Math.max(this.limit, Math.min(keep, this.items.length))
 		},
 
-		/** 点卡片：进资讯页并直接展开这一条，省掉「再找一遍」的一步 */
+		/** 点卡片：就地弹详情弹窗，不跳页（关掉就回首页原处） */
 		goDetail(n) {
 			if (!n || n.id == null) return
-			uni.navigateTo({ url: '/pages/news/news?id=' + encodeURIComponent(n.id) })
+			this.detail = n
 		},
 
 		goAll() {
