@@ -134,8 +134,19 @@ export default {
 		this.grow()
 	},
 
-	async onLoad() {
+	/**
+	 * 带 ?id= 进来是「从今日页卡片点进来的」：直接弹出那一条的详情。
+	 * getData 是 await 的，这里能保证 items 已就绪。
+	 * 找不到就停在列表，不报错（那一条可能已被 KEEP 挤掉了）。
+	 */
+	async onLoad(options) {
 		await this.getData(false)
+
+		const wantId = options && options.id
+		if (!wantId) return
+
+		const hit = this.items.find((x) => x && String(x.id) === String(wantId))
+		if (hit) this.detail = hit
 	},
 
 	methods: {

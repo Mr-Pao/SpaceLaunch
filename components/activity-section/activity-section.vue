@@ -73,11 +73,15 @@ import spaceData from '@/utils/data.js'
 import { formatShort, truncate, eventPlace, eventName as eventNameOf } from '@/utils/format.js'
 
 /**
- * 首页底部的「近期活动」板块。
+ * 「近期活动」板块（EVA / 轨道插入 / 飞掠这类「不是发射但同样在看」的事）。
  *
- * 活动原本是单独一个 tab 页（pages/event/event），v3.1.17 起把入口搬回首页底部，
- * 这里只做「预览」：取前 4 条 + 一个「查看全部活动」跳到完整活动页。
- * 完整列表仍留在 event 页，避免首页出现第二套分页体系。
+ * 沿革：活动原本是单独一个 tab 页（pages/event/event），v3.1.17 把入口搬回
+ * 今日页底部；v3.2.10 起今日页第五块换成航天资讯，活动回到探索页当资料
+ * 入口（活动是要照做的日程，用户是「去查」而不是「来看」）。
+ *
+ * 所以这个组件当前**没有宿主页引用**，保留是因为它功能完整（骨架屏、
+ * 上拉续载、跳详情），以后要往发射页或别处放活动预览可以直接复用；
+ * easycom 只编译被引用的组件，留着不影响包体积。
  */
 export default {
 	// limit 是「首屏露几条」，同时也是每次下拉追加的步长。

@@ -134,12 +134,14 @@
 				</view>
 			</view>
 
-			<!-- 5 近期活动（EVA / 轨道插入 / 飞掠这类「不是发射但同样在看」的事）。
-			     它以前挂在发射页列表最底部，100 条发射压在上面，等于没人看得到，
-			     现在搬到今日页当第五块；活动页仍是完整列表的落点 -->
-			<activity-section ref="acts" :limit="3" />
+			<!-- 5 航天资讯。
+			     资讯是全站唯一高频滚动、有时效性的内容（每 3 小时一轮），
+			     以前挂在「我的 → 探索」网格末位，那儿是管理收藏和提醒的地方，
+			     没人会去刷新闻。这里和「近期活动」对调：活动是要照做的日程，
+			     更适合当资料放探索；资讯放首页底部负责「有更新」的提示 -->
+			<news-section ref="news" :limit="3" />
 
-			<!-- 四块都没数据（冷启动 + 全挂了）：给一句人话，别留空白页 -->
+			<!-- 五块都没数据（冷启动 + 全挂了）：给一句人话，别留空白页 -->
 			<view class="empty" v-if="!daily && !inSpace.length && !next && !otd.length">
 				<text class="empty-icon">🛰️</text>
 				<text class="empty-text">{{ loading ? '正在拉取今日数据...' : '今天的数据还没准备好' }}</text>
@@ -155,13 +157,14 @@
 /**
  * 今日（启动页）
  *
- * 四块固定内容，按「看图 → 看人 → 看下次 → 看历史」的顺序排：
+ * 五块固定内容，按「看图 → 看人 → 看下次 → 看历史 → 看外面怎么说」的顺序排：
  *   每日一图      图库聚合按日确定性挑一张
  *   此刻在天上     宇航员库 in_space 筛选
  *   下次发射       upcoming 里第一条还没发射的 + 金色倒计时
  *   往年今日      CI 每天按「月-日」筛好的历史发射
+ *   航天资讯      SNAPI 聚合报道，每 3 小时同步一次
  *
- * 四块各自独立加载，任何一块失败只影响自己 —— 首页不能因为
+ * 五块各自独立加载，任何一块失败只影响自己 —— 首页不能因为
  * 某个数据集 404 就整页白掉。
  */
 import spaceData from '@/utils/data.js'
@@ -345,6 +348,10 @@ export default {
 			uni.stopPullDownRefresh()
 			return
 		}
+		// 资讯是独立组件、自己管数据，下拉时一并让它重拉（会走 data.js 的 TTL 判断，
+		// 没到期就是读缓存，不会每次都打 CDN）
+		const news = this.$refs.news
+		if (news && news.reload) news.reload()
 		this.loadAll(true).then(() => uni.stopPullDownRefresh())
 	},
 
@@ -356,8 +363,8 @@ export default {
 	 * 往年今日展开后页面变长，也会自然多触发几次，直到 27 条全出。
 	 */
 	onReachBottom() {
-		const acts = this.$refs.acts
-		if (acts) acts.loadMore()
+		const news = this.$refs.news
+		if (news) news.loadMore()
 	},
 
 	methods: {
@@ -504,8 +511,9 @@ export default {
 	margin-bottom: 14rpx;
 }
 
-/* 四块标题统一 34rpx：观察下来 30rpx 偏小，
-   「近期活动」那块的 acts-title 一直是 34rpx，两个大标题并排时肉眼能看出差一档 */
+/* 五块标题统一 34rpx：观察下来 30rpx 偏小。
+   「航天资讯」和「近期活动」这两个组件块内部也是 34rpx，
+   页内标题和组件标题必须同档，否则上下滚过去肉眼能看出差一截 */
 .sec-title {
 	color: #ffffff;
 	font-size: 34rpx;
