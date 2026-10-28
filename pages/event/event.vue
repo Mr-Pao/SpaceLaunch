@@ -4,9 +4,11 @@
 		<!-- 审核模式下整页只留空态：活动是资讯感最重的一块，
 		     开关来自 COS 的 app-config.json（utils/config.js），
 		     失败兜底正常展示，不影响普通用户 -->
-		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
-			<text class="nav-title">近期活动</text>
-		</view>
+		<!-- 这一页原先用自绘的 .nav-row（只有标题、没有返回键），
+		     从探索页进来后无处可退。统一改用 nav-bar：
+		     它是从分享卡片直接打开也会兜底 switchTab 回首页的。
+		     solid 常显——列表页顶上没有大图，标题要一直看得见 -->
+		<nav-bar solid placeholder title="近期活动" />
 
 		<block v-if="!reviewMode">
 			<view class="stat" v-if="list.length" style="padding-top: 8rpx">
@@ -79,10 +81,11 @@
 import { createListMixin } from '@/utils/list-mixin.js'
 import { formatShort, truncate, eventPlace, eventName as eventNameOf } from '@/utils/format.js'
 import { getConfig } from '@/utils/config.js'
-import navMixin from '@/utils/nav-mixin.js'
 
 export default {
-	mixins: [navMixin, createListMixin({ dataset: 'events', pageSize: 8 })],
+	// 状态栏高度改由 nav-bar 自己算（它内部取 getSystemInfoSync），
+	// 这一页不再需要 navMixin 的 statusBarH
+	mixins: [createListMixin({ dataset: 'events', pageSize: 8 })],
 
 	data() {
 		return {
@@ -143,7 +146,7 @@ export default {
 
 .page {
 	min-height: 100vh;
-	/* 顶部留白由 .stat 的 statusBarH 动态给 */
+	/* 顶部留白由 nav-bar 的 placeholder 占位（状态栏 + 44px），这里不用再补 */
 	padding: 0 24rpx 200rpx;
 	box-sizing: border-box;
 }

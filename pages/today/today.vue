@@ -96,9 +96,23 @@
 
 			<!-- 4 往年今日 -->
 			<view class="otd" v-if="otd.length">
+				<!-- 折叠入口放在标题行右侧，不再压在列表下面：
+				     往年今日一天一次、多是「顺手扫一眼」，想展开的人
+				     在看见标题那一刻就该够得着，不用先滚过三条才找到 -->
 				<view class="sec-head">
 					<text class="sec-title">往年今日</text>
-					<text class="sec-sub">{{ otd.length }} 次发射</text>
+					<view class="sec-acts">
+						<text class="sec-sub">{{ otd.length }} 次发射</text>
+						<view
+							class="more-inline"
+							v-if="otd.length > OTD_FOLD"
+							hover-class="more-hover"
+							@click="toggleOtdOpen"
+						>
+							<text class="more-text">{{ otdOpen ? '收起' : '更多 ' + (otd.length - OTD_FOLD) + ' 条' }}</text>
+							<text class="more-arrow" :class="{ 'is-up': otdOpen }">›</text>
+						</view>
+					</view>
 				</view>
 
 				<!-- 点进去是发射详情页。归档里的历史任务不在「已发射」快照内，
@@ -119,18 +133,6 @@
 						<text class="otd-name">{{ x.title }}</text>
 						<text class="otd-meta" v-if="x.meta">{{ x.meta }}</text>
 					</view>
-				</view>
-
-				<!-- 默认只露三条：这是「顺手看一眼」的内容，不是要坐这儿读的。
-				     折叠入口与「更多发射」同一套靠右样式，位置也一致（列表下方） -->
-				<view
-					class="more-row"
-					v-if="otd.length > OTD_FOLD"
-					hover-class="more-hover"
-					@click="toggleOtdOpen"
-				>
-					<text class="more-text">{{ otdOpen ? '收起' : '更多 ' + (otd.length - OTD_FOLD) + ' 条' }}</text>
-					<text class="more-arrow" :class="{ 'is-up': otdOpen }">›</text>
 				</view>
 			</view>
 
@@ -527,6 +529,27 @@ export default {
 	font-size: 22rpx;
 }
 
+/* 区块头右侧那一组（计数 + 折叠入口）。
+   margin-left:auto 只在挂了这个类的块里生效，别的 sec-head
+   还是「标题 + 紧跟的小字」，不会因为这里改动而集体右对齐 */
+.sec-acts {
+	display: flex;
+	align-items: center;
+	margin-left: auto;
+}
+
+.sec-acts .sec-sub {
+	margin-left: 0;
+}
+
+/* 往年今日的折叠入口：原来在列表下方，现在跟标题同一行 */
+.more-inline {
+	display: flex;
+	align-items: center;
+	margin-left: 18rpx;
+	padding: 6rpx 0;
+}
+
 /* ---- 1 每日一图 ---- */
 .daily {
 	position: relative;
@@ -763,15 +786,8 @@ export default {
 	margin-bottom: 30rpx;
 }
 
-/* 卡片下面那行出口：靠右，天蓝色，和卡内「查看详情 ›」是同一套视觉语言 */
-.more-row {
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	margin-top: 10rpx;
-	padding: 8rpx 4rpx;
-}
-
+/* 折叠入口用的 .more-hover / .more-text / .more-arrow 见「往年今日」那组，
+   原来压在列表下面的 .more-row 已随入口上移删掉 */
 .more-hover {
 	opacity: 0.6;
 }
