@@ -151,9 +151,16 @@
 			}
 		},
 		{
+			"path": "pages/environment/environment",
+			"style": {
+				"navigationBarTitleText": "太空环境",
+				"onReachBottomDistance": 200
+			}
+		},
+		{
 			"path": "pages/debris/debris",
 			"style": {
-				"navigationBarTitleText": "解体 / 再入事件"
+				"navigationBarTitleText": "太空环境"
 			}
 		},
 		{

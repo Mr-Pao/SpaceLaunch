@@ -1,0 +1,59 @@
+name: sync-space-neo
+
+# NeoWs 近地天体同步。
+#
+# 为什么独立一个 workflow：
+#   1. 数据源是 NASA（不是 LL2、不是 GCAT），限流按 NASA API key 算，
+#      跟别的同步任务互不相干；
+#   2. 一天只变一次 —— NeoWs 的 feed 是「今天起 7 天」的滚动窗口，
+#      一天跑一轮就够，没必要跟着 15 分钟一次的主同步跑；
+#   3. 只需 3 个请求（未来 7 天 / 过去 7 天 / 已发现总数），二十秒能跑完。
+#
+# 产出：space-data/neo-nears.json，「太空环境」页的近地天体 tab 读它。
+
+on:
+  schedule:
+    # 每天 UTC 02:20 = 北京时间 10:20。放在上午是为了当天新增的接近数据尽早入库
+    - cron: '20 2 * * *'
+  push:
+    paths:
+      - 'scripts/neo.js'
+      - '.github/workflows/neo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-neo
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: 抓取 NeoWs 并上传
+        working-directory: scripts
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET || 'spacelaunch-1258113633' }}
+          COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
+          COS_ACL: public-read
+          # NASA 免费 key（api.nasa.gov 邮箱申请，1000 次/小时）。
+          # 没配就退回 DEMO_KEY（30 次/小时、50 次/天，按 IP），
+          # 而 GitHub runner 是共享 IP，很可能已经被别人吃光 —— 所以务必配。
+          NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
+        run: node neo.js

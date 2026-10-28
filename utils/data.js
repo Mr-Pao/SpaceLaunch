@@ -103,6 +103,10 @@ const FILES = {
 	orbitStats: 'orbit-stats.json',
 	// 在轨解体 / 再入事件流（GCAT 已终结子集，按再入日期排序）
 	debrisEvents: 'debris-events.json',
+	// 近地天体：未来 7 天飞掠地球的小行星（NASA NeoWs）。
+	// 与上面 debrisEvents 合起来是「太空环境」栏目的两面：
+	// 那边是地球上的东西掉下来，这边是外面的东西飞过来
+	neoNears: 'neo-nears.json',
 	// 航天资讯（SNAPI v4）。CI 每 3 小时抓一轮、保留最近 200 条；
 	// 标题与摘要已中文化（翻不出来为空，前端回退英文）；
 	// launches 里是可回连发射详情页的 LL2 UUID
@@ -144,6 +148,8 @@ const SOFT_TTL = {
 	satellites: 12 * 60 * 60 * 1000,
 	orbitStats: 12 * 60 * 60 * 1000,
 	debrisEvents: 12 * 60 * 60 * 1000,
+	// 近地天体一天才更新一次（CI 每天跑一轮），3 小时软过期已经比数据本身新
+	neoNears: 3 * 60 * 60 * 1000,
 	// 资讯每 3 小时一轮，1 小时软过期已经够新；单份才 30~50KB
 	news: 60 * 60 * 1000
 }
@@ -303,7 +309,8 @@ function request(url) {
 // GCAT 三数据集体量大、且季度才更新一次，用「小时级」缓存戳：
 // 同一小时内所有用户命中同一份 CDN 边缘缓存，避免像分钟级那样每次打开都直连源站。
 // 图库 / 卫星分片早就用小时级（见 galleryChunk / satelliteChunk），这里对齐，否则新页面比图库还慢。
-const HOURLY_CACHE = new Set(['satellites', 'orbitStats', 'debrisEvents'])
+// neoNears 一天才变一次，同样没有理由每分钟换个戳去回源
+const HOURLY_CACHE = new Set(['satellites', 'orbitStats', 'debrisEvents', 'neoNears'])
 
 function fetchDataset(name) {
 	// 高频更新的数据集（即将发射等）仍用分钟级，保证新鲜度；
@@ -338,6 +345,12 @@ function fetchDataset(name) {
 			// debrisEvents：解体事件数与总条数
 			breakupCount: body.breakupCount,
 			count: body.count,
+			// neoNears：全库已发现数 / 潜在危险数 / 过去一周掠地数 / 窗口 / 最近一颗
+			totalKnown: body.totalKnown,
+			hazardous: body.hazardous,
+			pastCount: body.pastCount,
+			window: body.window,
+			closest: body.closest,
 			list: body.list,
 			savedAt: Date.now()
 		}
