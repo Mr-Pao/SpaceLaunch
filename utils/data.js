@@ -201,7 +201,11 @@ function readStorage(name) {
 		// 微信小程序里 uni.setStorageSync 存对象会自动序列化，取回来已是对象
 		// 但 H5 / 某些端可能拿到字符串，两种都兜住
 		const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
-		if (!obj || !Array.isArray(obj.list) || obj.list.length === 0) return null
+		if (!obj || !Array.isArray(obj.list)) return null
+		// 普通数据集 list 为空视为「无数据」不缓存，避免空结果被长期保留；
+		// 但 orbitStats 这类聚合数据集本体 list 为空（数据在 byState/byOrbit/byDecade/total），
+		// 必须允许它进缓存，否则每次打开都走网络
+		if (obj.list.length === 0 && !obj.byState && !obj.byOrbit && !obj.total) return null
 		if (!obj.savedAt) return null
 
 		const age = Date.now() - obj.savedAt
@@ -280,8 +284,16 @@ function request(url) {
 	})
 }
 
+// GCAT 三数据集体量大、且季度才更新一次，用「小时级」缓存戳：
+// 同一小时内所有用户命中同一份 CDN 边缘缓存，避免像分钟级那样每次打开都直连源站。
+// 图库 / 卫星分片早就用小时级（见 galleryChunk / satelliteChunk），这里对齐，否则新页面比图库还慢。
+const HOURLY_CACHE = new Set(['satellites', 'orbitStats', 'debrisEvents'])
+
 function fetchDataset(name) {
-	const url = CDN_BASE + '/' + FILES[name] + '?t=' + Math.floor(Date.now() / 60000)
+	// 高频更新的数据集（即将发射等）仍用分钟级，保证新鲜度；
+	// GCAT 体量大、变化慢，用小时级让 CDN 边缘缓存生效
+	const granularity = HOURLY_CACHE.has(name) ? 3600000 : 60000
+	const url = CDN_BASE + '/' + FILES[name] + '?t=' + Math.floor(Date.now() / granularity)
 
 	return request(url).then((body) => {
 		// 版本不一致不拒绝，只提示：字段都是后加的，旧数据照样能用（前端对缺失字段有回退）。

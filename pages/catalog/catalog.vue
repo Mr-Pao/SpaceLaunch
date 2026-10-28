@@ -36,7 +36,7 @@
 		</view>
 
 		<view class="list" v-else>
-			<view class="card" v-for="s in displayList" :key="s.id" @click="openDetail(s)">
+			<view class="card" v-for="s in visible" :key="s.id" @click="openDetail(s)">
 				<view class="info">
 					<view class="row1">
 						<text class="name">{{ s.name }}</text>
@@ -49,7 +49,9 @@
 			</view>
 
 			<view class="foot" v-if="loadingMore"><text class="hint-text">加载更多在轨航天器...</text></view>
+			<view class="foot" v-else-if="visible.length < displayList.length" @click="grow"><text class="hint-text">加载更多 · 已显示 {{ visible.length }} / {{ displayList.length }} 颗</text></view>
 			<view class="foot" v-else-if="loadedChunks >= totalChunks"><text class="hint-text">已加载全部 {{ total }} 颗</text></view>
+			<view class="foot" v-else><text class="hint-text">下滑加载更多…</text></view>
 		</view>
 
 		<view class="gcat-note">数据来源：GCAT (J. McDowell, planet4589.org/space/gcat) · CC-BY<text v-if="freshAt"> · {{ freshText() }}</text></view>
@@ -127,6 +129,9 @@ export default {
 			totalChunks: 1,
 			loadedChunks: 0,
 			loadingMore: false,
+			// 首屏只渲染 60 张卡，避免 800+ 节点一次性进 DOM 拖慢打开；
+			// 滑到底 / 点「加载更多」再增量展开，或触发拉下一片
+			renderCap: 60,
 			freshAt: '',
 			detail: null,
 			// 供模板迭代的静态选项（数组本身不进模板作用域守卫，安全）
@@ -155,14 +160,19 @@ export default {
 				out.push(s)
 			}
 			return out
+		},
+		// 真正渲染用裁剪后的窗口，首屏只画 renderCap 张卡
+		visible() {
+			return this.displayList.slice(0, this.renderCap)
 		}
 	},
 
 	watch: {
-		q() { this.autoExpand() },
-		orbitCat() { this.autoExpand() },
-		stateCat() { this.autoExpand() },
-		statusCat() { this.autoExpand() }
+		// 筛选变化时窗口回到顶部，并自动续拉命中片（与之前行为一致）
+		q() { this.onFilter() },
+		orbitCat() { this.onFilter() },
+		stateCat() { this.onFilter() },
+		statusCat() { this.onFilter() }
 	},
 
 	onPageScroll(e) {
@@ -185,7 +195,7 @@ export default {
 	},
 
 	onReachBottom() {
-		this.loadMore()
+		this.grow()
 	},
 
 	methods: {
@@ -198,6 +208,21 @@ export default {
 		setOrbit(k) { this.orbitCat = k },
 		setState(k) { this.stateCat = k },
 		setStatus(k) { this.statusCat = k },
+
+		// 筛选变化：窗口回到顶部，并自动续拉命中片（沿用旧 autoExpand 逻辑）
+		onFilter() {
+			this.renderCap = 60
+			this.autoExpand()
+		},
+
+		// 增量展开：先把已加载的更多命中项画出来；已画完但还有未拉的分片时，去拉下一片
+		grow() {
+			if (this.renderCap < this.displayList.length) {
+				this.renderCap += 60
+			} else if (this.loadedChunks < this.totalChunks) {
+				this.loadMore()
+			}
+		},
 
 		// 筛选后若当前已加载片里没有命中，自动续拉几片（最多 8 片），避免用户只见空列表
 		async autoExpand() {

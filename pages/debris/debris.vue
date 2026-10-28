@@ -27,10 +27,10 @@
 		</view>
 
 		<view class="timeline" v-else>
-			<view class="item" v-for="(e, i) in displayList" :key="e.id + '-' + i">
+			<view class="item" v-for="(e, i) in visibleList" :key="e.id + '-' + i">
 				<view class="rail">
 					<view class="dot" :class="e.status === 'DSO' ? 'boom' : 'fall'"></view>
-					<view class="line" v-if="i < displayList.length - 1"></view>
+					<view class="line" v-if="i < visibleList.length - 1"></view>
 				</view>
 				<view class="card">
 					<view class="row1">
@@ -42,7 +42,8 @@
 				</view>
 			</view>
 
-			<view class="foot"><text class="hint-text">已显示 {{ displayList.length }} / {{ total }} 起</text></view>
+			<view class="foot" v-if="visibleList.length < displayList.length" @click="grow"><text class="hint-text">加载更多 · 已显示 {{ visibleList.length }} / {{ displayList.length }} 起</text></view>
+			<view class="foot" v-else><text class="hint-text">已显示全部 {{ total }} 起</text></view>
 		</view>
 
 		<view class="gcat-note">数据来源：GCAT (J. McDowell, planet4589.org/space/gcat) · CC-BY<text v-if="freshAt"> · {{ freshText() }}</text></view>
@@ -68,7 +69,10 @@ export default {
 			events: [],
 			total: 0,
 			freshAt: '',
-			stateCats: STATE_CATS
+			stateCats: STATE_CATS,
+			// 渲染窗口：事件有 2000+ 条，一次性渲染所有卡片会卡死首屏，
+			// 只先画前 80 条，滑到底 / 点「加载更多」再增量展开
+			renderCount: 80
 		}
 	},
 
@@ -84,12 +88,26 @@ export default {
 				}
 				return true
 			})
+		},
+		// 真正渲染用裁剪后的窗口，避免 2000+ 节点一次性进 DOM
+		visibleList() {
+			return this.displayList.slice(0, this.renderCount)
 		}
+	},
+
+	watch: {
+		// 筛选条件变化时窗口回到顶部，避免残留一大段已筛选掉的旧列表
+		q() { this.renderCount = 80 },
+		stateCat() { this.renderCount = 80 }
 	},
 
 	onPageScroll(e) {
 		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
+	},
+
+	onReachBottom() {
+		this.grow()
 	},
 
 	async onLoad() {
@@ -107,6 +125,13 @@ export default {
 
 	methods: {
 		setState(k) { this.stateCat = k },
+
+		// 增量展开渲染窗口（最多再露 60 条），数据全在内存里，只是少画几张卡
+		grow() {
+			if (this.renderCount < this.displayList.length) {
+				this.renderCount += 60
+			}
+		},
 
 		freshText() {
 			return spaceData.freshnessText(this.freshAt)
