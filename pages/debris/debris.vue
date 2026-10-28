@@ -1,32 +1,42 @@
 <template>
 	<view class="page">
-		<nav-bar :solid="true" :placeholder="true" title="太空环境" />
-		<view class="tip">
-			<text class="tip-text">正在打开太空环境…</text>
+		<nav-bar :solid="navSolid" :placeholder="true" :title="navSolid ? '解体 / 再入' : ''" />
+
+		<view class="hero">
+			<text class="hero-title">解体 / 再入</text>
+			<text class="hero-sub">航天器在轨解体与再入记录 · 数据来自 GCAT</text>
 		</view>
+
+		<debris-section ref="sec" />
 	</view>
 </template>
 
 <script>
+const NAV_SOLID_SCROLL = 120
+
 /**
- * 「解体 / 再入」已并入「太空环境」页面（pages/environment），
- * 见那里的两个 tab。这个页面只作为**老路径的转发壳**保留：
+ * 解体 / 再入事件流（GCAT 已终结子集）。
  *
- *   · 3.2.4 上线后分享出去的卡片，path 都写的是 /pages/debris/debris；
- *   · 小程序码、聊天记录里的旧卡片不会跟着改，删掉这个文件就是一片 404。
- *
- * 转发到 tab=debris 而不是默认的近地天体，是因为走这条路径进来的人
- * 想看的一定是解体 / 再入。
+ * 和「卫星百科」「全球在轨」同一套数据源、同一类读者：都是查「天上有哪些东西、
+ * 它们的下场如何」。3.2.20 一度并进「太空环境」和近地天体共用两 tab，
+ * 3.2.22 拆回来各占一个入口。
  */
 export default {
-	onLoad() {
-		uni.redirectTo({
-			url: '/pages/environment/environment?tab=debris',
-			// 转发失败（极少见）就留在这个提示页，别白屏
-			fail: () => {
-				uni.showToast({ title: '打开失败，请返回重试', icon: 'none' })
-			}
-		})
+	data() {
+		return {
+			navSolid: false
+		}
+	},
+
+	onPageScroll(e) {
+		const solid = e.scrollTop > NAV_SOLID_SCROLL
+		if (solid !== this.navSolid) this.navSolid = solid
+	},
+
+	// 事件有上千条，上拉续载由内容组件负责展开
+	onReachBottom() {
+		const sec = this.$refs && this.$refs.sec
+		if (sec && sec.grow) sec.grow()
 	}
 }
 </script>
@@ -35,15 +45,23 @@ export default {
 .page {
 	min-height: 100vh;
 	background: #0a0e17;
+	padding: 0 32rpx 120rpx;
+	box-sizing: border-box;
 }
-.tip {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 200rpx 40rpx;
+
+.hero {
+	padding: 24rpx 8rpx 14rpx;
 }
-.tip-text {
+.hero-title {
+	display: block;
+	color: #e2e8f0;
+	font-size: 38rpx;
+	font-weight: 700;
+}
+.hero-sub {
+	display: block;
+	margin-top: 6rpx;
 	color: #6b7891;
-	font-size: 26rpx;
+	font-size: 22rpx;
 }
 </style>

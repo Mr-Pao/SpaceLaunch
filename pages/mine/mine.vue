@@ -219,11 +219,12 @@ export default {
 			// 空出的席位给「近期活动」—— 活动是需要照做的日程，当资料查更合适
 			entries: [
 				{ icon: '📊', name: '数据统计', desc: '历年发射量', url: '/pages/stats/stats' },
+				// 三项同一套数据源（GCAT 编目），读者也是同一批：查天上有什么、后来怎么样
 				{ icon: '🌍', name: '全球在轨', desc: '在轨资产统计', url: '/pages/orbit/orbit' },
 				{ icon: '🛰️', name: '卫星百科', desc: '在轨航天器编目', url: '/pages/catalog/catalog' },
-				// 近地天体与解体/再入是同一个问题的两面（外面飞来的 / 上面掉下去的），
-				// 合成一个「太空环境」两 tab 页面，不再各占一格
-				{ icon: '☄️', name: '太空环境', desc: '近地天体 · 解体再入', url: '/pages/environment/environment' },
+				{ icon: '💥', name: '解体 / 再入', desc: '在轨解体与再入事件', url: '/pages/debris/debris' },
+				// 近地天体不是同一套东西（NASA NeoWs，外面的小天体飞过来），单独一格
+				{ icon: '☄️', name: '近地天体', desc: '未来一周掠地日程', url: '/pages/neo/neo' },
 				{ icon: '📅', name: '近期活动', desc: 'EVA · 轨道插入 · 飞掠', url: '/pages/event/event' }
 			]
 		}

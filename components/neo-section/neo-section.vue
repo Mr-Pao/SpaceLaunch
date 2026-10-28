@@ -95,7 +95,7 @@
 import spaceData from '@/utils/data.js'
 
 /**
- * 「太空环境」的近地天体半边（NASA NeoWs）。
+ * 近地天体（NASA NeoWs）的内容主体，壳由 pages/neo 负责。
  *
  * 设计取舍：
  *   1. 主尺度用「地月距离」而不是公里 —— 38 万公里这个量级普通人抓不住，

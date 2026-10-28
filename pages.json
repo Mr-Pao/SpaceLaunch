@@ -151,16 +151,22 @@
 			}
 		},
 		{
+			"path": "pages/neo/neo",
+			"style": {
+				"navigationBarTitleText": "近地天体"
+			}
+		},
+		{
 			"path": "pages/environment/environment",
 			"style": {
-				"navigationBarTitleText": "太空环境",
-				"onReachBottomDistance": 200
+				"navigationBarTitleText": "太空环境"
 			}
 		},
 		{
 			"path": "pages/debris/debris",
 			"style": {
-				"navigationBarTitleText": "太空环境"
+				"navigationBarTitleText": "解体 / 再入",
+				"onReachBottomDistance": 200
 			}
 		},
 		{
