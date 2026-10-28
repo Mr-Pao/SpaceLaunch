@@ -102,7 +102,11 @@ const FILES = {
 	// 全球在轨资产（GCAT 聚合统计）：total + byState/byOrbit/byDecade，无逐条 list
 	orbitStats: 'orbit-stats.json',
 	// 在轨解体 / 再入事件流（GCAT 已终结子集，按再入日期排序）
-	debrisEvents: 'debris-events.json'
+	debrisEvents: 'debris-events.json',
+	// 航天资讯（SNAPI v4）。CI 每 3 小时抓一轮、保留最近 200 条；
+	// 标题与摘要已中文化（翻不出来为空，前端回退英文）；
+	// launches 里是可回连发射详情页的 LL2 UUID
+	news: 'news.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"
@@ -139,7 +143,9 @@ const SOFT_TTL = {
 	// 与 launchers 同待遇：12 小时软 TTL，别每次进页都白拉
 	satellites: 12 * 60 * 60 * 1000,
 	orbitStats: 12 * 60 * 60 * 1000,
-	debrisEvents: 12 * 60 * 60 * 1000
+	debrisEvents: 12 * 60 * 60 * 1000,
+	// 资讯每 3 小时一轮，1 小时软过期已经够新；单份才 30~50KB
+	news: 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。
@@ -165,6 +171,8 @@ const HARD_TTL = {
 	satellites: 2 * 24 * 60 * 60 * 1000,
 	orbitStats: 3 * 24 * 60 * 60 * 1000,
 	debrisEvents: 3 * 24 * 60 * 60 * 1000,
+	// 资讯是滚动列表，两天前的副本没有保留价值
+	news: 2 * 24 * 60 * 60 * 1000,
 	// 往年今日一天换一次，昨天的副本没有价值
 	onthisday: 12 * 60 * 60 * 1000
 }
@@ -238,7 +246,7 @@ function readStorage(name) {
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
 // onthisday 排在最后丢：它只有几 KB，首页首屏要用，丢了反而要等网络
-const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'satellites', 'agencies', 'gallery', 'videos', 'timelines', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday', 'spacestations', 'expeditions', 'dockings']
+const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'satellites', 'agencies', 'gallery', 'videos', 'timelines', 'news', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday', 'spacestations', 'expeditions', 'dockings']
 
 function writeStorage(name, data) {
 	try {

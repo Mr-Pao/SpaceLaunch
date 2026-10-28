@@ -219,7 +219,8 @@ export default {
 				{ icon: '📊', name: '数据统计', desc: '历年发射量', url: '/pages/stats/stats' },
 				{ icon: '🌍', name: '全球在轨', desc: '在轨资产统计', url: '/pages/orbit/orbit' },
 				{ icon: '🛰️', name: '卫星百科', desc: '在轨航天器编目', url: '/pages/catalog/catalog' },
-				{ icon: '💥', name: '解体 / 再入', desc: '太空事件流', url: '/pages/debris/debris' }
+				{ icon: '💥', name: '解体 / 再入', desc: '太空事件流', url: '/pages/debris/debris' },
+				{ icon: '📰', name: '航天资讯', desc: '最新报道 · 已中文化', url: '/pages/news/news' }
 			]
 		}
 	},

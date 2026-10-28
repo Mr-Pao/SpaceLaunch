@@ -155,6 +155,13 @@
 			"style": {
 				"navigationBarTitleText": "解体 / 再入事件"
 			}
+		},
+		{
+			"path": "pages/news/news",
+			"style": {
+				"navigationBarTitleText": "航天资讯",
+				"onReachBottomDistance": 300
+			}
 		}
 	],
 	"tabBar": {

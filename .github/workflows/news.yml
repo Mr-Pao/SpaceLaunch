@@ -1,0 +1,60 @@
+name: sync-space-news
+
+# SNAPI 航天资讯同步。
+#
+# 为什么单独一个 workflow 而不是并进 sync.yml：
+#   1. 数据源完全不同（SNAPI 而不是 LL2），不占用 LL2 那 15 次/小时的预算；
+#   2. 抓取频率与发射数据不同（资讯每 3 小时足够，没必要 15 分钟一次）；
+#   3. 翻译是这块最耗时的一步，独立跑不会拖慢发射数据的同步。
+#
+# 频率选择：SNAPI 每天新增几十条，每 3 小时一轮 + 每轮取最新 60 条（两路各 30），
+# 完全能覆盖，且翻译缓存命中率高（同一篇文章只翻一次）。
+# 注意 cron 用 UTC，北京时间 = UTC+8。
+
+on:
+  schedule:
+    - cron: '0 */3 * * *' # 每 3 小时
+  push:
+    paths:
+      - 'scripts/news.js'
+      - '.github/workflows/news.yml'
+      - 'scripts/data/i18n-terms.json' # 术语表变了要重翻一轮，顺带触发
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # 同一时间只跑一个，避免两轮同时写 news.json 互相覆盖
+  group: sync-news
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: 抓取 SNAPI 并上传
+        working-directory: scripts
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET || 'spacelaunch-1258113633' }}
+          COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
+          # 桶是私有读，单个对象要打 public-read，否则小程序拉不到（403）
+          COS_ACL: public-read
+          # 标题与摘要中文化：CI 在海外节点可直连 Google 免费端点且不限量，
+          # auto = Google 挂了自动降级 MyMemory，两条都挂就保留英文
+          TRANSLATE_PROVIDER: auto
+        run: node news.js
