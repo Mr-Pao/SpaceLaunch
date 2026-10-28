@@ -36,7 +36,9 @@
 							<text class="site">{{ n.site }}</text>
 							<text class="sep">·</text>
 							<text class="time">{{ n.atShort }}</text>
-							<text class="tag" v-if="n.launches && n.launches.length">发射</text>
+							<!-- 只在真能跳的时候打「发射」标签：标签的意义是「点开能看那次发射」，
+							     打着标签却打不开，比不打更让人困惑 -->
+							<text class="tag" v-if="n.launchRef">发射</text>
 						</view>
 					</view>
 				</view>
@@ -78,13 +80,16 @@
 				<text class="d-sum d-en" v-else-if="detail.summary">{{ detail.summary }}</text>
 
 				<!-- 主次按「这页最想让你干什么」定：能跳发射时，跳转才是主线
-				     （资讯一半的价值在那 28 条能回连发射详情），复制链接退居次要；
-				     没有关联发射时复制就是唯一动作，于是把主色还给它 -->
+				     （资讯一半的价值在于能回连发射详情），复制链接退居次要；
+				     打不开时复制就是唯一能用的动作，于是把主色还给它 -->
 				<view class="d-acts">
-					<view class="act" :class="{ primary: launchLink !== 'ok' }" @click="copyUrl">
+					<view class="act" :class="{ primary: !hasLaunchRef }" @click="copyUrl">
 						<text class="act-text">复制原文链接</text>
 					</view>
-					<view v-if="launchLink === 'ok'" class="act primary" @click="goLaunch">
+					<!-- 与列表的「发射」标签同源（都看 launchRef）。
+				     以前这里挂的是运行时网络查询结果，导致列表打着标签、
+				     详情里按钮却凭空消失 -->
+					<view v-if="hasLaunchRef" class="act primary" @click="goLaunch">
 						<text class="act-text">查看相关发射</text>
 					</view>
 				</view>
@@ -119,18 +124,21 @@ export default {
 			focus: false,
 			// 数据到了但找不到那一篇（被挤出最新 200 条）
 			focusMissed: false,
-			// 「查看相关发射」入口的三态：'' 无关联 / checking 判定中 / ok 可跳。
-			// 见 open() 与方法区的 checkLaunch 注释
-			launchLink: '',
 			// 渲染窗口：最多 200 条，一次性全画会拖慢首屏，先 30 条
 			renderCount: RENDER_STEP
 		}
 	},
 
 	computed: {
+		// 「这次发射可以点开看」——列表的「发射」标签、抽屉的「查看相关发射」按钮、
+		// 「关联发射」筛选，全部只看这一个字段，三者永远同进同出。
+		// launchRef 由 CI 在同步资讯时查归档填好（带 net），前端零查询
+		hasLaunchRef() {
+			return !!(this.detail && this.detail.launchRef && this.detail.launchRef.id)
+		},
 		filteredList() {
 			if (!this.onlyLaunch) return this.items
-			return this.items.filter((n) => n.launches && n.launches.length)
+			return this.items.filter((n) => n.launchRef)
 		},
 		visibleList() {
 			return this.filteredList.slice(0, this.renderCount)
@@ -206,54 +214,24 @@ export default {
 			}
 		},
 
+		/**
+		 * 「查看相关发射」这个入口以前有个矛盾：列表打了「发射」标签，
+		 * 点进去按钮却没了。
+		 *
+		 * 根子在于两处用了不同判据 —— 列表看「有没有关联 id」，详情看
+		 * 「运行时能不能查到」。而 SNAPI 只给 launch_id（UUID）不给发射时间，
+		 * 本地快照只有 upcoming 100 + previous 100，归档查找又限深 12 片，
+		 * 于是十几年前的老任务（好奇号 2011 在 p16）数据明明在库里也查不到。
+		 *
+		 * 现在统一交给 CI：同步资讯时扫一遍归档分片，把能打开的发射连 net
+		 * 一起算出来存进 launchRef。前端三个地方（标签 / 按钮 / 筛选）都只
+		 * 看 launchRef，不再有任何运行时判定，打开抽屉也就零网络开销。
+		 */
 		open(n) {
 			this.detail = n
-			this.checkLaunch(n)
-		},
-
-		/**
-		 * 判断这条报道的「相关发射」能不能打开。
-		 *
-		 * SNAPI 只给 launch_id（UUID），不给发射时间；而本地快照只有
-		 * upcoming 100 条 + previous 100 条，归档查找又限深 12 片。
-		 * 实测 28 条带关联的资讯里只有 5 条真能跳，剩下的多是十几年前的
-		 * 老任务（好奇号 2011、Rosetta 2004 这类 —— SNAPI 的「关联」
-		 * 其实是「文中提到过」，并不等于「这篇在讲它」）。
-		 *
-		 * 所以抽屉打开时就判一次：跳得了才显示按钮。与其让用户点进去
-		 * 看一屏「未找到该发射任务」，不如这个入口根本别出现。
-		 */
-		async checkLaunch(n) {
-			const id = n && n.launches && n.launches[0]
-			if (!id) {
-				this.launchLink = ''
-				return
-			}
-
-			// 缓存里有就立即定案：正常使用路径下都在这里结束
-			if (spaceData.peekLaunchById(id)) {
-				this.launchLink = 'ok'
-				return
-			}
-
-			const seq = (this._linkSeq = (this._linkSeq || 0) + 1)
-			this.launchLink = 'checking'
-
-			// 缓存没有：交给 findLaunchById 走一次网络再判（它内部先扫缓存）
-			let hit = null
-			try {
-				hit = await spaceData.findLaunchById(id)
-			} catch (e) {
-				// 网络失败按「打不开」处理：宁可少一个入口，也不要跳过去报错
-			}
-
-			// 用户可能已经滑到下一条，过期结果直接丢掉
-			if (this._linkSeq !== seq) return
-			this.launchLink = hit ? 'ok' : ''
 		},
 
 		closeDetail() {
-			this.launchLink = ''
 			// focus 态本来就没有列表可回，关掉就是「看完了」→ 退回上一页（发射详情）。
 			// 页面栈只有一层（分享直达之类）时 navigateBack 会失败，那就退回列表态
 			if (this.focus) {
@@ -279,11 +257,16 @@ export default {
 			})
 		},
 
+		/**
+		 * 跳发射详情。launchRef 是 CI 算好的「能打开的那一个」，
+		 * 带上 net 让详情页直达归档分片（否则从最新往回翻，限深 12 片）。
+		 */
 		goLaunch() {
-			const id = this.detail && this.detail.launches && this.detail.launches[0]
-			if (!id) return
+			const ref = this.detail && this.detail.launchRef
+			if (!ref || !ref.id) return
 
-			const url = '/pages/launch/launchInfo?id=' + encodeURIComponent(id)
+			let url = '/pages/launch/launchInfo?id=' + encodeURIComponent(ref.id)
+			if (ref.net) url += '&net=' + encodeURIComponent(ref.net)
 			const fail = () => uni.showToast({ title: '该发射未收录', icon: 'none' })
 
 			// focus 态本来就是从发射详情页点进来的，再 navigateTo 会「发射→资讯→发射→资讯」

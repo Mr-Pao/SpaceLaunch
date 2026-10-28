@@ -35,7 +35,8 @@
 							<text class="site">{{ n.site }}</text>
 							<text class="sep">·</text>
 							<text class="time">{{ n.atShort }}</text>
-							<text class="tag" v-if="n.launches && n.launches.length">发射</text>
+							<!-- 只在真能跳时标记：和资讯页列表、详情按钮同一判据 -->
+							<text class="tag" v-if="n.launchRef">发射</text>
 						</view>
 					</view>
 				</view>

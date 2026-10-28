@@ -244,10 +244,86 @@ function slim(raw) {
   }
 }
 
+/**
+ * 关联发射的「定位索引」：uuid → 发射时间（net）。
+ *
+ * SNAPI 只给 LL2 的 launch UUID，不给发射时间。小程序打开一条发射的路径是
+ * 「快照 200 条 → 归档分片（按时间切，共 76 片）」，而归档查找要靠 net 才能
+ * 直达目标分片，否则只能从最新往回翻（限深 12 片）—— 十几年前的老任务
+ * （好奇号 2011 的 MSL 在 p22）数据明明在库里，却永远翻不到，点进去就是
+ * 「未找到该发射任务」。
+ *
+ * 所以在 CI 里问归档一次「这些 uuid 落在哪一片」，把 net 写进 news.json，
+ * 前端点击时直接带 net 跳转，一次请求命中。查不到的记 null，下轮不再扫。
+ */
+const LOCATOR_KEY = 'space-data/launch-locator.json'
+const HIST_PREFIX = 'space-data/history/'
+
+async function loadLocator() {
+  try {
+    const d = await readCosJson(LOCATOR_KEY)
+    return d && d.map && typeof d.map === 'object' ? d.map : {}
+  } catch (e) {
+    console.log(`  · 定位索引不存在（按首轮全量扫）: ${e.message}`)
+    return {}
+  }
+}
+
+/**
+ * 在归档分片里找这些 uuid，命中的把 net 写进 map；
+ * 扫完整库仍没有的写 null，下轮不再重复请求。
+ * 返回本轮新命中的数量。
+ */
+async function scanArchive(ids, map) {
+  const want = new Set(ids.filter((id) => !(id in map)))
+  if (!want.size) return 0
+
+  let index = null
+  try {
+    index = await readCosJson(HIST_PREFIX + 'index.json')
+  } catch (e) {
+    console.warn('  ! 归档索引拉取失败，本轮跳过定位: ' + e.message)
+    return 0
+  }
+  const pages = (index && index.pages) || []
+  if (!pages.length) return 0
+
+  let found = 0
+  const CONC = 6
+  for (let i = 0; i < pages.length && want.size; i += CONC) {
+    const batch = pages.slice(i, i + CONC)
+    const lists = await Promise.all(
+      batch.map(async (p) => {
+        try {
+          const d = await readCosJson(HIST_PREFIX + p.file)
+          return (d && d.list) || []
+        } catch (e) {
+          return []
+        }
+      })
+    )
+    for (const list of lists) {
+      for (const x of list) {
+        const id = String(x.id)
+        if (!want.has(id)) continue
+        map[id] = x.net || null
+        if (x.net) found++
+        want.delete(id)
+      }
+    }
+    process.stderr.write(
+      `\r    · 归档扫描 ${Math.min(i + CONC, pages.length)}/${pages.length} 片，命中 ${found}   `
+    )
+  }
+  process.stderr.write('\n')
+
+  for (const id of want) map[id] = null
+  return found
+}
+
 async function main() {
   console.log('=== 同步 SNAPI 资讯 ===')
   fs.mkdirSync(OUT_DIR, { recursive: true })
-
   // ---- 1. 两路抓取 ----
   // 串行而非并发：SNAPI 对突发并发不友好，本机实测并发两路会互相拖慢甚至超时
   const note = (m) => process.stderr.write(m + '\n')
@@ -387,6 +463,57 @@ async function main() {
   const list = [...byId.values()]
     .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
     .slice(0, KEEP)
+
+  // ---- 5.5 关联发射定位 ----
+  // 只处理最终留下的这 200 条（被挤掉的不必浪费请求）。
+  // 定位索引是累积的，老 uuid 查过一次就不再问归档。
+  //
+  // locator 初值用 null 而不是 {}：dry-run / 没配 COS 时压根没跑定位，
+  // 这时候不能把条目上已有的 launchRef 抹掉
+  let locator = null
+  if (!DRY && hasCosConfig()) {
+    locator = await loadLocator()
+    const ids = new Set()
+    for (const it of list) for (const id of it.launches || []) ids.add(String(id))
+    if (ids.size) {
+      const before = Object.keys(locator).length
+      const found = await scanArchive([...ids], locator)
+      console.log(
+        `  · 关联发射定位: ${ids.size} 个 uuid / 本轮新命中 ${found} / 索引累计 ${Object.keys(locator).length} 条`
+      )
+      if (Object.keys(locator).length !== before) {
+        const p = path.join(OUT_DIR, 'launch-locator.json')
+        fs.writeFileSync(
+          p,
+          JSON.stringify({ v: 1, generatedAt: new Date().toISOString(), map: locator })
+        )
+        try {
+          await upload(p, LOCATOR_KEY, 'public, max-age=86400')
+          console.log('  ↑ launch-locator.json')
+        } catch (e) {
+          console.warn('  ! 定位索引上传失败（不影响资讯本身）: ' + e.message)
+        }
+      }
+    }
+  }
+
+  // 每篇只留「第一个能直达的」发射：前端点击只需要一个，多存只是撑体积。
+  // 定位不到就不写这个字段 —— 前端据此知道「点了会打不开」
+  if (locator) {
+    let linked = 0
+    for (const it of list) {
+      const hit = (it.launches || [])
+        .map((id) => ({ id: String(id), net: locator[String(id)] }))
+        .find((x) => x.net)
+      if (hit) {
+        it.launchRef = hit
+        linked++
+      } else {
+        delete it.launchRef
+      }
+    }
+    if (list.length) console.log(`  · 可直达发射的资讯: ${linked} / ${list.length} 条`)
+  }
 
   const payload = {
     v: DATA_VERSION,
