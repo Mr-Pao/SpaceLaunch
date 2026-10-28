@@ -438,8 +438,17 @@ function refreshInBackground(name, oldGeneratedAt, onUpdate) {
 		})
 }
 
+/**
+ * 给数据集补前端兜底值，并标记是否过期。
+ *
+ * 用 Object.assign 以原始数据打底，而不是逐字段列白名单：
+ * 这里以前是白名单式挑选，新增数据集的字段忘记同步就会「数据里有、页面显示 0」，
+ * 而且不报错、不告警，极难发现 —— neoNears 的 totalKnown / pastCount / closest
+ * 就这么丢过一轮（页面上「已发现的近地天体」显示成「—」、"过去 7 天 0 次"）。
+ * 打底之后，只有需要改写的字段在这里显式覆盖。
+ */
 function decorate(data, stale) {
-	return {
+	return Object.assign({}, data, {
 		list: data.list,
 		count: typeof data.count === 'number'
 			? data.count
@@ -458,7 +467,7 @@ function decorate(data, stale) {
 		byDecade: data.byDecade || [],
 		breakupCount: data.breakupCount || 0,
 		stale: !!stale
-	}
+	})
 }
 
 // ============ 图库分片 ============

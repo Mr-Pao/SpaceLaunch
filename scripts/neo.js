@@ -31,7 +31,7 @@
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
-const { upload, hasCosConfig } = require('./lib/cos')
+const { upload, hasCosConfig, readCosJson } = require('./lib/cos')
 
 const API = 'https://api.nasa.gov/neo/rest/v1'
 // CI 从 Secrets 注入；没有就用 DEMO_KEY（30 次/小时、50 次/天按 IP）。
@@ -95,6 +95,24 @@ function shiftDays(base, n) {
   const d = new Date(base.getTime())
   d.setUTCDate(d.getUTCDate() + n)
   return d
+}
+
+let prevCache
+/**
+ * 上一轮已经传上去的 payload，只在某一段抓取失败时才用得上。
+ *
+ * 失败写 0 比不更新更糟：「过去 7 天 0 次」看着像个正常数字，不会有人怀疑，
+ * 但它其实是「这个数没抓到」。所以宁可沿用旧值 —— 数字旧一天，
+ * 也好过凭空出现一个错的。
+ */
+async function prevPayload() {
+  if (prevCache !== undefined) return prevCache
+  try {
+    prevCache = (await readCosJson(`space-data/${OUT_FILE}`)) || {}
+  } catch (e) {
+    prevCache = {}
+  }
+  return prevCache
 }
 
 /**
@@ -205,8 +223,10 @@ async function main() {
     pastCount = past.element_count || 0
     console.log(`  · 过去 7 天: ${pastCount} 条`)
   } catch (e) {
-    // 这一段拿不到不影响主列表
-    console.log(`  ! 过去 7 天抓取失败（不影响主列表）: ${e.message}`)
+    // 这一段拿不到不影响主列表，但别把统计写成 0（详见 prevPayload 注释）
+    const old = await prevPayload()
+    pastCount = old.pastCount || 0
+    console.log(`  ! 过去 7 天抓取失败，沿用上轮 ${pastCount}: ${e.message}`)
   }
 
   // ---- 3. 已发现的近地天体总数（browse 只取 1 条，靠 page.total_elements）----
@@ -216,7 +236,9 @@ async function main() {
     totalKnown = (browse.page && browse.page.total_elements) || 0
     console.log(`  · 已发现近地天体: ${totalKnown}`)
   } catch (e) {
-    console.log(`  ! 总数抓取失败（不影响主列表）: ${e.message}`)
+    const old = await prevPayload()
+    totalKnown = old.totalKnown || 0
+    console.log(`  ! 总数抓取失败，沿用上轮 ${totalKnown}: ${e.message}`)
   }
 
   // 按接近时刻升序：时间线从最近的一次开始，和「解体 / 再入」倒序不同——
