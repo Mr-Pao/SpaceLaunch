@@ -36,7 +36,7 @@
 							<text class="sep">·</text>
 							<text class="time">{{ n.atShort }}</text>
 							<!-- 只在真能跳时标记：和资讯页列表、详情按钮同一判据 -->
-							<text class="tag" v-if="n.launchRef">发射</text>
+							<text class="tag" v-if="hasLaunch(n)">发射</text>
 						</view>
 					</view>
 				</view>
@@ -108,6 +108,16 @@ export default {
 	},
 
 	methods: {
+		/**
+		 * 这条资讯是否挂着**能跳转的**发射。CI 把定位不到 net 的都剔掉了，
+		 * 所以有 launchRefs 就一定打得开。兼容旧数据的单值 launchRef。
+		 */
+		hasLaunch(n) {
+			if (!n) return false
+			if (Array.isArray(n.launchRefs) && n.launchRefs.length) return true
+			return !!(n.launchRef && n.launchRef.id)
+		},
+
 		/**
 		 * @param {boolean} force 下拉刷新时传 true，绕过 TTL 缓存真去拉。
 		 *   不传就只读缓存 —— 首次进首页不该为了「可能没变」的资讯空跑一次网络。

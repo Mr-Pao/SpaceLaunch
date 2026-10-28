@@ -25,7 +25,7 @@
 					<view class="act" :class="{ primary: !hasLaunchRef }" @click="copyUrl">
 						<text class="act-text">复制原文链接</text>
 					</view>
-					<!-- 与列表的「发射」标签同源（都看 launchRef）。
+					<!-- 与列表的「发射」标签同源（都看 launchRefs）。
 					     以前这里挂的是运行时网络查询结果，导致列表打着标签、
 					     详情里按钮却凭空消失 -->
 					<view v-if="hasLaunchRef" class="act primary" @click="goLaunch">
@@ -36,28 +36,73 @@
 				<text class="d-hint">小程序内不转载正文，复制链接到浏览器可读全文</text>
 			</scroll-view>
 		</view>
+
+		<!-- 多条候选时的选择层。`launches[]` 不标主次（SNAPI 只给 launch_id + provider），
+		     猜「哪个是这期的主角」必然错 —— 好奇号博客那条就是这么被链到 2011 年
+		     MSL 发射上的。所以干脆不猜：一条直接跳，多条列出来让人自己选。 -->
+		<view v-if="picker" class="pick-mask" @click="picker = false"></view>
+		<view v-if="picker" class="pick-sheet">
+			<view class="sheet-grab"></view>
+			<text class="pick-title">这条资讯涉及 {{ launchRefs.length }} 次发射</text>
+			<text class="pick-sub">这条资讯提到了多次发射，按时间从近到远排</text>
+			<scroll-view scroll-y class="pick-list">
+				<view
+					class="pick-row"
+					v-for="(r, i) in launchRefs"
+					:key="r.id"
+					@click="jumpTo(r)"
+				>
+					<text class="pick-idx">{{ i + 1 }}</text>
+					<view class="pick-info">
+						<text class="pick-name">{{ r.name || '未命名任务' }}</text>
+						<text class="pick-net">{{ shortTime(r.net) }}</text>
+					</view>
+					<text class="pick-arrow">›</text>
+				</view>
+			</scroll-view>
+		</view>
 	</view>
 </template>
 
 <script>
 import { setTabBarHidden } from '@/utils/tabbar.js'
+import { formatShort } from '@/utils/format.js'
 
 /**
  * 一条资讯的详情弹窗。纯展示 + 两个动作，自己不发任何请求：
- * 「这次发射能不能打开」由 CI 预先算好写在 launchRef 里，前端零查询。
+ * 「这篇涉及哪几次发射、能不能打开」由 CI 预先算好写在 launchRefs 里，前端零查询。
  */
 export default {
 	props: {
 		// 传 null 即关闭
 		article: { type: Object, default: null },
-		// 当前已经在看的发射 id（发射详情页里用）。点「查看相关发射」时
+		// 当前已经在看的发射 id（发射详情页里用）。点某个发射时
 		// 如果就是这一次，关掉弹窗就够了，不必再开一页一模一样的详情
 		curLaunchId: { type: String, default: '' }
 	},
 
+	data() {
+		return {
+			// 多条候选时的选择层
+			picker: false
+		}
+	},
+
 	computed: {
+		/**
+		 * 这篇资讯涉及、且确认能打开的全部发射（CI 已排好序：最接近发布时间的在前）。
+		 * 兼容旧数据：CI 还没刷到新版时只有单个 launchRef。
+		 */
+		launchRefs() {
+			const a = this.article
+			if (!a) return []
+			if (Array.isArray(a.launchRefs)) return a.launchRefs.filter((r) => r && r.id)
+			if (a.launchRef && a.launchRef.id) return [a.launchRef]
+			return []
+		},
+
 		hasLaunchRef() {
-			return !!(this.article && this.article.launchRef && this.article.launchRef.id)
+			return this.launchRefs.length > 0
 		}
 	},
 
@@ -68,6 +113,8 @@ export default {
 		// 非 tab 页拿不到实例，静默跳过）
 		article(v) {
 			this.setBarHidden(!!v)
+			// 换了一条资讯就收起选择层，别让它跟着带过去
+			this.picker = false
 		}
 	},
 
@@ -81,8 +128,12 @@ export default {
 			setTabBarHidden(hidden)
 		},
 
+		shortTime(v) {
+			return formatShort(v)
+		},
+
 		close() {
-			// 先恢复 tabBar 再通知父组件：goLaunch 会紧接着 navigateTo，
+			// 先恢复 tabBar 再通知父组件：jumpTo 会紧接着 navigateTo，
 			// 到了新页面再想恢复就找不到 tabBar 实例了
 			this.setBarHidden(false)
 			this.$emit('close')
@@ -100,15 +151,29 @@ export default {
 		},
 
 		/**
-		 * 跳发射详情。launchRef 是 CI 算好的「能打开的那一个」，
-		 * 带上 net 让详情页直达归档分片（否则从最新往回翻，限深 12 片）。
+		 * 「查看相关发射」：一条时直接跳，多条先让用户选。
+		 * 不自动挑第一个 —— 数组顺序是 SNAPI 的提及顺序，没有语义。
 		 */
 		goLaunch() {
-			const ref = this.article && this.article.launchRef
+			const refs = this.launchRefs
+			if (!refs.length) return
+			if (refs.length === 1) {
+				this.jumpTo(refs[0])
+				return
+			}
+			this.picker = true
+		},
+
+		/**
+		 * 跳发射详情。带上 net 让详情页直达归档分片
+		 * （否则只能从最新往回翻，限深 12 片，十几年前的老任务翻不到）。
+		 */
+		jumpTo(ref) {
 			if (!ref || !ref.id) return
 
 			// 已经在这个发射的详情页上：关掉弹窗就是「看到了」
 			if (this.curLaunchId && String(ref.id) === String(this.curLaunchId)) {
+				this.picker = false
 				this.close()
 				return
 			}
@@ -116,6 +181,7 @@ export default {
 			let url = '/pages/launch/launchInfo?id=' + encodeURIComponent(ref.id)
 			if (ref.net) url += '&net=' + encodeURIComponent(ref.net)
 
+			this.picker = false
 			this.close()
 			uni.navigateTo({
 				url,
@@ -242,5 +308,97 @@ export default {
 	font-size: 21rpx;
 	color: #4f5b6b;
 	line-height: 1.6;
+}
+
+/* ---- 多条候选：选择层（压在详情面板之上）---- */
+.pick-mask {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.72);
+	z-index: 62;
+}
+
+.pick-sheet {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	max-height: 74vh;
+	background: #0a0f16;
+	border-radius: 28rpx 28rpx 0 0;
+	z-index: 63;
+	overflow: hidden;
+	padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pick-title {
+	display: block;
+	padding: 8rpx 32rpx 0;
+	font-size: 30rpx;
+	font-weight: 600;
+	color: #f2f6fa;
+}
+
+.pick-sub {
+	display: block;
+	padding: 10rpx 32rpx 0;
+	font-size: 21rpx;
+	line-height: 1.5;
+	color: #5d6a7a;
+}
+
+.pick-list {
+	max-height: 56vh;
+	padding: 18rpx 24rpx 32rpx;
+	box-sizing: border-box;
+}
+
+.pick-row {
+	display: flex;
+	align-items: center;
+	padding: 22rpx 20rpx;
+	border-radius: 18rpx;
+	background: rgba(255, 255, 255, 0.04);
+	margin-bottom: 14rpx;
+}
+
+.pick-idx {
+	width: 44rpx;
+	font-size: 22rpx;
+	color: #5c8fb3;
+	font-weight: 600;
+}
+
+.pick-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.pick-name {
+	display: block;
+	font-size: 27rpx;
+	line-height: 1.4;
+	color: #dfe9f3;
+	/* 型号 | 任务 的组合名可能很长，两行截断 */
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+.pick-net {
+	display: block;
+	margin-top: 6rpx;
+	font-size: 21rpx;
+	color: #5d6a7a;
+}
+
+.pick-arrow {
+	font-size: 34rpx;
+	color: #3d4a58;
+	margin-left: 12rpx;
 }
 </style>

@@ -34,7 +34,7 @@
 						<text class="time">{{ n.atShort }}</text>
 						<!-- 只在真能跳的时候打「发射」标签：标签的意义是「点开能看那次发射」，
 						     打着标签却打不开，比不打更让人困惑 -->
-						<text class="tag" v-if="n.launchRef">发射</text>
+						<text class="tag" v-if="hasLaunch(n)">发射</text>
 					</view>
 				</view>
 			</view>
@@ -82,11 +82,11 @@ export default {
 	},
 
 	computed: {
-		// 「关联发射」筛选只看 launchRef：它由 CI 在同步资讯时查归档算好
+		// 「关联发射」筛选只看 launchRefs：它由 CI 在同步资讯时查归档算好
 		// （带 net），和列表的「发射」标签、弹窗里的「查看相关发射」同源
 		filteredList() {
 			if (!this.onlyLaunch) return this.items
-			return this.items.filter((n) => n.launchRef)
+			return this.items.filter((n) => this.hasLaunch(n))
 		},
 		visibleList() {
 			return this.filteredList.slice(0, this.renderCount)
@@ -136,6 +136,16 @@ export default {
 	},
 
 	methods: {
+		/**
+		 * 这条资讯是否挂着**能跳转的**发射。CI 把定位不到 net 的都剔掉了，
+		 * 所以有 launchRefs 就一定打得开。兼容旧数据的单值 launchRef。
+		 */
+		hasLaunch(n) {
+			if (!n) return false
+			if (Array.isArray(n.launchRefs) && n.launchRefs.length) return true
+			return !!(n.launchRef && n.launchRef.id)
+		},
+
 		async getData(force) {
 			try {
 				const d = await spaceData.load('news', { force: !!force })

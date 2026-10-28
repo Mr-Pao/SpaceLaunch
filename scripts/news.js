@@ -238,14 +238,14 @@ function slim(raw) {
     // 列表里只显示「月-日 时:分」，详情页用完整时间
     atShort: at ? at.slice(5) : '',
     // 关联的 LL2 发射 UUID，前端可回连发射详情页。
-    // 留 5 个而不是全量：一篇综述报道可能提到五六次发射，全留会撑体积；
-    // 但只留 2 个会漏 —— 反查「这条发射被哪些报道提到」时第 3 个之后就永远查不到
-    launches: (raw.launches || []).map((x) => x && x.launch_id).filter(Boolean).slice(0, 5)
+    // 上限放到 8：实测一篇综述稿最多挂 6-7 个（Rocket Report 那期 6 个），
+    // 留 5 会悄悄少列一个，用户点开弹窗就发现对不上正文。
+    launches: (raw.launches || []).map((x) => x && x.launch_id).filter(Boolean).slice(0, 8)
   }
 }
 
 /**
- * 关联发射的「定位索引」：uuid → 发射时间（net）。
+ * 发射的「定位索引」：uuid → { n: 发射时间(net), m: 任务名 }。
  *
  * SNAPI 只给 LL2 的 launch UUID，不给发射时间。小程序打开一条发射的路径是
  * 「快照 200 条 → 归档分片（按时间切，共 76 片）」，而归档查找要靠 net 才能
@@ -255,9 +255,56 @@ function slim(raw) {
  *
  * 所以在 CI 里问归档一次「这些 uuid 落在哪一片」，把 net 写进 news.json，
  * 前端点击时直接带 net 跳转，一次请求命中。查不到的记 null，下轮不再扫。
+ *
+ * 顺带把任务名一起存下来：资讯里要显示的是「所属任务 · MSL｜2011-11-26」，
+ * 只给日期没有名字，读者没法判断这个链接值不值得点。
  */
 const LOCATOR_KEY = 'space-data/launch-locator.json'
 const HIST_PREFIX = 'space-data/history/'
+
+/**
+ * 未来/最近发射的快照（前端同款数据），用来给 locator 补 net。
+ *
+ * 归档 `history/` 只收**已发射**的任务，未来发射压根不在里面 —— 于是
+ * 「猎鹰 9 号将发射 27 颗星链」这种最该连的新闻，uuid 在归档里扫不到，
+ * 被记成 null，按钮反而消失；而几十年前的老任务因为躺在归档里，全部能连上。
+ * 结果就是「能点的全是老任务」。这两个快照正好补上最近 100 发 + 最近 100 个待发。
+ */
+const SNAPSHOT_KEYS = [
+  'space-data/launches-upcoming.json',
+  'space-data/launches-previous.json'
+]
+
+/** 旧版 locator 存的是裸 net 字符串，读的时候统一成 { net, name } */
+function normLoc(v) {
+  if (!v) return null
+  if (typeof v === 'string') return { net: v, name: '' }
+  return { net: v.n || null, name: v.m || '' }
+}
+
+async function loadSnapshotNets(ids, map) {
+  if (!ids.size) return 0
+  let filled = 0
+  for (const key of SNAPSHOT_KEYS) {
+    let d = null
+    try {
+      d = await readCosJson(key)
+    } catch (e) {
+      continue
+    }
+    const list = (d && d.list) || []
+    for (const x of list) {
+      const id = String(x.id)
+      // 只补「还没定位到」的：归档/快照里已经查实的不要被覆盖
+      if (!ids.has(id)) continue
+      const cur = normLoc(map[id])
+      if ((cur && cur.net) || !x.net) continue
+      map[id] = { n: x.net, m: x.name || '' }
+      filled++
+    }
+  }
+  return filled
+}
 
 async function loadLocator() {
   try {
@@ -270,12 +317,22 @@ async function loadLocator() {
 }
 
 /**
- * 在归档分片里找这些 uuid，命中的把 net 写进 map；
+ * 在归档分片里找这些 uuid，命中的把 { net, name } 写进 map；
  * 扫完整库仍没有的写 null，下轮不再重复请求。
  * 返回本轮新命中的数量。
+ *
+ * `want` 多一类：**查到 net 但没任务名**的（旧版 locator 只存了 net 字符串）。
+ * 这类必须重扫一遍把名字补上 —— 资讯里要显示「所属任务 · 名称｜日期」，
+ * 只有日期读者没法判断值不值得点。补完就带 name，之后不会再扫。
  */
 async function scanArchive(ids, map) {
-  const want = new Set(ids.filter((id) => !(id in map)))
+  const want = new Set(
+    ids.filter((id) => {
+      if (!(id in map)) return true // 从没查过
+      const cur = normLoc(map[id])
+      return !!(cur && cur.net && !cur.name) // 查到了时间、缺名字
+    })
+  )
   if (!want.size) return 0
 
   let index = null
@@ -306,7 +363,7 @@ async function scanArchive(ids, map) {
       for (const x of list) {
         const id = String(x.id)
         if (!want.has(id)) continue
-        map[id] = x.net || null
+        map[id] = x.net ? { n: x.net, m: x.name || '' } : null
         if (x.net) found++
         want.delete(id)
       }
@@ -477,9 +534,10 @@ async function main() {
     for (const it of list) for (const id of it.launches || []) ids.add(String(id))
     if (ids.size) {
       const before = Object.keys(locator).length
+      const snap = await loadSnapshotNets(ids, locator)
       const found = await scanArchive([...ids], locator)
       console.log(
-        `  · 关联发射定位: ${ids.size} 个 uuid / 本轮新命中 ${found} / 索引累计 ${Object.keys(locator).length} 条`
+        `  · 关联发射定位: ${ids.size} 个 uuid / 快照补 ${snap} / 归档命中 ${found} / 索引累计 ${Object.keys(locator).length} 条`
       )
       if (Object.keys(locator).length !== before) {
         const p = path.join(OUT_DIR, 'launch-locator.json')
@@ -497,22 +555,47 @@ async function main() {
     }
   }
 
-  // 每篇只留「第一个能直达的」发射：前端点击只需要一个，多存只是撑体积。
-  // 定位不到就不写这个字段 —— 前端据此知道「点了会打不开」
+  // ---- 5.6 关联发射落成数组 ----
+  // `launches[]` 是「这篇文章涉及的发射」，可以 0 个也可能 6 个（综述稿尤其多），
+  // 数组顺序是 SNAPI 的提及顺序、没有语义。所以：
+  //   1. 全部保留，不猜「哪个是主角」—— 猜错就是好奇号那种事故；
+  //   2. 按 |net - 发布时间| 升序排，让最像这条新闻的那次排第一，
+  //      前端「一条直接跳、多条让用户选」正好用这个顺序；
+  //   3. 定位不到 net 的丢掉 —— 没有 net 就翻不到归档分片，点进去必然
+  //      「未找到该发射任务」，列出来只是给用户挖坑。
   if (locator) {
     let linked = 0
+    let multi = 0
+    let total = 0
     for (const it of list) {
-      const hit = (it.launches || [])
-        .map((id) => ({ id: String(id), net: locator[String(id)] }))
-        .find((x) => x.net)
-      if (hit) {
-        it.launchRef = hit
-        linked++
-      } else {
-        delete it.launchRef
+      const at = Date.parse(String(it.at || '').replace(' ', 'T') + 'Z')
+      const refs = []
+      for (const id of it.launches || []) {
+        const loc = normLoc(locator[String(id)])
+        if (!loc || !loc.net) continue
+        const t = Date.parse(loc.net)
+        const gap = isFinite(t) && isFinite(at) ? Math.abs(t - at) / 86400000 : 1e9
+        refs.push({ id: String(id), net: loc.net, name: loc.name || '', gap })
       }
+      refs.sort((a, b) => a.gap - b.gap)
+      for (const r of refs) delete r.gap
+
+      if (refs.length) {
+        it.launchRefs = refs
+        linked++
+        total += refs.length
+        if (refs.length > 1) multi++
+      } else {
+        delete it.launchRefs
+      }
+      // 老字段：早期版本只存一个。留着会跟 launchRefs 打架，统一清掉
+      delete it.launchRef
     }
-    if (list.length) console.log(`  · 可直达发射的资讯: ${linked} / ${list.length} 条`)
+    if (list.length) {
+      console.log(
+        `  · 带关联发射的资讯: ${linked} / ${list.length} 条（共 ${total} 个发射，其中 ${multi} 条挂多个，前端弹窗选）`
+      )
+    }
   }
 
   const payload = {
