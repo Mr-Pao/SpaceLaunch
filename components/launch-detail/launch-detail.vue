@@ -294,7 +294,8 @@ export default {
 			// 同一条发射在跨过"当前时刻"后会从 upcoming 挪到 previous，
 			// 用户刚看过列表就点进来时可能已经换边了，所以两边都查。
 			// findLaunchById 内部先扫缓存，命中则零网络开销。
-			let d = await spaceData.findLaunchById(id)
+			// 带上 curNet：目标明显在过去时它会跳过 757KB 的远期待发快照。
+			let d = await spaceData.findLaunchById(id, this.curNet)
 			if (this._seq !== seq) return
 
 			// 快照（previous 只存最新 100 条）里没有 → 去历史归档分片里找。

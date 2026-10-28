@@ -268,11 +268,19 @@ const HIST_PREFIX = 'space-data/history/'
  * 归档 `history/` 只收**已发射**的任务，未来发射压根不在里面 —— 于是
  * 「猎鹰 9 号将发射 27 颗星链」这种最该连的新闻，uuid 在归档里扫不到，
  * 被记成 null，按钮反而消失；而几十年前的老任务因为躺在归档里，全部能连上。
- * 结果就是「能点的全是老任务」。这两个快照正好补上最近 100 发 + 最近 100 个待发。
+ * 结果就是「能点的全是老任务」。
+ *
+ * 三份快照覆盖不同时段：
+ *   upcoming     最近 100 个待发（约到 2026-12-30）
+ *   previous     最近 100 次已发
+ *   upcomingMore 更远的待发 375 条（2026-12-31 ~ 2039）
+ * 少最后一份的话，Artemis 这类挂远期任务的报道会一条都连不上 —— 实测
+ * 「NASA 全力推进阿耳忒弥斯 III、IV 和 V」挂了 2 个 uuid，两个都定位不到。
  */
 const SNAPSHOT_KEYS = [
   'space-data/launches-upcoming.json',
-  'space-data/launches-previous.json'
+  'space-data/launches-previous.json',
+  'space-data/launches-upcoming-more.json'
 ]
 
 /** 旧版 locator 存的是裸 net 字符串，读的时候统一成 { net, name } */
@@ -286,6 +294,18 @@ async function loadSnapshotNets(ids, map) {
   if (!ids.size) return 0
   let filled = 0
   for (const key of SNAPSHOT_KEYS) {
+    // 需要的都补上了就别再下后面的 —— 最后一份远期待发有 757KB，
+    // 只有在真被远期任务挡住时才值得付这个代价
+    let missing = false
+    for (const id of ids) {
+      const c = normLoc(map[id])
+      if (!c || !c.net) {
+        missing = true
+        break
+      }
+    }
+    if (!missing) break
+
     let d = null
     try {
       d = await readCosJson(key)

@@ -563,16 +563,20 @@ export function getAgencyById(id) {
 }
 
 /**
- * 跨 upcoming / previous 找一条发射
+ * 跨 upcoming / previous / upcomingMore 找一条发射
  *
  * 详情页不要直接调两次 getById：那样第一次 miss 就会 force 拉网络，
  * 如果这条其实在另一个数据集里，等于白拉 55KB。
- * 这里先扫两个数据集的缓存，都没命中才依次拉网络。
+ * 这里先扫三个数据集的缓存，都没命中才依次拉网络。
+ *
+ * 第三个数据集是**远期待发**（375 条 / 757KB，net 一直到 2039）。
+ * 少了它，Artemis、登月着陆器这类两年后的任务点进去必然「未找到该发射任务」——
+ * 资讯里挂的这些远期任务就全成了死链，所以只能连最近 100 发范围内的。
  */
-export async function findLaunchById(id) {
+export async function findLaunchById(id, net) {
 	if (id === undefined || id === null || id === '') return null
 	const target = String(id)
-	const names = ['upcoming', 'previous']
+	const names = ['upcoming', 'previous', 'upcomingMore']
 
 	// 先看缓存，命中就零网络开销
 	for (const name of names) {
@@ -583,7 +587,7 @@ export async function findLaunchById(id) {
 	}
 
 	// 缓存里都没有（冷启动直接进详情），按需拉一次
-	for (const name of names) {
+	for (const name of ['upcoming', 'previous']) {
 		try {
 			const d = await load(name, { force: true })
 			const found = d.list.find((x) => String(x.id) === target)
@@ -592,7 +596,19 @@ export async function findLaunchById(id) {
 			// 一个数据集失败不影响另一个
 		}
 	}
-	return null
+
+	// 远期待发放最后、且不 force：757KB 只为找一条，有 12 小时缓存就先用着。
+	// 但调用方给了 net 且明显在过去时直接跳过 —— 十几年前的老任务不可能在
+	// 待发列表里，为了它下一份 757KB 不值当（这类应该去归档分片找）。
+	const past = net ? Date.parse(net) < Date.now() - 24 * 3600 * 1000 : false
+	if (past) return null
+
+	try {
+		const d = await load('upcomingMore')
+		return d.list.find((x) => String(x.id) === target) || null
+	} catch (e) {
+		return null
+	}
 }
 
 /**
