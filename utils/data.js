@@ -113,7 +113,10 @@ const FILES = {
 	news: 'news.json',
 	// NASA 每日天文（APOD 近 7 天）+ 每日地球（EPIC 当天）：首页「每日一览」轮播
 	apod: 'apod.json',
-	epic: 'epic.json'
+	epic: 'epic.json',
+	// NASA Image Library 主题精选（阿波罗/哈勃/韦伯/火星/星云/地球）：
+	// 图库 dock 的「NASA 影像」入口进来的独立页面用，与发射图库分开
+	nasaImages: 'nasa-images.json'
 }
 
 // 软过期时间：超过就认为"可以先展示、但值得后台刷新一次"
@@ -157,7 +160,9 @@ const SOFT_TTL = {
 	news: 60 * 60 * 1000,
 	// APOD/EPIC 都是每天才换一次，给 12 小时软 TTL 足够新鲜，且不会每次进首页都回源
 	apod: 12 * 60 * 60 * 1000,
-	epic: 12 * 60 * 60 * 1000
+	epic: 12 * 60 * 60 * 1000,
+	// NASA 影像每月才重抓一次，12 小时软 TTL 足够，不会每次进页面都回源
+	nasaImages: 12 * 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。
@@ -258,7 +263,7 @@ function readStorage(name) {
 // 存储配额不够时的淘汰顺序：先丢体积大、非首屏的数据集。
 // upcoming（首页首屏）永远不主动丢——它被清掉的话下次冷启动白屏等网络。
 // onthisday 排在最后丢：它只有几 KB，首页首屏要用，丢了反而要等网络
-const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'satellites', 'agencies', 'gallery', 'videos', 'timelines', 'news', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday', 'spacestations', 'expeditions', 'dockings']
+const EVICT_ORDER = ['pads', 'cores', 'astronauts', 'launchers', 'satellites', 'agencies', 'gallery', 'videos', 'timelines', 'news', 'upcomingMore', 'stats', 'events', 'previous', 'onthisday', 'spacestations', 'expeditions', 'dockings', 'nasaImages']
 
 function writeStorage(name, data) {
 	try {
@@ -316,7 +321,7 @@ function request(url) {
 // 同一小时内所有用户命中同一份 CDN 边缘缓存，避免像分钟级那样每次打开都直连源站。
 // 图库 / 卫星分片早就用小时级（见 galleryChunk / satelliteChunk），这里对齐，否则新页面比图库还慢。
 // neoNears 一天才变一次，同样没有理由每分钟换个戳去回源
-const HOURLY_CACHE = new Set(['satellites', 'orbitStats', 'debrisEvents', 'neoNears', 'apod', 'epic'])
+const HOURLY_CACHE = new Set(['satellites', 'orbitStats', 'debrisEvents', 'neoNears', 'apod', 'epic', 'nasaImages'])
 
 function fetchDataset(name) {
 	// 高频更新的数据集（即将发射等）仍用分钟级，保证新鲜度；

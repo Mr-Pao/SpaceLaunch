@@ -90,6 +90,10 @@
 				<text class="all-text">看视频</text>
 				<text class="all-arrow">🎬</text>
 			</view>
+			<view class="all-btn nasa" hover-class="all-btn-hover" @click="goNasa">
+				<text class="all-text">NASA 影像</text>
+				<text class="all-arrow">🌌</text>
+			</view>
 		</view>
 
 		<view class="loading" v-if="loading">
@@ -104,6 +108,10 @@
 				<text class="all-text">看发射视频</text>
 				<text class="all-arrow">🎬</text>
 			</view>
+			<view class="all-btn nasa solo" hover-class="all-btn-hover" @click="goNasa">
+				<text class="all-text">看 NASA 影像</text>
+				<text class="all-arrow">🌌</text>
+			</view>
 		</view>
 	</view>
 </template>
@@ -113,8 +121,8 @@
  * 图库
  *
  * 交互只有一件事：看着它们慢慢飘，喜欢就点开看原图。
- * 没有分类、没有搜索 —— 视频入口单独放在底部 dock（「看视频」），
- * 跳到 video-gallery 页按网格看所有发射视频，能播的直接内联播。
+ * 没有分类、没有搜索 —— 视频入口（「看视频」）与 NASA 影像入口（「NASA 影像」）
+ * 单独放在底部 dock，分别跳到 video-gallery / nasa-images 页。
  * 漂流墙里不塞视频卡：视频是另一种浏览节奏，混进来会打断「一扇窗」的沉浸感。
  *
  * 为什么每行只放 12 张再复制一份：
@@ -208,6 +216,10 @@ export default {
 
 		goVideos() {
 			uni.navigateTo({ url: '/pages/video-gallery/video-gallery' })
+		},
+
+		goNasa() {
+			uni.navigateTo({ url: '/pages/nasa-images/nasa-images' })
 		},
 
 		/**
@@ -542,6 +554,16 @@ export default {
 
 .all-btn.vid .all-arrow {
 	color: #b794ff;
+}
+
+/* NASA 影像入口：再一个并排，用星蓝描边区分 */
+.all-btn.nasa {
+	margin-left: 16rpx;
+	border-color: rgba(56, 189, 248, 0.45);
+}
+
+.all-btn.nasa .all-arrow {
+	color: #7dd3fc;
 }
 
 /* 空态里的视频入口：单独成行居中，离上方说明留点间距 */
