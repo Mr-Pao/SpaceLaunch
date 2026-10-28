@@ -17,6 +17,7 @@ on:
   push:
     paths:
       - 'scripts/news.js'
+      - 'scripts/lib/image.js' # 抓图/镜像逻辑改了也要重跑一轮
       - '.github/workflows/news.yml'
       - 'scripts/data/i18n-terms.json' # 术语表变了要重翻一轮，顺带触发
   workflow_dispatch:

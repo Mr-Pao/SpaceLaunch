@@ -25,7 +25,14 @@
 
 			<template v-else>
 				<view class="row" v-for="n in visible" :key="n.id" hover-class="row-hover" @click="goDetail(n)">
-					<image v-if="n.image" class="thumb" :src="n.image" mode="aspectFill" lazy-load></image>
+					<image
+						v-if="n.image && !imgErr[n.id]"
+						class="thumb"
+						:src="n.image"
+						mode="aspectFill"
+						lazy-load
+						@error="onImgErr(n)"
+					></image>
 					<view v-else class="thumb thumb-empty">
 						<text class="thumb-ico">🛰</text>
 					</view>
@@ -90,7 +97,11 @@ export default {
 			// 这一块如果真空白，滚到这儿会以为页面断了
 			loading: true,
 			// 正在看详情的那一条（null 即弹窗关闭）
-			detail: null
+			detail: null,
+			// 加载失败的封面：图片地址失效时 image 组件不会报错，只会留一块
+			// 底色（在深色主题里就是纯黑），必须自己接 error 换成占位图标。
+			// 按 id 记，同一条重试也不会反复闪
+			imgErr: {}
 		}
 	},
 
@@ -108,6 +119,12 @@ export default {
 	},
 
 	methods: {
+		/** 封面加载失败：记住这一条，模板会换成占位图标 */
+		onImgErr(n) {
+			if (!n || n.id == null) return
+			this.imgErr[n.id] = true
+		},
+
 		/**
 		 * 这条资讯是否挂着**能跳转的**发射。CI 把定位不到 net 的都剔掉了，
 		 * 所以有 launchRefs 就一定打得开。兼容旧数据的单值 launchRef。

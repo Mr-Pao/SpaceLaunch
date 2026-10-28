@@ -28,7 +28,7 @@
 const fs = require('fs')
 const path = require('path')
 const { upload, hasCosConfig, readCosJson } = require('./lib/cos')
-const { mirrorImages } = require('./lib/image')
+const { mirrorImages, coverFromPage } = require('./lib/image')
 const translate = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
@@ -40,6 +40,13 @@ const KEEP = 200 // 保留最近多少条
 const FETCH_LIMIT = 30 // 每路抓多少条
 const SUMMARY_MAX = 300 // 摘要截断长度（字符），太长翻译慢且列表用不上
 const DRY = process.argv.includes('--dry-run')
+
+// 封面失效修补：每轮最多回几篇文章页找新图（每条 1 次页面 + 1 次图片下载）
+const MAX_COVER_REPAIR = 8
+// 同一条最多补救几轮。再失败就当这篇文章真没图，永久走占位
+const MAX_COVER_TRIES = 3
+// 自家 CDN 的标识。镜像成功的地址一定含它，其余一律视为「没托管好」
+const CDN_MARK = 'myqcloud.com'
 
 /**
  * 内容合规黑名单。
@@ -540,6 +547,49 @@ async function main() {
   const list = [...byId.values()]
     .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
     .slice(0, KEEP)
+
+  // ---- 5.2 修补失效封面 ----
+  //
+  // SNAPI 的 image_url 只是抓取当时的快照，之后会失效，而它自己不会更新：
+  //   · NASA 换图床：blogs.nasa.gov/... 301 到 www.nasa.gov，原路径吃 404
+  //   · 媒体删旧图：Spaceflight Now 的 2025 年配图，文章还在图没了
+  //   · 站点 og 抓歪：APOD 那条拿到的是 NASA 站内 logo，不是当天那张天文图
+  // 而段 4 只镜像「新增」条目、失败也不回填，于是第一次没下载成功的地址
+  // 会被永久沿用 —— 真机上就永久是一块纯黑，用户看到的就是「这条没图」。
+  //
+  // 这里对最终留下的条目再扫一遍：地址不在自家 CDN 上的，回文章页重新找图
+  // （og:image → 正文首图）。找不到就置空让前端画占位图标，别留一个打不开的黑块。
+  // 置空不等于放弃：记 coverTries，还有次数就下轮再试，够数了才认命。
+  let coverFixed = 0
+  let coverDropped = 0
+  if (!DRY && hasCosConfig()) {
+    const broken = list
+      .filter((it) => {
+        // 从来没有过封面（SNAPI 就没给）就别占配额，前端本来就画占位
+        if (!it.image && !it.coverTries) return false
+        // 已经在自家 CDN 上，不用管
+        if (it.image && it.image.indexOf(CDN_MARK) >= 0) return false
+        return (it.coverTries || 0) < MAX_COVER_TRIES
+      })
+      .slice(0, MAX_COVER_REPAIR)
+
+    for (const it of broken) {
+      it.coverTries = (it.coverTries || 0) + 1
+      const fixed = await coverFromPage(it.url)
+      if (fixed) {
+        it.image = fixed
+        delete it.coverTries
+        coverFixed++
+      } else {
+        it.image = ''
+        // coverTries 不能删：留着这个数才能让 filter 判定「试够了，别再抓」
+        coverDropped++
+      }
+    }
+    if (broken.length) {
+      console.log(`  · 封面修补: 尝试 ${broken.length} 条 / 换图成功 ${coverFixed} / 暂无图 ${coverDropped}`)
+    }
+  }
 
   // ---- 5.5 关联发射定位 ----
   // 只处理最终留下的这 200 条（被挤掉的不必浪费请求）。

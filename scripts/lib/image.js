@@ -20,6 +20,7 @@
  */
 
 const crypto = require('crypto')
+const http = require('http')
 const https = require('https')
 const sharp = require('sharp')
 const { hasCosConfig, headObject, putBuffer } = require('./cos')
@@ -54,6 +55,12 @@ const CONCURRENCY = 4
 // 大图在慢网络下要下很久，20 秒不够；CI 海外节点通常几秒就完
 const TIMEOUT_MS = 45000
 const UA = 'SpaceLaunch/1.1 (+https://github.com/Mr-Pao/SpaceLaunch)'
+// 抓文章页要装浏览器：NASA / Spaceflight Now 对非浏览器 UA 常回 403 或精简页
+const PAGE_UA =
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+const MAX_HTML_BYTES = 3 * 1024 * 1024
+// 这些词出现在 URL 里基本意味着是站点装饰而不是文章配图
+const IMG_NOISE = /logo|icon|avatar|sprite|placeholder|badge|favicon|default|blank|spacer|header|footer|banner-?nav/i
 
 const stats = { reuse: 0, uploaded: 0, skipped: 0, failed: 0 }
 
@@ -104,11 +111,23 @@ function download(url, depth = 0) {
 	return new Promise((resolve, reject) => {
 		if (depth > 3) return reject(new Error('重定向次数过多'))
 
-		const req = https.get(url, { timeout: TIMEOUT_MS, headers: { 'User-Agent': UA } }, (res) => {
+		// 必须按协议挑模块：原先写死 https.get，遇到 http:// 的图（SNAPI 偶尔给，
+		// 比如 spaceflightnow 的 wp-content）直接抛 "Protocol http: not supported"，
+		// 表现为「这张封面无论如何都镜像不下来」，且失败后不回填、只能一直黑着
+		const mod = /^http:\/\//i.test(url) ? http : https
+
+		const req = mod.get(url, { timeout: TIMEOUT_MS, headers: { 'User-Agent': UA } }, (res) => {
 			// LL2 的图偶尔会 302 到别的节点
 			if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
 				res.resume()
-				return resolve(download(res.headers.location, depth + 1))
+				let next = res.headers.location
+				// location 可能是相对路径（NASA 多个站的 301 都是相对的）
+				try {
+					next = new URL(next, url).toString()
+				} catch (e) {
+					// 解析失败就按原样试
+				}
+				return resolve(download(next, depth + 1))
 			}
 			if (res.statusCode !== 200) {
 				res.resume()
@@ -213,6 +232,163 @@ async function mirrorOne(url, preset = PRESETS.thumb) {
 		memo.set(memoKey, null)
 		return null
 	}
+}
+
+/**
+ * 抓文章页 HTML。用浏览器 UA + 不压缩：NASA / Spaceflight Now 这类站点
+ * 会挡自定义 UA，返回精简页或 403；不压缩省掉 gunzip 这一步。
+ */
+function fetchHtml(url, depth = 0) {
+	return new Promise((resolve, reject) => {
+		if (depth > 4) return reject(new Error('重定向次数过多'))
+		const mod = /^http:\/\//i.test(url) ? http : https
+		const req = mod.get(
+			url,
+			{
+				timeout: TIMEOUT_MS,
+				headers: {
+					'User-Agent': PAGE_UA,
+					Accept: 'text/html,application/xhtml+xml',
+					'Accept-Encoding': 'identity'
+				}
+			},
+			(res) => {
+				if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+					res.resume()
+					let next = res.headers.location
+					try {
+						next = new URL(next, url).toString()
+					} catch (e) {
+						// 解析失败就按原样试
+					}
+					return resolve(fetchHtml(next, depth + 1))
+				}
+				if (res.statusCode !== 200) {
+					res.resume()
+					return reject(new Error('HTTP ' + res.statusCode))
+				}
+				const chunks = []
+				let size = 0
+				res.on('data', (c) => {
+					size += c.length
+					if (size > MAX_HTML_BYTES) {
+						req.destroy(new Error('页面超过 3MB'))
+						return
+					}
+					chunks.push(c)
+				})
+				res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+			}
+		)
+		req.on('timeout', () => req.destroy(new Error('页面超时')))
+		req.on('error', reject)
+	})
+}
+
+/** srcset 里挑最大的一张："a.jpg 678w, b.jpg 1024w" → b.jpg */
+function largestFromSrcset(srcset) {
+	let best = null
+	let bestW = -1
+	for (const part of srcset.split(',')) {
+		const m = part.trim().match(/^(\S+?)(?:\s+(\d+)([wx]))?$/)
+		if (!m) continue
+		const w = m[2] ? parseInt(m[2], 10) : 0
+		if (w > bestW) {
+			best = m[1]
+			bestW = w
+		}
+	}
+	return best
+}
+
+/**
+ * 从文章页 HTML 里挑出可能的封面图，按可靠性排序。
+ *
+ * 为什么需要这个：SNAPI 的 `image_url` 只是抓取当时快照，之后会失效 ——
+ * NASA 换图床（blogs.nasa.gov → www.nasa.gov）、媒体删旧图（Spaceflight Now
+ * 的 2025 年旧配图）、APOD 页面更新当天的真图，都会让 URL 变 404。
+ * 这个字段本身不会更新，所以封面一旦坏掉就是永久坏掉。
+ * 文章页还在，og:image 和正文首图仍在，从那里重新找一张是唯一可靠的办法。
+ */
+function pageImageCandidates(html, baseUrl) {
+	const out = []
+	const push = (raw) => {
+		if (!raw) return
+		let u = raw.trim().replace(/&amp;/g, '&')
+		try {
+			u = new URL(u, baseUrl).toString()
+		} catch (e) {
+			return
+		}
+		if (!/^https?:\/\//i.test(u)) return
+		// 必须像张图：常见扩展名，或 NASA 图床那种 jcr:content/cq5dam 路径
+		if (!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(u) && !/renditions|cq5dam/i.test(u)) return
+		if (IMG_NOISE.test(u)) return
+		// 极小缩略图（-80x60 / -326x245）在卡片里会糊，直接排除
+		const dim = u.match(/-(\d{1,4})x(\d{1,4})\.(jpe?g|png|webp)/i)
+		if (dim && (parseInt(dim[1], 10) < 400 || parseInt(dim[2], 10) < 300)) return
+		if (!out.includes(u)) out.push(u)
+	}
+
+	// 1. og:image / twitter:image（站点自己认定的封面，最可信）
+	for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
+		const tag = m[0]
+		const k = tag.match(/(?:property|name)=["']([^"']+)["']/i)
+		if (!k) continue
+		if (!/^(og:image(:secure_url|:url)?|twitter:image)$/i.test(k[1])) continue
+		const c = tag.match(/content=["']([^"']+)["']/i)
+		if (c) push(c[1])
+	}
+
+	// 2. 正文图（og:image 缺失或也失效时的退路）
+	for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+		const tag = m[0]
+		const ss = tag.match(/srcset=["']([^"']+)["']/i)
+		if (ss) push(largestFromSrcset(ss[1]))
+		const src = tag.match(/\bsrc=["']([^"']+)["']/i)
+		if (src) push(src[1])
+	}
+
+	return out.slice(0, 6)
+}
+
+/**
+ * 同一个地址的几种可能变体。
+ *
+ * NASA 主站（WordPress）的 wp-content 原图路径直接访问是 404，
+ * 必须带 ?w= 之类的缩放参数才由 CDN 生成 —— og:image 里给的偏偏是不带参数的形式。
+ * 所以候选下载失败时补一档再试，别把一张好图判死刑。
+ */
+function urlVariants(u) {
+	const out = [u]
+	if (/\/wp-content\/uploads\//i.test(u) && u.indexOf('?') < 0) {
+		out.push(u + '?w=1024', u + '?resize=1024,1024')
+	}
+	return out
+}
+
+/**
+ * 封面坏了就回文章页重新找一张。
+ *
+ * 返回新图的 COS 地址；找不到可用的返回 null（调用方据此把 image 置空，
+ * 前端会渲染占位图标，比一直挂着一个 404 的黑块好）。
+ */
+async function coverFromPage(pageUrl, preset = PRESETS.thumb) {
+	if (!pageUrl || !/^https?:\/\//i.test(pageUrl)) return null
+	let html = ''
+	try {
+		html = await fetchHtml(pageUrl)
+	} catch (e) {
+		return null
+	}
+	const cands = pageImageCandidates(html, pageUrl)
+	for (const u of cands) {
+		for (const v of urlVariants(u)) {
+			const mirrored = await mirrorOne(v, preset)
+			if (mirrored) return mirrored
+		}
+	}
+	return null
 }
 
 /**
@@ -322,4 +498,4 @@ function summary() {
 	return { ...stats }
 }
 
-module.exports = { mirrorImages, slotsOf }
+module.exports = { mirrorImages, slotsOf, coverFromPage, pageImageCandidates }

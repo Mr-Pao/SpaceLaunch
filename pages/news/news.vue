@@ -23,7 +23,14 @@
 
 		<view class="list" v-else>
 			<view class="card" v-for="n in visibleList" :key="n.id" @click="open(n)">
-				<image v-if="n.image" class="thumb" :src="n.image" mode="aspectFill" lazy-load />
+				<image
+					v-if="n.image && !imgErr[n.id]"
+					class="thumb"
+					:src="n.image"
+					mode="aspectFill"
+					lazy-load
+					@error="onImgErr(n)"
+				/>
 				<view v-else class="thumb thumb-empty"><text class="thumb-ico">🛰</text></view>
 				<view class="info">
 					<text class="title">{{ n.titleZh || n.title }}</text>
@@ -77,7 +84,10 @@ export default {
 			freshAt: '',
 			detail: null,
 			// 渲染窗口：最多 200 条，一次性全画会拖慢首屏，先 30 条
-			renderCount: RENDER_STEP
+			renderCount: RENDER_STEP,
+			// 加载失败的封面（按 id 记）：image 组件出错只会留一块底色，
+			// 深色主题下就是纯黑，必须自己接 error 换占位
+			imgErr: {}
 		}
 	},
 
@@ -136,6 +146,12 @@ export default {
 	},
 
 	methods: {
+		/** 封面加载失败：记住这一条，模板会换成占位图标 */
+		onImgErr(n) {
+			if (!n || n.id == null) return
+			this.imgErr[n.id] = true
+		},
+
 		/**
 		 * 这条资讯是否挂着**能跳转的**发射。CI 把定位不到 net 的都剔掉了，
 		 * 所以有 launchRefs 就一定打得开。兼容旧数据的单值 launchRef。

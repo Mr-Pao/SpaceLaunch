@@ -8,7 +8,13 @@
 		<view class="sheet">
 			<view class="sheet-grab"></view>
 			<scroll-view scroll-y class="sheet-body">
-				<image v-if="article.image" class="d-img" :src="article.image" mode="widthFix" />
+				<image
+					v-if="article.image && !imgBroken"
+					class="d-img"
+					:src="article.image"
+					mode="widthFix"
+					@error="imgBroken = true"
+				/>
 				<text class="d-title">{{ article.titleZh || article.title }}</text>
 				<view class="d-meta">
 					<text class="d-site">{{ article.site }}</text>
@@ -84,7 +90,10 @@ export default {
 	data() {
 		return {
 			// 多条候选时的选择层
-			picker: false
+			picker: false,
+			// 大图加载失败：地址失效时 image 组件只留一块底色，深色下就是纯黑，
+			// 整屏黑条比没有图更难看，出错直接收起这块
+			imgBroken: false
 		}
 	},
 
@@ -115,6 +124,8 @@ export default {
 			this.setBarHidden(!!v)
 			// 换了一条资讯就收起选择层，别让它跟着带过去
 			this.picker = false
+			// 上一条的图坏了不代表这一条也坏
+			this.imgBroken = false
 		}
 	},
 
