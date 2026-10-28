@@ -1,57 +1,70 @@
 <template>
 	<view class="page">
 		<star-field />
-		<nav-bar :solid="navSolid" :title="navSolid ? '航天资讯' : ''" :placeholder="true" />
+		<nav-bar :solid="navSolid || focus" :title="navSolid || focus ? '航天资讯' : ''" :placeholder="true" />
 
-		<view class="hero">
-			<text class="hero-title">航天资讯</text>
-			<text class="hero-sub">{{ total }} 条报道 · {{ siteCount }} 家媒体 · 已中文编译</text>
-		</view>
+		<!-- focus 态：带 ?id= 进来（发射详情页的「相关报道」、首页资讯卡点进来）。
+		     用户的意图是「看这一篇」，不是「逛资讯」，所以列表整块不渲染 ——
+		     底下留着一屏列表只会让人以为点错了。关掉抽屉直接返回上一页 -->
+		<block v-if="!focus">
+			<view class="hero">
+				<text class="hero-title">航天资讯</text>
+				<text class="hero-sub">{{ total }} 条报道 · {{ siteCount }} 家媒体 · 已中文编译</text>
+			</view>
 
-		<view class="tabs">
-			<view class="tab" :class="{ on: !onlyLaunch }" @click="setTab(false)">全部</view>
-			<view class="tab" :class="{ on: onlyLaunch }" @click="setTab(true)">关联发射</view>
-		</view>
+			<view class="tabs">
+				<view class="tab" :class="{ on: !onlyLaunch }" @click="setTab(false)">全部</view>
+				<view class="tab" :class="{ on: onlyLaunch }" @click="setTab(true)">关联发射</view>
+			</view>
 
-		<view class="loading" v-if="loading">
-			<text class="loading-text">正在加载资讯…</text>
-		</view>
+			<view class="loading" v-if="loading">
+				<text class="loading-text">正在加载资讯…</text>
+			</view>
 
-		<view class="empty" v-else-if="!visibleList.length">
-			<text class="empty-text">{{ onlyLaunch ? '暂无关联发射的报道' : '暂无资讯' }}</text>
-		</view>
+			<view class="empty" v-else-if="!visibleList.length">
+				<text class="empty-text">{{ onlyLaunch ? '暂无关联发射的报道' : '暂无资讯' }}</text>
+			</view>
 
-		<view class="list" v-else>
-			<view class="card" v-for="n in visibleList" :key="n.id" @click="open(n)">
-				<image v-if="n.image" class="thumb" :src="n.image" mode="aspectFill" lazy-load />
-				<view v-else class="thumb thumb-empty"><text class="thumb-ico">🛰</text></view>
-				<view class="info">
-					<text class="title">{{ n.titleZh || n.title }}</text>
-					<text class="sum" v-if="n.summaryZh || n.summary">{{ n.summaryZh || n.summary }}</text>
-					<view class="meta">
-						<text class="site">{{ n.site }}</text>
-						<text class="sep">·</text>
-						<text class="time">{{ n.atShort }}</text>
-						<text class="tag" v-if="n.launches && n.launches.length">发射</text>
+			<view class="list" v-else>
+				<view class="card" v-for="n in visibleList" :key="n.id" @click="open(n)">
+					<image v-if="n.image" class="thumb" :src="n.image" mode="aspectFill" lazy-load />
+					<view v-else class="thumb thumb-empty"><text class="thumb-ico">🛰</text></view>
+					<view class="info">
+						<text class="title">{{ n.titleZh || n.title }}</text>
+						<text class="sum" v-if="n.summaryZh || n.summary">{{ n.summaryZh || n.summary }}</text>
+						<view class="meta">
+							<text class="site">{{ n.site }}</text>
+							<text class="sep">·</text>
+							<text class="time">{{ n.atShort }}</text>
+							<text class="tag" v-if="n.launches && n.launches.length">发射</text>
+						</view>
 					</view>
 				</view>
-			</view>
 
-			<view class="foot" v-if="renderCount < filteredList.length">
-				<text class="foot-text">上滑加载更多（{{ renderCount }} / {{ filteredList.length }}）</text>
-			</view>
-			<view class="foot" v-else>
-				<text class="foot-text">{{ freshText }}</text>
-			</view>
+				<view class="foot" v-if="renderCount < filteredList.length">
+					<text class="foot-text">上滑加载更多（{{ renderCount }} / {{ filteredList.length }}）</text>
+				</view>
+				<view class="foot" v-else>
+					<text class="foot-text">{{ freshText }}</text>
+				</view>
 
-			<view class="src">
-				<text class="src-text">资讯来自 Spaceflight News API（The Space Devs），版权归各原始媒体所有</text>
+				<view class="src">
+					<text class="src-text">资讯来自 Spaceflight News API（The Space Devs），版权归各原始媒体所有</text>
+				</view>
 			</view>
+		</block>
+
+		<!-- focus 态没有抽屉可看时（数据还没到 / 那篇已被挤出最新列表）给一句话，
+		     不能留一屏纯黑。列表整个空 = 请求失败，跟「文章没了」是两回事 -->
+		<view class="focus-miss" v-if="focus && !detail">
+			<text class="empty-text">{{
+				focusMissed ? (items.length ? '这篇报道已不在最新列表中' : '资讯加载失败，请返回重试') : '正在加载…'
+			}}</text>
 		</view>
 
 		<!-- 详情抽屉 -->
 		<view class="mask" v-if="detail" @click="closeDetail"></view>
-		<view class="sheet" v-if="detail">
+		<view class="sheet" :class="{ focus: focus }" v-if="detail">
 			<view class="sheet-grab"></view>
 			<scroll-view scroll-y class="sheet-body">
 				<image v-if="detail.image" class="d-img" :src="detail.image" mode="widthFix" />
@@ -101,6 +114,11 @@ export default {
 			total: 0,
 			freshAt: '',
 			detail: null,
+			// focus 态：带 ?id= 进来，只显示那一条（列表整块不渲染）。
+			// 从发射详情页的「相关报道」或首页资讯卡点进来时用
+			focus: false,
+			// 数据到了但找不到那一篇（被挤出最新 200 条）
+			focusMissed: false,
 			// 「查看相关发射」入口的三态：'' 无关联 / checking 判定中 / ok 可跳。
 			// 见 open() 与方法区的 checkLaunch 注释
 			launchLink: '',
@@ -147,18 +165,22 @@ export default {
 	},
 
 	/**
-	 * 带 ?id= 进来是「从今日页卡片点进来的」：直接弹出那一条的详情。
-	 * getData 是 await 的，这里能保证 items 已就绪。
-	 * 找不到就停在列表，不报错（那一条可能已被 KEEP 挤掉了）。
+	 * 带 ?id= 进来就是「只看这一篇」：发射详情页的「相关报道」、首页资讯卡都走这条。
+	 *
+	 * focus 必须**在 await 之前**置位 —— onLoad 早于首次渲染，这样列表一帧都不会闪出来。
+	 * 找不到就停在 focusMissed，给一句人话 + 顶部返回，而不是把用户扔进列表页。
 	 */
 	async onLoad(options) {
+		const wantId = options && options.id
+		if (wantId) this.focus = true
+
 		await this.getData(false)
 
-		const wantId = options && options.id
 		if (!wantId) return
 
 		const hit = this.items.find((x) => x && String(x.id) === String(wantId))
 		if (hit) this.open(hit)
+		else this.focusMissed = true
 	},
 
 	methods: {
@@ -231,8 +253,19 @@ export default {
 		},
 
 		closeDetail() {
-			this.detail = null
 			this.launchLink = ''
+			// focus 态本来就没有列表可回，关掉就是「看完了」→ 退回上一页（发射详情）。
+			// 页面栈只有一层（分享直达之类）时 navigateBack 会失败，那就退回列表态
+			if (this.focus) {
+				uni.navigateBack({
+					fail: () => {
+						this.focus = false
+						this.detail = null
+					}
+				})
+				return
+			}
+			this.detail = null
 		},
 
 		copyUrl() {
@@ -249,13 +282,19 @@ export default {
 		goLaunch() {
 			const id = this.detail && this.detail.launches && this.detail.launches[0]
 			if (!id) return
+
+			const url = '/pages/launch/launchInfo?id=' + encodeURIComponent(id)
+			const fail = () => uni.showToast({ title: '该发射未收录', icon: 'none' })
+
+			// focus 态本来就是从发射详情页点进来的，再 navigateTo 会「发射→资讯→发射→资讯」
+			// 一层层往上叠，页面栈满 10 层就再也点不动。直接替换当前页，返回刚好回到最初那页
+			if (this.focus) {
+				uni.redirectTo({ url, fail })
+				return
+			}
+
 			this.detail = null
-			uni.navigateTo({
-				url: '/pages/launch/launchInfo?id=' + encodeURIComponent(id),
-				fail: () => {
-					uni.showToast({ title: '该发射未收录', icon: 'none' })
-				}
-			})
+			uni.navigateTo({ url, fail })
 		},
 
 		freshText() {
@@ -468,10 +507,32 @@ export default {
 	margin: 18rpx auto 6rpx;
 }
 
+/* focus 态：底下没有列表衬着，抽屉再留着 82vh 会露出一块空屏，干脆铺到近满 */
+.sheet.focus {
+	max-height: 90vh;
+}
+
+.sheet.focus .sheet-grab {
+	/* 这种形态拖不下来（关掉就返回上一页），小横杠会误导，藏掉 */
+	display: none;
+}
+
+/* focus 态但拿不到那篇（数据未到 / 已被挤出最新列表） */
+.focus-miss {
+	padding: 220rpx 48rpx 0;
+	text-align: center;
+}
+
 .sheet-body {
 	max-height: 76vh;
 	padding: 12rpx 32rpx 40rpx;
 	box-sizing: border-box;
+}
+
+.sheet.focus .sheet-body {
+	max-height: 84vh;
+	/* focus 态藏了上面那条小横杠，顶部不留点空隙图片会顶到圆角上 */
+	padding-top: 28rpx;
 }
 
 .d-img {

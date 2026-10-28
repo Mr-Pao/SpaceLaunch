@@ -237,8 +237,10 @@ function slim(raw) {
     at,
     // 列表里只显示「月-日 时:分」，详情页用完整时间
     atShort: at ? at.slice(5) : '',
-    // 关联的 LL2 发射 UUID，前端可回连发射详情页
-    launches: (raw.launches || []).map((x) => x && x.launch_id).filter(Boolean).slice(0, 2)
+    // 关联的 LL2 发射 UUID，前端可回连发射详情页。
+    // 留 5 个而不是全量：一篇综述报道可能提到五六次发射，全留会撑体积；
+    // 但只留 2 个会漏 —— 反查「这条发射被哪些报道提到」时第 3 个之后就永远查不到
+    launches: (raw.launches || []).map((x) => x && x.launch_id).filter(Boolean).slice(0, 5)
   }
 }
 
