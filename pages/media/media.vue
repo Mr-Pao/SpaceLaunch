@@ -83,6 +83,24 @@
 				<text class="tail-text">仅显示最近 {{ images.length }} 张</text>
 			</view>
 		</block>
+
+		<!-- 内联播放遮罩：视频本体已存到 COS 时直接播，不用跳出小程序 -->
+		<view class="player-mask" v-if="playing" @click="closePlayer">
+			<video
+				v-if="playing && playing.cosUrl"
+				class="player"
+				:src="playing.cosUrl"
+				controls
+				autoplay
+				:show-center-play-btn="true"
+				object-fit="contain"
+				@click.stop
+			></video>
+			<view class="player-bar" @click.stop>
+				<text class="player-title">{{ playing.title }}</text>
+				<text class="player-close" @click="closePlayer">✕</text>
+			</view>
+		</view>
 	</view>
 </template>
 
@@ -99,18 +117,20 @@
 const SHOT_H = { infographic: 1.5, config: 1.15, pad: 0.8, launch: 0.7 }
 
 export default {
-	data() {
-		return {
-			rocketId: '',
-			config: null,
-			series: [],
-			images: [],
-			videos: [],
-			truncated: false,
-			tab: 'image',
-			loading: true
-		}
-	},
+		data() {
+			return {
+				rocketId: '',
+				config: null,
+				series: [],
+				images: [],
+				videos: [],
+				truncated: false,
+				tab: 'image',
+				loading: true,
+				// 正在播放的视频（playable 的内联播放遮罩）
+				playing: null
+			}
+		},
 
 	computed: {
 		/** 系列里有多个构型时用系列名（猎鹰9号），只有自己就用型号名（Falcon 1） */
@@ -227,16 +247,24 @@ export default {
 		},
 
 		/**
-		 * 小程序里放不了 YouTube，web-view 也要配业务域名，所以只能复制链接。
-		 * 与其给个点了没反应的播放键，不如老实告诉用户下一步怎么做。
+		 * 视频本体已存到 COS（playable）就内联播放；否则小程序播不了，退回复制链接。
+		 * 复制链接仍是兜底：YouTube 等没下下来的、或用户想在大屏看原版的，点一下就能带走。
 		 */
 		openVideo(v) {
+			if (v && v.playable && v.cosUrl) {
+				this.playing = v
+				return
+			}
 			uni.setClipboardData({
 				data: v.url,
 				success: () => {
 					uni.showToast({ title: '链接已复制，可到浏览器打开', icon: 'none' })
 				}
 			})
+		},
+
+		closePlayer() {
+			this.playing = null
 		}
 	}
 }
@@ -429,5 +457,63 @@ export default {
 .tail-text {
 	color: #4d5a6e;
 	font-size: 22rpx;
+}
+
+/* ---- 内联播放遮罩 ---- */
+.player-mask {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background: rgba(4, 6, 10, 0.94);
+}
+
+.player {
+	width: 100%;
+	height: 78vh;
+	background: #000;
+}
+
+.player-bar {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 24rpx 28rpx calc(24rpx + env(safe-area-inset-bottom));
+	box-sizing: border-box;
+	background: linear-gradient(to top, rgba(4, 6, 10, 0.9) 0%, rgba(4, 6, 10, 0) 100%);
+}
+
+.player-title {
+	flex: 1;
+	min-width: 0;
+	padding-right: 24rpx;
+	color: #e2e8f0;
+	font-size: 24rpx;
+	line-height: 34rpx;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.player-close {
+	flex-shrink: 0;
+	width: 56rpx;
+	height: 56rpx;
+	line-height: 56rpx;
+	text-align: center;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.12);
+	color: #ffffff;
+	font-size: 30rpx;
 }
 </style>

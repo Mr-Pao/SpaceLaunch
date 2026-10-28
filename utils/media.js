@@ -124,6 +124,9 @@ export function collectMedia(configs, records) {
 			// 封面优先用视频自己的缩略图（就是这场发射的画面）；
 			// 早期版本借发射照片，结果整列全是同款火箭照
 			const cover = v.cover || r.imageThumb || r.image || ''
+			// 能存到 COS 的视频（直链/YouTube 已下载）直接内联播放；
+			// 否则退回「复制链接」。cosUrl/playable 由 videos.js 在 CI 侧填好
+			const playable = Boolean(v.cosUrl)
 			videos.push({
 				url: v.url,
 				title: v.title || r.name || '',
@@ -135,7 +138,10 @@ export function collectMedia(configs, records) {
 				cover,
 				thumb: cover,
 				net: r.net || '',
-				mins: v.mins || 0
+				mins: v.mins || 0,
+				cosUrl: v.cosUrl || '',
+				playable,
+				sourceType: v.sourceType || ''
 			})
 		}
 	}

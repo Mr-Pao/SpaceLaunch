@@ -21,12 +21,35 @@
  * 新挂上去的 webcast 补进来。不按「热门系列」过滤：LL2 的时间过滤
  * 参数实测无效，按配置过滤更是没有，而 previous 的排序本身
  * 就已经是「最近最多人关心的」—— 猎鹰 9 号能占到四成。
+ *
+ * ---------------------------------------------------------------------------
+ * 视频本体存 COS（3.2.25 新增）
+ * ---------------------------------------------------------------------------
+ * 以前只把 YouTube 封面镜像到 COS、点开复制链接 —— 小程序里放不了 YouTube，
+ * web-view 又得配业务域名，等于没做。现在改成：**能存的视频就存到 COS，
+ * 小程序内直接 <video> 播放**。
+ *
+ * - 直链媒体（.mp4/.webm/.mov...）：直接下载到 COS（key = space-video/{md5}.ext），
+ *   记录 cosUrl + playable:true。
+ * - YouTube：在 `YT_DL=1` 且本机有 yt-dlp 时尽力下载（需 ffmpeg 才能合并 DASH）；
+ *   没有就留 url + 封面、playable:false。
+ * - 其它/失败：playable:false，前端退回「复制链接」。
+ *
+ * 下载只对本轮**新抓到**的 vid 触发（每轮 10 条发射的 vid），按 URL 建 vidCache
+ * 跨轮保留已下载结果 —— 既不会每轮重复拉同一段视频，也不会首轮风暴式连下上千条。
+ * 游标转一圈（~120 轮）自然把所有发射的 webcast 都尝试一遍。
+ * 下载失败不写 cosUrl，下个周期还会再试，不会永久判死。
  */
 
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
+const http = require('http')
+const https = require('https')
+const os = require('os')
+const { execFileSync } = require('child_process')
 const { getJson } = require('./lib/fetch')
-const { upload, hasCosConfig, readCosJson } = require('./lib/cos')
+const { upload, hasCosConfig, readCosJson, putBuffer, headObject } = require('./lib/cos')
 const { mirrorImages } = require('./lib/image')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
@@ -42,10 +65,199 @@ const PAGE = 5
 // webcast），按 net 倒序留最近的 1200 条，约 500KB。太老的前端也几乎不翻。
 const KEEP = 1200
 
+// ---- 视频本体下载（3.2.25）----
+// COS 上的对象键前缀（落在 space-data/ 下，与 CDN_BASE 同级）
+const VIDEO_PREFIX = 'space-video'
+// 单段视频大小上限：火箭直播回放常 50-150MB，给 200MB 余量；再大就放弃（存储/流量不值）
+const VIDEO_MAX_BYTES = Number(process.env.VIDEO_MAX_BYTES || 200 * 1024 * 1024)
+// 每轮最多实际发起几次下载（直链 + YouTube 合计），给 LL2 抓取和脚本其余部分留时间
+const DL_MAX_PER_RUN = Number(process.env.DL_MAX_PER_RUN || 6)
+// 是否尝试下载 YouTube：默认关，开了且本机有 yt-dlp 才真正跑（CI 侧可装）
+const YT_DL = process.env.YT_DL === '1' || process.env.YT_DL === 'true'
+
+const UA = 'SpaceLaunch/1.1 (+https://github.com/Mr-Pao/SpaceLaunch)'
+
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v))
 const cut = (s, n) => {
 	const t = str(s).replace(/\s+/g, ' ').trim()
 	return t.length > n ? t.slice(0, n - 1) + '…' : t
+}
+
+function cdnBase() {
+	const { COS_BUCKET, COS_REGION } = process.env
+	if (!COS_BUCKET || !COS_REGION) return ''
+	return `https://${COS_BUCKET}.cos.${COS_REGION}.myqcloud.com`
+}
+
+/** 视频本体对象键：space-video/{md5_16}.{ext} */
+function vidKey(hash, ext) {
+	return `${VIDEO_PREFIX}/${hash}.${ext}`
+}
+
+/**
+ * 由 URL 判断视频来源：direct = 直链媒体文件，youtube = YouTube，other = 未知
+ * 不知来源的不强行下载（可能是 Vimeo / 官网内嵌播放器，下载下来也播不了）
+ */
+function classifyVideo(url) {
+	if (!url) return 'other'
+	if (/youtube\.com|youtu\.be|ytimg/i.test(url)) return 'youtube'
+	if (/\.(mp4|webm|mov|m4v|ogg|ogv|mkv)(\?|$)/i.test(url)) return 'direct'
+	return 'other'
+}
+
+/** 把一段 http(s) 响应体整段读进 Buffer，带重定向跟随与大小上限（视频用，比图片宽松得多） */
+function fetchBuffer(url, maxBytes, timeoutMs) {
+	return new Promise((resolve, reject) => {
+		const mod = /^http:\/\//i.test(url) ? http : https
+		const req = mod.get(
+			url,
+			{ timeout: timeoutMs, headers: { 'User-Agent': UA, Accept: '*/*' } },
+			(res) => {
+				if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+					res.resume()
+					let next = res.headers.location
+					try {
+						next = new URL(next, url).toString()
+					} catch (e) {
+						// 解析失败就按原样试
+					}
+					return resolve(fetchBuffer(next, maxBytes, timeoutMs))
+				}
+				if (res.statusCode !== 200) {
+					res.resume()
+					return reject(new Error('HTTP ' + res.statusCode))
+				}
+				const ct = res.headers['content-type'] || ''
+				const chunks = []
+				let size = 0
+				res.on('data', (c) => {
+					size += c.length
+					if (size > maxBytes) {
+						req.destroy(new Error('视频超过 ' + Math.round(maxBytes / 1048576) + 'MB'))
+						return
+					}
+					chunks.push(c)
+				})
+				res.on('end', () => resolve({ buf: Buffer.concat(chunks), contentType: ct }))
+			}
+		)
+		req.on('timeout', () => req.destroy(new Error('下载超时')))
+		req.on('error', reject)
+	})
+}
+
+/** 直链媒体：下载到 COS，返回可播放的 COS 地址；失败/跳过返回 null */
+async function tryDirect(url) {
+	const h = crypto.createHash('md5').update(url).digest('hex').slice(0, 16)
+	const extFromUrl = (url.match(/\.(mp4|webm|mov|m4v|ogg|ogv|mkv)(\?|$)/i) || [])[1] || 'mp4'
+	const key = vidKey(h, extFromUrl.toLowerCase())
+	if (await headObject(key)) return `${cdnBase()}/${key}`
+	try {
+		const { buf, contentType } = await fetchBuffer(url, VIDEO_MAX_BYTES, 90000)
+		if (!buf || !buf.length) return null
+		// 内容类型若与 URL 后缀冲突（少数站点用 .mp4 却给 video/webm），以 URL 后缀为准，避免 key 对不上
+		const realKey = /webm/i.test(contentType) && extFromUrl.toLowerCase() !== 'webm' ? vidKey(h, 'webm') : key
+		await putBuffer(buf, realKey, contentType || 'video/mp4', 'public, max-age=31536000')
+		return `${cdnBase()}/${realKey}`
+	} catch (e) {
+		console.warn(`  ! 直链视频下载失败 ${url.slice(-36)}: ${e.message}`)
+		return null
+	}
+}
+
+/** 本机是否已装 yt-dlp（没装就别浪费时间尝试）*/
+function ytDlpAvailable() {
+	try {
+		execFileSync('yt-dlp', ['--version'], { stdio: 'ignore', timeout: 8000 })
+		return true
+	} catch (e) {
+		return false
+	}
+}
+
+/** YouTube：借 yt-dlp 下载到本地临时文件再传 COS；需 ffmpeg 才能合并 DASH，没有则很多视频下不下来 */
+async function tryYoutube(url) {
+	const h = crypto.createHash('md5').update(url).digest('hex').slice(0, 16)
+	const key = vidKey(h, 'mp4')
+	if (await headObject(key)) return `${cdnBase()}/${key}`
+	const tmp = path.join(os.tmpdir(), `sl-vid-${h}.mp4`)
+	try {
+		execFileSync(
+			'yt-dlp',
+			[
+				'-f',
+				'best[ext=mp4]/best',
+				'--no-playlist',
+				'--max-filesize',
+				String(VIDEO_MAX_BYTES),
+				'-o',
+				tmp,
+				url
+			],
+			{ stdio: 'ignore', timeout: 120000 }
+		)
+		let stat
+		try {
+			stat = fs.statSync(tmp)
+		} catch (e) {
+			return null
+		}
+		if (!stat.size) return null
+		const buf = fs.readFileSync(tmp)
+		await putBuffer(buf, key, 'video/mp4', 'public, max-age=31536000')
+		return `${cdnBase()}/${key}`
+	} catch (e) {
+		// 超时 / 需要登录 / 地区限制 / 没 ffmpeg 合并失败 —— 都按「这次下不下来」处理
+		return null
+	} finally {
+		try {
+			fs.unlinkSync(tmp)
+		} catch (e) {
+			// 临时文件清不掉也无妨
+		}
+	}
+}
+
+/**
+ * 给一条 vid 补 cosUrl / playable / sourceType。
+ * 已下载过的（vidCache 命中）直接复用，不再重复下载。
+ * budget.n 是本轮剩余下载额度，每真正发起一次下载就 -1。
+ */
+async function enrichVid(vid, cache, budget) {
+	const url = vid.url
+	if (!url) {
+		vid.playable = false
+		vid.sourceType = 'other'
+		return vid
+	}
+	// 以前已经存过 → 直接复用，省一次下载
+	if (cache.has(url)) {
+		const c = cache.get(url)
+		vid.cosUrl = c.cosUrl || ''
+		vid.playable = Boolean(c.cosUrl)
+		vid.sourceType = c.sourceType || classifyVideo(url)
+		return vid
+	}
+
+	const type = classifyVideo(url)
+	vid.sourceType = type
+
+	let cosUrl = ''
+	if (hasCosConfig() && budget.n > 0) {
+		if (type === 'direct') {
+			budget.n--
+			cosUrl = (await tryDirect(url)) || ''
+		} else if (type === 'youtube' && YT_DL && ytDlpAvailable()) {
+			budget.n--
+			cosUrl = (await tryYoutube(url)) || ''
+		}
+	}
+
+	vid.cosUrl = cosUrl
+	vid.playable = Boolean(cosUrl)
+	// 成功才进缓存（失败下次周期再试）；下载额度用尽时也不缓存失败，留给下轮
+	if (cosUrl) cache.set(url, { cosUrl, sourceType: type })
+	return vid
 }
 
 /**
@@ -77,6 +289,7 @@ function slimVids(raw) {
 			start: str(v.start_time),
 			mins,
 			live: Boolean(v.live)
+			// cosUrl / playable / sourceType 由 runVideos 的 enrichVid 补，这里不写
 		})
 	}
 	out.sort((a, b) => (KIND_RANK[a.tid] ?? 3) - (KIND_RANK[b.tid] ?? 3))
@@ -103,6 +316,8 @@ async function runVideos() {
 
 	const byId = new Map()
 	let vidsBefore = 0
+	// vidCache：url → { cosUrl, sourceType }，跨轮保留已下载结果
+	const vidCache = new Map()
 	for (const x of old.list || []) {
 		if (!x || !x.id) continue
 		// 只保留有视频的行：游标本身就是「扫到哪了」的状态，
@@ -110,6 +325,9 @@ async function runVideos() {
 		if ((x.vids || []).length) {
 			byId.set(String(x.id), x)
 			vidsBefore++
+			for (const v of x.vids) {
+				if (v && v.url && v.cosUrl) vidCache.set(v.url, { cosUrl: v.cosUrl, sourceType: v.sourceType })
+			}
 		}
 	}
 
@@ -132,6 +350,10 @@ async function runVideos() {
 	let failed = 0
 	let total = Number(old.total) || 0
 	const fresh = []
+	// 下载预算：本轮最多真正发起几次视频本体下载
+	const budget = { n: DL_MAX_PER_RUN }
+	let dlOk = 0
+	let dlSkip = 0
 
 	for (const j of jobs) {
 		try {
@@ -145,6 +367,12 @@ async function runVideos() {
 				const vids = slimVids(r.vid_urls)
 				got++
 				if (!vids.length) continue
+				// 给每条 vid 补 cosUrl / playable（在读图封面之前，省一次网络）
+				for (const v of vids) {
+					await enrichVid(v, vidCache, budget)
+					if (v.cosUrl) dlOk++
+					else dlSkip++
+				}
 				const row = {
 					id: str(r.id),
 					name: str(r.name),
@@ -192,7 +420,9 @@ async function runVideos() {
 	fs.writeFileSync(filePath, JSON.stringify(payload), 'utf8')
 	const kb = (fs.statSync(filePath).size / 1024).toFixed(1)
 	console.log(
-		`  → ${FILE}  ${list.length} 条 / ${kb} KB（本轮扫 ${got}、新增有视频 ${withVid}、失败 ${failed}、total=${total}）`
+		`  → ${FILE}  ${list.length} 条 / ${kb} KB` +
+			`（本轮扫 ${got}、新增有视频 ${withVid}、失败 ${failed}、total=${total}` +
+			`、视频本体 已存 ${dlOk} / 未存(链接兜底) ${dlSkip}）`
 	)
 
 	// 第二层保险（P1-1）：**有视频条目**比存量缩水太多时宁可这轮不更新。

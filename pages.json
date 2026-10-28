@@ -138,6 +138,15 @@
 			}
 		},
 		{
+			"path": "pages/video-gallery/video-gallery",
+			"style": {
+				"navigationBarTitleText": "发射视频",
+				"enablePullDownRefresh": true,
+				"backgroundTextStyle": "light",
+				"onReachBottomDistance": 300
+			}
+		},
+		{
 			"path": "pages/catalog/catalog",
 			"style": {
 				"navigationBarTitleText": "航天器 / 卫星百科",

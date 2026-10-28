@@ -86,6 +86,10 @@
 				<text class="all-num">{{ total }}</text>
 				<text class="all-arrow">›</text>
 			</view>
+			<view class="all-btn vid" hover-class="all-btn-hover" @click="goVideos">
+				<text class="all-text">看视频</text>
+				<text class="all-arrow">🎬</text>
+			</view>
 		</view>
 
 		<view class="loading" v-if="loading">
@@ -96,6 +100,10 @@
 			<text class="empty-icon">🛰️</text>
 			<text class="empty-text">还没有图片</text>
 			<text class="empty-sub">历史图片正在由后台逐批补齐，过几个小时再来看看</text>
+			<view class="all-btn vid solo" hover-class="all-btn-hover" @click="goVideos">
+				<text class="all-text">看发射视频</text>
+				<text class="all-arrow">🎬</text>
+			</view>
 		</view>
 	</view>
 </template>
@@ -105,8 +113,9 @@
  * 图库
  *
  * 交互只有一件事：看着它们慢慢飘，喜欢就点开看原图。
- * 没有分类、没有搜索、没有视频 tab —— 视频在小程序里本来就播不了
- * （web-view 要配业务域名），与其给个「复制链接」的劝退按钮，不如不做。
+ * 没有分类、没有搜索 —— 视频入口单独放在底部 dock（「看视频」），
+ * 跳到 video-gallery 页按网格看所有发射视频，能播的直接内联播。
+ * 漂流墙里不塞视频卡：视频是另一种浏览节奏，混进来会打断「一扇窗」的沉浸感。
  *
  * 为什么每行只放 12 张再复制一份：
  *   无缝循环靠 track 复制内容 + translateX(-50%)。如果 800 张全塞进去，
@@ -195,6 +204,10 @@ export default {
 	methods: {
 		goAll() {
 			uni.navigateTo({ url: '/pages/gallery-all/gallery-all' })
+		},
+
+		goVideos() {
+			uni.navigateTo({ url: '/pages/video-gallery/video-gallery' })
 		},
 
 		/**
@@ -519,6 +532,21 @@ export default {
 	color: #38bdf8;
 	font-size: 30rpx;
 	line-height: 1;
+}
+
+/* 视频入口：和「看全部」并排，用略不同的描边区分 */
+.all-btn.vid {
+	margin-left: 16rpx;
+	border-color: rgba(168, 120, 255, 0.4);
+}
+
+.all-btn.vid .all-arrow {
+	color: #b794ff;
+}
+
+/* 空态里的视频入口：单独成行居中，离上方说明留点间距 */
+.all-btn.vid.solo {
+	margin: 28rpx auto 0;
 }
 
 /* ---- 空态 / 加载 ---- */
