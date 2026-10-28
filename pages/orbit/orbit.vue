@@ -1,10 +1,7 @@
 <template>
 	<view class="page">
 		<star-field />
-		<view class="nav-row" :style="{ paddingTop: statusBarH + 'px' }">
-			<view class="nav-back" @click="goBack"><text class="nav-arrow">‹</text></view>
-			<text class="nav-title">全球在轨资产</text>
-		</view>
+		<nav-bar :solid="true" :placeholder="true" title="全球在轨资产" />
 
 		<view class="loading" v-if="loading">
 			<text class="hint-text">统计中...</text>
@@ -109,15 +106,6 @@ export default {
 	},
 
 	methods: {
-		goBack() {
-			const pages = getCurrentPages()
-			if (pages.length > 1) {
-				uni.navigateBack()
-			} else {
-				uni.switchTab({ url: '/pages/mine/mine' })
-			}
-		},
-
 		async getData(force) {
 			this.loading = true
 			try {
@@ -155,29 +143,6 @@ function withDecadePct(rows) {
 	min-height: 100vh;
 	padding-bottom: 60rpx;
 	box-sizing: border-box;
-}
-
-.nav-row {
-	padding: 0 24rpx;
-}
-.nav-back {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 60rpx;
-	height: 60rpx;
-	margin-left: -10rpx;
-}
-.nav-arrow {
-	color: #ffffff;
-	font-size: 54rpx;
-	font-weight: 300;
-	line-height: 1;
-	margin-top: -6rpx;
-}
-.nav-title {
-	font-size: 36rpx;
-	padding-right: 160rpx;
 }
 
 .loading,

@@ -1,6 +1,6 @@
 <template>
 	<view class="page">
-		<nav-bar :solid="navSolid" :title="navSolid ? '解体 / 再入事件' : ''" />
+		<nav-bar :solid="navSolid" :placeholder="true" :title="navSolid ? '解体 / 再入事件' : ''" />
 
 		<view class="hero">
 			<text class="hero-title">在轨解体 / 再入事件</text>

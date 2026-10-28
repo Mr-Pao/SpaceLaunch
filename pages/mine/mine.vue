@@ -212,11 +212,11 @@ export default {
 			favs: [],
 			rems: [],
 			rockets: [],
-			// 探索区：发射统计 / 图库是老入口；卫星百科 / 全球在轨 / 解体再入
-			// 来自 GCAT 季度编目（CC-BY），各详情页都带 GCAT 署名
+			// 探索区：数据统计是老入口；卫星百科 / 全球在轨 / 解体再入
+			// 来自 GCAT 季度编目（CC-BY），各详情页都带 GCAT 署名。
+			// 图库本身是底部 tab，不再放进探索网格，避免和 tabBar 重复
 			entries: [
 				{ icon: '📊', name: '数据统计', desc: '历年发射量', url: '/pages/stats/stats' },
-				{ icon: '🖼️', name: '图库', desc: '发射现场照片', url: '/pages/gallery/gallery', tab: true },
 				{ icon: '🛰️', name: '卫星百科', desc: '在轨航天器编目', url: '/pages/catalog/catalog' },
 				{ icon: '🌍', name: '全球在轨', desc: '在轨资产统计', url: '/pages/orbit/orbit' },
 				{ icon: '💥', name: '解体 / 再入', desc: '太空事件流', url: '/pages/debris/debris' }

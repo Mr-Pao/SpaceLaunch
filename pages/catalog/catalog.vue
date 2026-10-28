@@ -1,6 +1,6 @@
 <template>
 	<view class="page">
-		<nav-bar :solid="navSolid" :title="navSolid ? '航天器 / 卫星百科' : ''" />
+		<nav-bar :solid="navSolid" :placeholder="true" :title="navSolid ? '航天器 / 卫星百科' : ''" />
 
 		<view class="hero">
 			<text class="hero-title">航天器 / 卫星百科</text>
