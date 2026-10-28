@@ -63,7 +63,7 @@
 						<view class="nr-meta">
 							<text class="nr-time">{{ x.atShort }}</text>
 							<text class="nr-sep">·</text>
-							<text class="nr-dim" v-if="x.dmax">直径 {{ x.dmin }}–{{ x.dmax }} m</text>
+							<text class="nr-dim" v-if="x.dmax">直径 {{ x.dmin }}–{{ x.dmax }} 米</text>
 							<text class="nr-sep" v-if="x.dmax">·</text>
 							<text class="nr-vel" v-if="x.vkms">{{ x.vkms }} km/s</text>
 						</view>
@@ -321,11 +321,16 @@ export default {
 .nr-line1 {
 	display: flex;
 	align-items: center;
+	min-width: 0;
 }
 .nr-name {
 	color: #e2e8f0;
 	font-size: 28rpx;
 	font-weight: 600;
+	/* 名字最长能到「2005 GU」这种 7 字符，但轨道编号形态不定，保险起见单行截断 */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .nr-haz {
 	margin-left: 10rpx;
@@ -334,10 +339,14 @@ export default {
 	color: #e0b25a;
 	background: rgba(224, 178, 90, 0.12);
 	border-radius: 5rpx;
+	flex-shrink: 0;
 }
 .nr-meta {
 	display: flex;
 	align-items: center;
+	/* 必须允许换行：日期 + 直径区间 + 速度在窄屏上放不下，
+	     不换行就会把右边的「地月距离」挤出屏幕（375 宽实测会切掉） */
+	flex-wrap: wrap;
 	margin-top: 8rpx;
 }
 .nr-time,
@@ -345,6 +354,7 @@ export default {
 .nr-vel {
 	color: #6b7891;
 	font-size: 22rpx;
+	white-space: nowrap;
 }
 .nr-sep {
 	margin: 0 8rpx;
