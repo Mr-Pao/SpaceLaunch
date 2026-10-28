@@ -10,33 +10,50 @@
 		<block v-if="!reviewMode">
 			<!-- 1 每日一图。按「北京天序号」哈希抽图，同一天反复进来看到的是同一张，
 			     跨天才换 —— 用真随机的话每次进页都换，就没有「今天这张」的意思了 -->
-			<view class="daily" v-if="daily" hover-class="daily-hover" @click="openPhoto(daily)">
-				<image class="daily-img" :src="dailySrc" mode="aspectFill" @error="imgBroken = true"></image>
-				<view class="daily-shade"></view>
-
-				<view class="daily-top">
-					<text class="daily-tag">每日一图</text>
-				</view>
-
-				<view class="daily-body">
-					<text class="daily-name">{{ dailyTitle }}</text>
-					<text class="daily-meta" v-if="dailyMeta">{{ dailyMeta }}</text>
-					<text class="daily-credit" v-if="daily.credit">@{{ daily.credit }}</text>
-
-					<!-- 两个出口压在图上：整卡点击是看大图，这两个要 .stop，
-					     否则会一并触发外层，图先弹出来再跳页，观感很乱 -->
-					<view class="daily-acts">
-						<view class="daily-link" hover-class="daily-link-hover" @click.stop="goLaunch(daily.id)">
-							<text class="daily-link-text">查看详情</text>
-							<text class="daily-link-arrow">›</text>
+			<!-- 1 每日一览：NASA 每日天文（APOD）+ 每日地球（EPIC）+ 今日发射图 轮播 -->
+			<swiper
+				v-if="dailyCards.length"
+				class="daily-swiper"
+				:autoplay="true"
+				:interval="5000"
+				:circular="true"
+				:duration="450"
+				:indicator-dots="true"
+				indicator-color="rgba(255,255,255,0.28)"
+				indicator-active-color="#38bdf8"
+			>
+				<swiper-item v-for="(c, i) in dailyCards" :key="i">
+					<view class="daily-card" @click="openCard(c)">
+						<image
+							v-if="!dailyErr[i]"
+							class="daily-img"
+							:src="c.src"
+							mode="aspectFill"
+							@error="onDailyErr(i)"
+						></image>
+						<view class="daily-shade"></view>
+						<view class="daily-top">
+							<text class="daily-tag">{{ c.tag }}</text>
 						</view>
-						<view class="daily-link" hover-class="daily-link-hover" @click.stop="goGallery">
-							<text class="daily-link-text">更多图片</text>
-							<text class="daily-link-arrow">›</text>
+						<view class="daily-body">
+							<text class="daily-name">{{ c.title }}</text>
+							<text class="daily-meta" v-if="c.date">{{ c.date }}</text>
+							<text class="daily-desc" v-if="c.desc">{{ c.desc }}</text>
+							<text class="daily-credit" v-if="c.credit">{{ c.credit }}</text>
+							<view class="daily-acts" v-if="c.type === 'sl'" @click.stop>
+								<view class="daily-link" hover-class="daily-link-hover" @click.stop="goLaunch(c.launchId, c.net)">
+									<text class="daily-link-text">查看详情</text>
+									<text class="daily-link-arrow">›</text>
+								</view>
+								<view class="daily-link" hover-class="daily-link-hover" @click.stop="goGallery">
+									<text class="daily-link-text">更多图片</text>
+									<text class="daily-link-arrow">›</text>
+								</view>
+							</view>
 						</view>
 					</view>
-				</view>
-			</view>
+				</swiper-item>
+			</swiper>
 
 			<!-- 2 此刻在天上 -->
 			<view class="inspace" v-if="inSpace.length">
@@ -211,6 +228,11 @@ export default {
 			astronauts: [],
 			upcoming: [],
 			onthisday: [],
+			// NASA 每日天文 / 每日地球（首页「每日一览」轮播数据源）
+			apod: [],
+			epic: [],
+			// 轮播卡片内图片加载失败的索引，标记后回退底色
+			dailyErr: {},
 			// 往年今日是否展开（默认折叠到 OTD_FOLD 条）
 			otdOpen: false,
 			// 模板要读这个常量，挂到 data 上（options API 的模板访问不到模块作用域）
@@ -261,6 +283,60 @@ export default {
 			if (!d) return ''
 			const when = formatDateTime(d.net)
 			return [rocketName({ name: d.cname }), when].filter(Boolean).join(' · ')
+		},
+
+		/**
+		 * 首页「每日一览」轮播卡片：把三类每日图混排成一组可滑动卡片。
+		 *   - APOD 近 7 天（type=apod）
+		 *   - EPIC 当天地球（type=epic）
+		 *   - 现有「每日一图」发射现场图（type=sl，保留查看详情/图库出口）
+		 * 顺序让 SL 排最后：用户最熟悉的「今日发射图」不用滑就能看到，
+		 * NASA 两张作为惊喜往前插。
+		 */
+		dailyCards() {
+			const cards = []
+			const apod = this.apod || []
+			for (const x of apod) {
+				cards.push({
+					type: 'apod',
+					tag: '每日天文',
+					date: x.date || '',
+					title: x.title || '',
+					desc: x.explanation || '',
+					src: x.thumb,
+					full: x.full,
+					credit: x.credit || ''
+				})
+			}
+			const epic = this.epic || []
+			for (const x of epic) {
+				cards.push({
+					type: 'epic',
+					tag: '每日地球',
+					date: (x.date || '').slice(0, 10),
+					title: '地球 · DSCOVR',
+					desc: x.caption || '',
+					src: x.thumb,
+					full: x.full,
+					credit: 'NASA EPIC'
+				})
+			}
+			const d = this.daily
+			if (d) {
+				cards.push({
+					type: 'sl',
+					tag: '今日发射',
+					date: this.dailyMeta,
+					title: this.dailyTitle,
+					desc: '',
+					src: this.dailySrc,
+					full: (d.thumb && fullImageOf(d.thumb)) || this.dailySrc,
+					credit: d.credit ? '@' + d.credit : '',
+					launchId: d.id,
+					net: d.net
+				})
+			}
+			return cards
 		},
 
 		inSpace() {
@@ -411,18 +487,22 @@ export default {
 		async loadAll(force) {
 			this.loading = true
 
-			const [g, a, u, o] = await Promise.all([
-				spaceData.load('gallery', { force: !!force }).catch(() => null),
-				spaceData.load('astronauts').catch(() => null),
-				// 待发射列表本身有 15 分钟缓存，下拉时才强制刷
-				spaceData.load('upcoming', { force: !!force }).catch(() => null),
-				spaceData.load('onthisday', { force: !!force }).catch(() => null)
-			])
+		const [g, a, u, o, ap, ep] = await Promise.all([
+			spaceData.load('gallery', { force: !!force }).catch(() => null),
+			spaceData.load('astronauts').catch(() => null),
+			// 待发射列表本身有 15 分钟缓存，下拉时才强制刷
+			spaceData.load('upcoming', { force: !!force }).catch(() => null),
+			spaceData.load('onthisday', { force: !!force }).catch(() => null),
+			spaceData.load('apod').catch(() => null),
+			spaceData.load('epic').catch(() => null)
+		])
 
-			if (g) this.gallery = (g.list || []).filter((x) => x && x.thumb)
-			if (a) this.astronauts = a.list || []
-			if (u) this.upcoming = u.list || []
-			if (o) this.onthisday = o.list || []
+		if (g) this.gallery = (g.list || []).filter((x) => x && x.thumb)
+		if (a) this.astronauts = a.list || []
+		if (u) this.upcoming = u.list || []
+		if (o) this.onthisday = o.list || []
+		if (ap) this.apod = ap.list || []
+		if (ep) this.epic = ep.list || []
 
 			this.loading = false
 		},
@@ -445,6 +525,24 @@ export default {
 					'/pages/launch/launchInfo?id=' + item.id + '&photo=1' +
 					(item.net ? '&net=' + encodeURIComponent(item.net) : '')
 			})
+		},
+
+		/** 首页「每日一览」轮播卡片点击：
+		    SL 类型（今日发射图）进发射详情图片态（沿用 openPhoto）；
+		    APOD/EPIC 类型用 uni.previewImage 全屏看原图 */
+		openCard(c) {
+			if (!c) return
+			if (c.type === 'sl') {
+				this.openPhoto({ id: c.launchId, net: c.net })
+			} else {
+				const url = c.full || c.src
+				if (url) uni.previewImage({ urls: [url], current: url })
+			}
+		},
+
+		/** 轮播图加载失败：标记该索引，模板回退到底色，避免裂图 */
+		onDailyErr(i) {
+			this.$set(this.dailyErr, i, true)
 		},
 
 		/** 横滑列表滑过之后，右侧的「还有内容」提示就该消失 */
@@ -551,15 +649,25 @@ export default {
 }
 
 /* ---- 1 每日一图 ---- */
-.daily {
-	position: relative;
+.daily-swiper {
 	height: 500rpx;
 	margin-top: 16rpx;
 	margin-bottom: 30rpx;
 	border-radius: 24rpx;
 	overflow: hidden;
+}
+
+.daily-card {
+	position: relative;
+	height: 500rpx;
+	border-radius: 24rpx;
+	overflow: hidden;
 	background: #141a26;
 	border: 1rpx solid rgba(255, 255, 255, 0.07);
+}
+
+.daily-card:active {
+	opacity: 0.92;
 }
 
 .daily-hover {
@@ -666,6 +774,24 @@ export default {
 	font-size: 23rpx;
 	line-height: 1;
 	text-shadow: 0 1rpx 6rpx rgba(0, 0, 0, 0.6);
+}
+
+.daily-desc {
+	display: -webkit-box;
+	margin-top: 10rpx;
+	color: rgba(255, 255, 255, 0.64);
+	font-size: 21rpx;
+	line-height: 1.42;
+	max-height: 92rpx;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+}
+
+/* 底部给轮播指示点留白，避免圆点和文字叠在一起 */
+.daily-body {
+	bottom: 46rpx;
 }
 
 /* ---- 2 此刻在天上 ---- */
