@@ -283,6 +283,29 @@
 						</view>
 					</view>
 				</view>
+
+				<!-- 相关报道：资讯流里提到过本次发射的文章，点开进资讯详情。
+				     关联来自 SNAPI 的 launch_id，绝大多数老任务一条都没有，
+				     拿不到就整块不显示 —— 宁可不出现，也不给一个空卡片 -->
+				<view class="card" v-if="news.length">
+					<view class="card-title">
+						相关报道
+						<text class="news-count">{{ news.length }} 篇</text>
+					</view>
+					<view
+						class="news-row"
+						v-for="n in news"
+						:key="n.id"
+						hover-class="news-hover"
+						@click="tapNews(n)"
+					>
+						<view class="news-body">
+							<text class="news-title">{{ n.titleZh || n.title }}</text>
+							<text class="news-meta">{{ n.site }} · {{ n.atShort || n.at }}</text>
+						</view>
+						<text class="news-go">›</text>
+					</view>
+				</view>
 	</view>
 </template>
 
@@ -318,6 +341,8 @@ export default {
 		agency: { type: Object, default: null },
 		// 本次任务的航天器（飞船本体），和 timeline 同一个来源，可能为 null
 		craft: { type: Object, default: null },
+		// 提到过本次发射的报道（来自资讯流反查），没有就是空数组
+		news: { type: Array, default: () => [] },
 		// 发射周期（T- 序列）原始节点，来自 timelines.json，可能为空
 		timeline: { type: Array, default: () => [] },
 		// 审核模式：隐藏任务描述 / 天气顾虑 / 失败原因等长文，只留参数
@@ -640,6 +665,11 @@ export default {
 		preview(url) {
 			if (!url) return
 			uni.previewImage({ urls: [url], current: url })
+		},
+
+		// 报道交给壳组件跳转：这里只管把选中项抛上去，不碰路由
+		tapNews(n) {
+			this.$emit('news-tap', n)
 		},
 
 		// 工位名 → pad 详情。pad 库是每天刷的全量快照，
@@ -1311,6 +1341,64 @@ export default {
 	font-size: 30rpx;
 	font-weight: 600;
 	margin-bottom: 20rpx;
+}
+
+/* 相关报道：一条一行，标题最多两行，meta 一行。
+   描述是长文、报道是链接，视觉上要明显更轻，不能抢任务描述的注意力 */
+.news-count {
+	margin-left: 12rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+	font-weight: 400;
+}
+
+.news-row {
+	display: flex;
+	align-items: center;
+	padding-bottom: 20rpx;
+}
+
+/* 行间用相邻兄弟选择器画分割线（wxss 对 :first-of-type 支持不稳，
+   这种写法天然只作用于第二行起，首行不会多一条线） */
+.news-row + .news-row {
+	margin-top: 20rpx;
+	padding-top: 20rpx;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.news-hover {
+	opacity: 0.6;
+}
+
+.news-body {
+	flex: 1;
+	/* 窄屏下没有 min-width: 0，长标题会把右侧箭头挤出屏幕 */
+	min-width: 0;
+}
+
+.news-title {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	color: #dfe7f0;
+	font-size: 28rpx;
+	line-height: 1.5;
+}
+
+.news-meta {
+	display: block;
+	margin-top: 8rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.news-go {
+	flex-shrink: 0;
+	margin-left: 16rpx;
+	color: #4a5568;
+	font-size: 34rpx;
+	line-height: 1;
 }
 
 .arrow {

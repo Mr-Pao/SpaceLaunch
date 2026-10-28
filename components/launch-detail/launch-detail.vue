@@ -43,6 +43,7 @@
 					:agency="agency"
 					:craft="craft"
 					:timeline="timeline"
+					:news="news"
 					:review-mode="reviewMode"
 					:is-fav="isFav"
 					:is-reminded="isReminded"
@@ -52,6 +53,7 @@
 					@remind="addReminder"
 					@share-tap="onShareTap"
 					@poster="makePoster"
+					@news-tap="openNews"
 					@toggle-desc="descExpanded = !descExpanded"
 					@set-tl-open="tlOpen = $event"
 				/>
@@ -136,6 +138,8 @@ export default {
 			timeline: [],
 			// 本次任务的航天器（飞船本体），和 timeline 同一个来源，可能为 null
 			craft: null,
+			// 提到过这次发射的报道（来自资讯流），绝大多数任务没有 → 空数组
+			news: [],
 			// 时间线是展开全部还是只给接下来几步
 			tlOpen: false,
 			// 审核模式：隐藏任务描述 / 天气顾虑 / 失败原因等长文，只留参数
@@ -272,6 +276,8 @@ export default {
 			this.media = null
 			this.timeline = []
 			this.craft = null
+			// 换任务进来时先把上一个任务的报道清掉，避免串台
+			this.news = []
 			this.isFav = fav.has(id)
 			this.isReminded = this._hasReminded(id)
 			// 换一个任务进来时描述回到折叠态
@@ -296,6 +302,11 @@ export default {
 
 			// 时间线不阻塞首屏：内容先画出来，抓到的时间线到了再补一块
 			this.loadTimeline(id)
+
+			// 提到过这次发射的报道：同样不阻塞首屏。news.json 有 40KB，
+			// 而大多数发射根本没有报道，拉回来是空的就整块不显示。
+			// 看图器态（photo）下正文被整屏盖住，用户看不到这块，别白拉
+			if (!this.photoOn) this.loadNews(id, seq)
 
 			// 首图上的「图片库」入口数字：聚合同系列媒体，和媒体页同一口径。
 			// 不阻塞首屏，算完前入口只是不显示
@@ -327,6 +338,29 @@ export default {
 				this.timeline = []
 				this.craft = null
 			}
+		},
+
+		/**
+		 * 提到过这次发射的报道。
+		 *
+		 * 资讯的关联是单向的（文章 → launch id），这里靠 data.js 反查。
+		 * 与时间线同理：不阻塞首屏，回来晚一步也没关系；
+		 * 出错就当作没有报道，整块不显示 —— 详情页不能因为资讯挂了而缺内容。
+		 */
+		async loadNews(id, seq) {
+			try {
+				const list = await spaceData.newsForLaunch(id)
+				if (this._seq !== seq) return
+				this.news = list
+			} catch (e) {
+				this.news = []
+			}
+		},
+
+		// 点报道 → 资讯页并直接展开那一条（news 页的 onLoad 支持 ?id=）
+		openNews(a) {
+			if (!a || a.id == null) return
+			uni.navigateTo({ url: '/pages/news/news?id=' + a.id })
 		},
 
 		/** 分享路径里的 net 参数：知道大致时间才能在归档里直达目标分片 */

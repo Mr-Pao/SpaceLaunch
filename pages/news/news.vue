@@ -64,11 +64,14 @@
 				<text class="d-sum" v-if="detail.summaryZh">{{ detail.summaryZh }}</text>
 				<text class="d-sum d-en" v-else-if="detail.summary">{{ detail.summary }}</text>
 
+				<!-- 主次按「这页最想让你干什么」定：能跳发射时，跳转才是主线
+				     （资讯一半的价值在那 28 条能回连发射详情），复制链接退居次要；
+				     没有关联发射时复制就是唯一动作，于是把主色还给它 -->
 				<view class="d-acts">
-					<view class="act primary" @click="copyUrl">
+					<view class="act" :class="{ primary: launchLink !== 'ok' }" @click="copyUrl">
 						<text class="act-text">复制原文链接</text>
 					</view>
-					<view v-if="launchLink === 'ok'" class="act" @click="goLaunch">
+					<view v-if="launchLink === 'ok'" class="act primary" @click="goLaunch">
 						<text class="act-text">查看相关发射</text>
 					</view>
 				</view>

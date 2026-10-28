@@ -622,6 +622,33 @@ export function peekLaunchById(id) {
 	return null
 }
 
+/**
+ * 反查：这次发射被哪些报道提到过。
+ *
+ * 资讯的关联是单向的（文章 → launch id），发射详情页要反过来用，
+ * 只能在 news.json 里筛一遍。两三百条的线性扫比另做一份索引文件划算：
+ * 索引要新数据集 + CI 产物 + 版本对齐，而这里只是一个内存内 filter。
+ *
+ * 网络开销：news.json 40KB、TTL 一小时。首页的资讯块通常已经拉过了，
+ * 进详情页时多半直接命中缓存。拿不到就返回空数组，页面上整块不显示。
+ */
+export async function newsForLaunch(id) {
+	if (id === undefined || id === null || id === '') return []
+	const target = String(id)
+
+	let d = null
+	try {
+		d = await load('news')
+	} catch (e) {
+		return []
+	}
+
+	const list = (d && d.list) || []
+	return list.filter(
+		(a) => Array.isArray(a.launches) && a.launches.some((x) => String(x) === target)
+	)
+}
+
 /** 下拉刷新：绕过缓存重新拉 */
 export function refresh(name) {	return load(name, { force: true })
 }
@@ -683,6 +710,7 @@ export default {
 	getAgencyById,
 	findLaunchById,
 	peekLaunchById,
+	newsForLaunch,
 	refresh,
 	freshnessText,
 	clear,
