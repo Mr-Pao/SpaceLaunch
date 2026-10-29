@@ -510,9 +510,20 @@ export default {
 		const [g, a, u, o, ap, ep] = await Promise.all([
 			spaceData.load('gallery', { force: !!force }).catch(() => null),
 			spaceData.load('astronauts').catch(() => null),
-			// 待发射列表本身有 15 分钟缓存，下拉时才强制刷
-			spaceData.load('upcoming', { force: !!force }).catch(() => null),
-			spaceData.load('onthisday', { force: !!force }).catch(() => null),
+			// 待发射列表本身有 15 分钟缓存，下拉时才强制刷。
+			// 接 onUpdate：停在今日页时后台刷到新排期也能自动顶上，不用退出去再进
+			spaceData.load('upcoming', {
+				force: !!force,
+				onUpdate: (fresh) => {
+					this.upcoming = (fresh && fresh.list) || []
+				}
+			}).catch(() => null),
+			spaceData.load('onthisday', {
+				force: !!force,
+				onUpdate: (fresh) => {
+					this.onthisday = (fresh && fresh.list) || []
+				}
+			}).catch(() => null),
 			// 接 onUpdate：命中旧缓存时先返回缓存、后台再刷；不接就永远停在旧结果
 			spaceData.load('apod', { onUpdate: (fresh) => this.applyApod(fresh) }).catch(() => null),
 			// 同样接 onUpdate：EPIC 从 4 张扩到 13 张后，不接就还停在旧缓存上

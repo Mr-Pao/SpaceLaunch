@@ -141,15 +141,25 @@ export default {
 		 */
 		async load(force) {
 			try {
-				const d = await spaceData.load('news', { force: !!force })
-				this.items = (d && d.list) || []
-				this.shown = Math.min(this.limit, this.items.length)
+				// 接 onUpdate：首页这一块常驻，命中缓存先渲染、后台刷到新的再替换
+				const d = await spaceData.load('news', {
+					force: !!force,
+					onUpdate: (fresh) => this.applyNews(fresh)
+				})
+				this.applyNews(d)
 			} catch (e) {
 				console.warn('[news-section] 加载资讯失败', e)
 			} finally {
 				// 失败也要收骨架屏，否则它会一直呼吸、像是永远在加载
 				this.loading = false
 			}
+		},
+
+		applyNews(d) {
+			this.items = (d && d.list) || []
+			// 保留用户已经展开的条数：后台刷新回来别把「展开更多」收回去
+			const want = Math.max(this.shown || 0, this.limit)
+			this.shown = Math.min(want, this.items.length)
 		},
 
 		// 由宿主页的 onReachBottom 调用（组件自己拿不到页面滚动事件）

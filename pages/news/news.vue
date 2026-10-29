@@ -164,14 +164,23 @@ export default {
 
 		async getData(force) {
 			try {
-				const d = await spaceData.load('news', { force: !!force })
-				this.items = (d && d.list) || []
-				this.total = (d && d.count) || this.items.length
-				this.freshAt = (d && d.generatedAt) || ''
+				// 接 onUpdate：资讯每 3 小时一轮，命中缓存先渲染、后台刷到新的再替换，
+				// 不然停在页面上永远看不到新一批
+				const d = await spaceData.load('news', {
+					force: !!force,
+					onUpdate: (fresh) => this.applyNews(fresh)
+				})
+				this.applyNews(d)
 			} catch (e) {
 				console.warn('[news] 加载失败', e)
 			}
 			this.loading = false
+		},
+
+		applyNews(d) {
+			this.items = (d && d.list) || []
+			this.total = (d && d.count) || this.items.length
+			this.freshAt = (d && d.generatedAt) || ''
 		},
 
 		setTab(v) {
