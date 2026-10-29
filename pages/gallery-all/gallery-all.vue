@@ -452,10 +452,16 @@ export default {
 			this.apodLoading = true
 			try {
 				const d = await spaceData.load('apod').catch(() => null)
-				const list = (d && d.list) || []
-				this.apodList = list
-					.filter((x) => x && x.full)
-					.map((x) => ({ thumb: x.thumb || x.full, full: x.full, title: x.title || '' }))
+				const seen = new Set()
+				const out = []
+				for (const x of (d && d.list) || []) {
+					if (!x || !x.full) continue
+					// 兜底去重：NASA 接口降级时可能写出多张相同图，避免前端再出现「连排重复」
+					if (seen.has(x.full)) continue
+					seen.add(x.full)
+					out.push({ thumb: x.thumb || x.full, full: x.full, title: x.title || '' })
+				}
+				this.apodList = out
 				this.apodLoaded = true
 			} catch (e) {
 				console.warn('[gallery-all] APOD 加载失败', e)

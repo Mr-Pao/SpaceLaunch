@@ -70,25 +70,43 @@ async function fetchJson(url, retries = 2) {
 
 async function runApod() {
 	const items = []
+	// 按图片 URL 去重：NASA 接口偶发降级时会对所有日期返回同一条占位响应，
+	// 不在此去重就会写出 N 张一模一样的图
+	const seen = new Set()
 	for (let i = 0; i < APOD_DAYS; i++) {
 		const date = ymd(Date.now() - i * 86400000)
 		try {
 			const a = await fetchJson(
 				`https://api.nasa.gov/planetary/apod?api_key=${APOD_KEY}&date=${date}`
 			)
-			if (a && a.media_type === 'image' && a.url) {
-				items.push({
-					date: a.date || date,
-					title: a.title || '',
-					explanation: a.explanation || '',
-					thumb: a.url,
-					full: a.hdurl || a.url,
-					credit: a.copyright || ''
-				})
-				console.log(`  ✓ APOD ${date}: ${a.title}`)
-			} else {
-				console.log(`  · APOD ${date}: 非图片（${a && a.media_type}），跳过`)
+			const url = (a && a.url) || ''
+			// 真实性校验：必须 image 类型、且 url 指向真实图片。
+			// 降级占位响应的 url 落在 science.nasa.gov 的 WP 主题资源目录
+			// （/wp-content/themes/.../assets/），并非天文图，必须丢弃
+			const bad =
+				!a ||
+				a.media_type !== 'image' ||
+				!url ||
+				/\/wp-content\/themes\//.test(url) ||
+				!/^https?:\/\//i.test(url)
+			if (bad) {
+				console.log(`  · APOD ${date}: 非图片/占位响应，跳过`)
+				continue
 			}
+			if (seen.has(url)) {
+				console.log(`  · APOD ${date}: 与已有条目重复，跳过`)
+				continue
+			}
+			seen.add(url)
+			items.push({
+				date: a.date || date,
+				title: a.title || '',
+				explanation: a.explanation || '',
+				thumb: a.url,
+				full: a.hdurl || a.url,
+				credit: a.copyright || ''
+			})
+			console.log(`  ✓ APOD ${date}: ${a.title}`)
 		} catch (e) {
 			console.warn(`  ! APOD ${date} 抓取失败: ${e.message}`)
 		}
