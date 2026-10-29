@@ -27,13 +27,16 @@
 
 const fs = require('fs')
 const path = require('path')
-const { upload, hasCosConfig } = require('./lib/cos')
+const { upload, hasCosConfig, readCosJson } = require('./lib/cos')
 const { mirrorImages } = require('./lib/image')
 const { loadCache, translateTexts, getZh, saveCache } = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
-const APOD_DAYS = Number(process.env.APOD_DAYS || 7)
-const EPIC_KEEP = Number(process.env.EPIC_KEEP || 4)
+const APOD_DAYS = Number(process.env.APOD_DAYS || 100)
+// 历史保留上限：每天 +1，不设上限 JSON 会无限膨胀
+const APOD_MAX = Number(process.env.APOD_MAX || 400)
+// EPIC 一天一组约 13 张（DSCOVR 一次完整自转扫描），全取
+const EPIC_KEEP = Number(process.env.EPIC_KEEP || 13)
 
 const APOD_FILE = 'apod.json'
 const EPIC_FILE = 'epic.json'
@@ -81,13 +84,17 @@ async function fetchJson(url, retries = 2) {
 	throw lastErr
 }
 
-async function runApod() {
+async function runApod(haveDates) {
 	const items = []
 	// 按图片 URL 去重：NASA 接口偶发降级时会对所有日期返回同一条占位响应，
 	// 不在此去重就会写出 N 张一模一样的图
 	const seen = new Set()
+	const have = haveDates || new Set()
 	for (let i = 0; i < APOD_DAYS; i++) {
 		const date = ymd(Date.now() - i * 86400000)
+		// 历史里已有这天就跳过：增量运行只补最新的那几天，
+		// 首轮 APOD_DAYS=100 会把过去三个月一次抓齐
+		if (have.has(date)) continue
 		try {
 			const a = await fetchJson(
 				`https://science.nasa.gov/wp-json/wp/v2/apod-basic/${apodCode(date)}`
@@ -168,16 +175,27 @@ async function main() {
 	}
 	fs.mkdirSync(OUT_DIR, { recursive: true })
 
-	const apodItems = await runApod()
+	// 先读 COS 上已有的 apod.json 当历史底座：每轮只补缺失日期，不重抓、不丢旧图
+	let existing = []
+	try {
+		const old = await readCosJson(APOD_KEY_COS)
+		existing = (old && old.list) || []
+		if (existing.length) console.log(`  · 历史 APOD ${existing.length} 条（${existing[existing.length - 1].date} ~ ${existing[0].date}）`)
+	} catch (e) {
+		console.warn(`  ! 读取历史 APOD 失败，本轮按全新处理: ${e.message}`)
+	}
+
+	const haveDates = new Set(existing.map((x) => x.date).filter(Boolean))
+	const apodFresh = await runApod(haveDates)
 	const epicItems = await runEpic()
 
 	// 翻译标题与说明：卡片和详情页都要求中文，翻不出来就在前端回退英文。
 	// 沿用 sync.js 那套哈希缓存，CI 每轮只增量翻新内容，不会撞免费额度
-	if (apodItems.length || epicItems.length) {
+	if (apodFresh.length || epicItems.length) {
 		try {
 			await loadCache()
 			const texts = []
-			for (const x of apodItems) {
+			for (const x of apodFresh) {
 				if (x.title) texts.push(x.title)
 				if (x.explanation) texts.push(x.explanation)
 			}
@@ -185,7 +203,7 @@ async function main() {
 				if (x.caption) texts.push(x.caption)
 			}
 			if (texts.length) await translateTexts(texts)
-			for (const x of apodItems) {
+			for (const x of apodFresh) {
 				x.titleZh = getZh(x.title)
 				x.explanationZh = getZh(x.explanation)
 			}
@@ -200,9 +218,10 @@ async function main() {
 	}
 
 	// 图片镜像 COS：缩略图（480px）+ 原图（全尺寸）。无 COS 配置时跳过，保留原 URL
+	// 只镜像本轮新抓的条目，历史条目上一轮已经镜像过
 	if (hasCosConfig()) {
-		if (apodItems.length) {
-			await mirrorImages(apodItems, [
+		if (apodFresh.length) {
+			await mirrorImages(apodFresh, [
 				{ path: 'thumb', preset: 'thumb' },
 				{ path: 'full', preset: 'full' }
 			])
@@ -214,6 +233,15 @@ async function main() {
 			])
 		}
 	}
+
+	// 合并历史 + 新增：同日期以新数据为准，按日期倒序，超出上限的旧图丢弃
+	const apodMap = new Map()
+	for (const x of existing) if (x && x.date) apodMap.set(x.date, x)
+	for (const x of apodFresh) if (x && x.date) apodMap.set(x.date, x)
+	const apodItems = [...apodMap.values()]
+		.sort((a, b) => String(b.date).localeCompare(String(a.date)))
+		.slice(0, APOD_MAX)
+	console.log(`  · APOD 合并后 ${apodItems.length} 条（本轮新增 ${apodFresh.length}，上限 ${APOD_MAX}）`)
 
 	const at = new Date().toISOString()
 	const apodPayload = {

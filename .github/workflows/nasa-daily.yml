@@ -35,7 +35,8 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     # 7 天 APOD × 每条约 1 秒 + 镜像，15 分钟绰绰有余
-    timeout-minutes: 15
+    # 首轮要补 100 天 APOD（约 100 次抓取 + 镜像），之后每天只增量 1~2 张
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4

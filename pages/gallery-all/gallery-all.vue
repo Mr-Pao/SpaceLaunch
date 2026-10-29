@@ -239,7 +239,7 @@ export default {
 			tabs: [
 				{ key: 'image', name: '发射图片' },
 				{ key: 'video', name: '发射视频' },
-				{ key: 'earth', name: '地球' },
+				{ key: 'earth', name: '今日地球' },
 				{ key: 'astro', name: '天文' },
 				{ key: 'nasa', name: '星云' }
 			],
