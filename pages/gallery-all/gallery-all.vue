@@ -95,10 +95,9 @@
 							class="cell"
 							v-for="(c, i) in col"
 							:key="ci + '-' + i"
-							:style="{ height: c.h + 'rpx' }"
 							@click="openPhotoDetail(c.it, '每日地球')"
 						>
-							<image class="cell-img" :src="c.it.thumb" mode="aspectFill" lazy-load></image>
+							<image class="cell-img cell-img-auto" :src="c.it.thumb" mode="widthFix" lazy-load></image>
 						</view>
 					</view>
 				</view>
@@ -124,10 +123,9 @@
 							class="cell"
 							v-for="(c, i) in col"
 							:key="ci + '-' + i"
-							:style="{ height: c.h + 'rpx' }"
 							@click="openPhotoDetail(c.it, '每日天文')"
 						>
-							<image class="cell-img" :src="c.it.thumb" mode="aspectFill" lazy-load></image>
+							<image class="cell-img cell-img-auto" :src="c.it.thumb" mode="widthFix" lazy-load></image>
 						</view>
 					</view>
 				</view>
@@ -155,10 +153,9 @@
 							class="cell"
 							v-for="(c, i) in col"
 							:key="ci + '-' + i"
-							:style="{ height: c.h + 'rpx' }"
 							@click="openPhotoDetail(c.it, '星云')"
 						>
-							<image class="cell-img" :src="c.it.thumb" mode="aspectFill" lazy-load></image>
+							<image class="cell-img cell-img-auto" :src="c.it.thumb" mode="widthFix" lazy-load></image>
 						</view>
 					</view>
 				</view>
@@ -698,6 +695,12 @@ export default {
 	display: block;
 	width: 100%;
 	height: 100%;
+}
+
+/* 地球/天文/星云：按缩略图原始比例展示（widthFix），不裁切、不放大。
+   height 必须 auto，否则父类的 100% 会盖掉 widthFix 算出的高度 */
+.cell-img-auto {
+	height: auto;
 }
 
 /* ---- 底部状态（图片标签） ---- */
