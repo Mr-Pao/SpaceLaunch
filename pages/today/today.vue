@@ -550,14 +550,23 @@ export default {
 		 * 每日一图只有一张，相册上下文就是单元素 —— 左右滑自然滑不动，
 		 * 底部「查看发射详情」直接跳到这次发射的详情。
 		 */
-		openPhoto(item) {
-			if (!item) return
-
-			setAlbum([item], 0, 'today')
+		/**
+		 * 每日一图 → 发射详情的图片优先态。
+		 *
+		 * thumb 必须带上：相册上下文是详情页唯一的图片来源，
+		 * 只传 id/net 的话 album 项没有图，图片态就是一片黑底
+		 */
+		openPhoto(card) {
+			if (!card || !card.id) return
+			setAlbum(
+				[{ id: card.id, net: card.net, thumb: card.thumb || card.full || '' }],
+				0,
+				'today'
+			)
 			uni.navigateTo({
 				url:
-					'/pages/launch/launchInfo?id=' + item.id + '&photo=1' +
-					(item.net ? '&net=' + encodeURIComponent(item.net) : '')
+					'/pages/launch/launchInfo?id=' + card.id + '&photo=1' +
+					(card.net ? '&net=' + encodeURIComponent(card.net) : '')
 			})
 		},
 
@@ -567,7 +576,7 @@ export default {
 		openCard(c) {
 			if (!c) return
 			if (c.type === 'sl') {
-				this.openPhoto({ id: c.launchId, net: c.net })
+				this.openPhoto({ id: c.launchId, net: c.net, thumb: c.full || c.src })
 				return
 			}
 			this.goPhotoDetail(c.type)
@@ -591,7 +600,7 @@ export default {
 		viewDetail(c) {
 			if (!c) return
 			if (c.type === 'sl') {
-				this.openPhoto({ id: c.launchId, net: c.net })
+				this.openPhoto({ id: c.launchId, net: c.net, thumb: c.full || c.src })
 			} else {
 				// 天文/地球：进图片详情页看原图与介绍
 				this.goPhotoDetail(c.type)
