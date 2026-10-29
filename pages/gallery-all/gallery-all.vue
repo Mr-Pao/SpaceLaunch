@@ -89,18 +89,16 @@
 			</view>
 
 			<block v-else>
-				<view class="grid" v-if="epicList.length">
-					<view class="gcol" v-for="(col, ci) in epicCols" :key="ci">
+				<view class="wall" v-if="epicList.length">
+					<view class="col" v-for="(col, ci) in earthCols" :key="ci">
 						<view
-							class="card"
-							v-for="(it, i) in col"
+							class="cell"
+							v-for="(c, i) in col"
 							:key="ci + '-' + i"
-							@click="previewList(epicList, it.full)"
+							:style="{ height: c.h + 'rpx' }"
+							@click="openPhotoDetail(c.it, '每日地球')"
 						>
-							<image class="thumb" :src="it.thumb" mode="aspectFill" lazy-load></image>
-							<view class="cap" v-if="it.title">
-								<text class="cap-title">{{ it.title }}</text>
-							</view>
+							<image class="cell-img" :src="c.it.thumb" mode="aspectFill" lazy-load></image>
 						</view>
 					</view>
 				</view>
@@ -120,18 +118,16 @@
 			</view>
 
 			<block v-else>
-				<view class="grid" v-if="apodList.length">
-					<view class="gcol" v-for="(col, ci) in apodCols" :key="ci">
+				<view class="wall" v-if="apodList.length">
+					<view class="col" v-for="(col, ci) in astroCols" :key="ci">
 						<view
-							class="card"
-							v-for="(it, i) in col"
+							class="cell"
+							v-for="(c, i) in col"
 							:key="ci + '-' + i"
-							@click="previewList(apodList, it.full)"
+							:style="{ height: c.h + 'rpx' }"
+							@click="openPhotoDetail(c.it, '每日天文')"
 						>
-							<image class="thumb" :src="it.thumb" mode="aspectFill" lazy-load></image>
-							<view class="cap" v-if="it.title">
-								<text class="cap-title">{{ it.title }}</text>
-							</view>
+							<image class="cell-img" :src="c.it.thumb" mode="aspectFill" lazy-load></image>
 						</view>
 					</view>
 				</view>
@@ -153,18 +149,16 @@
 
 			<block v-else>
 				<!-- 只保留星云一个主题，二级筛选栏整块去掉（主标签已经叫星云） -->
-				<view class="grid" v-if="nasaList.length && nasaVisible.length">
-					<view class="gcol" v-for="(col, ci) in nasaCols" :key="ci">
+				<view class="wall" v-if="nasaVisible.length">
+					<view class="col" v-for="(col, ci) in nasaCols" :key="ci">
 						<view
-							class="card"
-							v-for="(it, i) in col"
+							class="cell"
+							v-for="(c, i) in col"
 							:key="ci + '-' + i"
-							@click="previewList(nasaFiltered, it.full)"
+							:style="{ height: c.h + 'rpx' }"
+							@click="openPhotoDetail(c.it, '星云')"
 						>
-							<image class="thumb" :src="it.thumb" mode="aspectFill" lazy-load></image>
-							<view class="cap" v-if="it.title">
-								<text class="cap-title">{{ it.title }}</text>
-							</view>
+							<image class="cell-img" :src="c.it.thumb" mode="aspectFill" lazy-load></image>
 						</view>
 					</view>
 				</view>
@@ -304,13 +298,13 @@ export default {
 		},
 
 		// ---- 地球标签：两列均分 ----
-		epicCols() {
-			return this.split2(this.epicList)
+		earthCols() {
+			return this.waterfall(this.epicList)
 		},
 
 		// ---- 天文标签：两列均分 ----
-		apodCols() {
-			return this.split2(this.apodList)
+		astroCols() {
+			return this.waterfall(this.apodList)
 		},
 
 		// ---- NASA 标签：只展示星云 ----
@@ -326,7 +320,7 @@ export default {
 		},
 
 		nasaCols() {
-			return this.split2(this.nasaVisible)
+			return this.waterfall(this.nasaVisible)
 		},
 
 		nasaHasMore() {
@@ -368,7 +362,49 @@ export default {
 	},
 
 	methods: {
-		// 两列均分（视频 / 地球 / 天文 / NASA 共用）
+		/**
+		 * 瀑布流两列：按已累计高度择优落列，高度由 id 哈希决定（同图恒定）。
+		 * 地球 / 天文 / 星云共用，和图片 tab 的排列观感保持一致。
+		 */
+		waterfall(list) {
+			const L = []
+			const R = []
+			let hl = 0
+			let hr = 0
+			for (let gi = 0; gi < (list || []).length; gi++) {
+				const it = list[gi]
+				const h = heightOf(it.id || it.full || String(gi))
+				const cell = { it, h, gi }
+				if (hl <= hr) {
+					L.push(cell)
+					hl += h
+				} else {
+					R.push(cell)
+					hr += h
+				}
+			}
+			return [L, R]
+		},
+
+		/** 点图进图片详情页：数据经 Storage 传递，避免上千字介绍塞进 URL */
+		openPhotoDetail(it, tag) {
+			if (!it) return
+			try {
+				uni.setStorageSync('_photo_detail', {
+					full: it.full || it.thumb || '',
+					title: it.title || '',
+					date: it.date || '',
+					intro: it.intro || '',
+					credit: it.credit || '',
+					tag
+				})
+			} catch (e) {
+				console.warn('[gallery-all] 详情数据暂存失败', e)
+			}
+			uni.navigateTo({ url: '/pages/photo-detail/photo-detail?from=gallery' })
+		},
+
+		// 两列均分（视频仍用等分网格）
 		split2(list) {
 			const L = []
 			const R = []
@@ -452,7 +488,14 @@ export default {
 				const list = (d && d.list) || []
 				this.epicList = list
 					.filter((x) => x && x.full)
-					.map((x) => ({ thumb: x.thumb || x.full, full: x.full, title: x.caption || '' }))
+					.map((x) => ({
+						thumb: x.thumb || x.full,
+						full: x.full,
+						title: '地球 · DSCOVR',
+						date: (x.date || '').slice(0, 10),
+						intro: x.captionZh || x.caption || '',
+						credit: 'NASA EPIC'
+					}))
 				this.epicLoaded = true
 			} catch (e) {
 				console.warn('[gallery-all] EPIC 加载失败', e)
@@ -475,7 +518,14 @@ export default {
 				// 兜底去重：降级可能写出多张相同图，避免「连排重复」
 				if (seen.has(x.full)) continue
 				seen.add(x.full)
-				out.push({ thumb: x.thumb || x.full, full: x.full, title: x.title || '' })
+				out.push({
+					thumb: x.thumb || x.full,
+					full: x.full,
+					title: x.titleZh || x.title || '',
+					date: (x.date || '').slice(0, 10),
+					intro: x.explanationZh || x.explanation || '',
+					credit: x.credit || ''
+				})
 			}
 			return out
 		},
@@ -531,7 +581,10 @@ export default {
 					themeName: x.themeName || '',
 					title: x.title || '',
 					thumb: x.thumb || '',
-					full: x.full || x.thumb || ''
+					full: x.full || x.thumb || '',
+					date: (x.date || '').slice(0, 10),
+					intro: x.desc || '',
+					credit: x.center || ''
 				}))
 				this.nasaShow = 60
 				this.nasaLoaded = true
@@ -541,15 +594,6 @@ export default {
 			} finally {
 				this.nasaLoading = false
 			}
-		},
-
-		// 统一的大图预览：传入当前标签的完整列表与点击项
-		previewList(list, current) {
-			if (!list || !list.length || !current) return
-			uni.previewImage({
-				urls: list.map((x) => x.full || x.thumb),
-				current
-			})
 		},
 
 		// ---- 图片标签：分片加载 ----
@@ -801,20 +845,6 @@ export default {
 	width: 100%;
 	height: 240rpx;
 	background: #0d1420;
-}
-
-.cap {
-	padding: 12rpx 14rpx 14rpx;
-}
-
-.cap-title {
-	display: -webkit-box;
-	-webkit-box-orient: vertical;
-	-webkit-line-clamp: 2;
-	overflow: hidden;
-	color: #e2e8f0;
-	font-size: 23rpx;
-	line-height: 32rpx;
 }
 
 /* ---- 内联播放遮罩（复制自 video-gallery.vue） ---- */

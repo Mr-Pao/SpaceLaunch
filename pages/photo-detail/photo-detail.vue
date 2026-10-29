@@ -42,6 +42,23 @@ export default {
 	},
 
 	onLoad(options) {
+		// 图库点图进来：数据在 Storage 里（可能上千字，不能塞 URL）
+		if (options && options.from === 'gallery') {
+			const c = uni.getStorageSync('_photo_detail') || {}
+			try {
+				uni.removeStorageSync('_photo_detail')
+			} catch (e) {
+				// 清不掉无所谓，下次会被覆盖
+			}
+			this.navTitle = c.tag || '图片详情'
+			this.title = c.title || ''
+			this.intro = c.intro || ''
+			this.full = c.full || ''
+			const parts = [c.tag, c.date, c.credit ? '@' + String(c.credit).replace(/^@/, '') : '']
+			this.sub = parts.filter(Boolean).join(' · ')
+			return
+		}
+
 		const type = options && options.type === 'epic' ? 'epic' : 'apod'
 		this.type = type
 		this.navTitle = type === 'epic' ? '每日地球' : '每日天文'
