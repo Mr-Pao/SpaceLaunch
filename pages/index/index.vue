@@ -88,14 +88,14 @@
 			</template>
 
 			<template v-else>
-			<!-- 最近一次发射 + 倒计时。放在列表上方当视觉焦点（只对「待发射」有意义） -->
-			<view class="next-wrap" v-if="nextLaunch && visible.length">
-				<next-launch :item="nextLaunch" @select="goDetail" />
-			</view>
-
 			<view class="stat" v-if="list.length">
 				<text class="stat-main">{{ statMain }}</text>
 				<text class="stat-sub">{{ statSub }}</text>
+			</view>
+
+			<!-- 最近一次发射 + 倒计时。放在列表上方当视觉焦点（只对「待发射」有意义） -->
+			<view class="next-wrap" v-if="nextLaunch && visible.length">
+				<next-launch :item="nextLaunch" @select="goDetail" />
 			</view>
 
 			<!-- 已生效的筛选：给一行概览，点 × 一键清掉 -->
