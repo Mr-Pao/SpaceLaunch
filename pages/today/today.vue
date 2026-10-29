@@ -26,9 +26,9 @@
 					<view class="daily-card" @click="openCard(c)">
 						<image
 							v-if="!dailyErr[i]"
-							class="daily-img"
+							:class="['daily-img', c.type === 'epic' ? 'daily-img-earth' : '']"
 							:src="c.src"
-							mode="aspectFill"
+							:mode="c.type === 'epic' ? 'aspectFit' : 'aspectFill'"
 							@error="onDailyErr(i)"
 						></image>
 						<view class="daily-shade"></view>
@@ -691,6 +691,12 @@ export default {
 	width: 100%;
 	height: 100%;
 	display: block;
+}
+
+/* 每日地球：方形全彩地球铺满会被裁掉边缘、显得过大，
+   aspectFit 完整显示后左右留白，用深色兜住 */
+.daily-img-earth {
+	background: #0d1420;
 }
 
 /* 底部压黑：图上叠字，不压一层的话浅色天空背景上完全读不出来 */
