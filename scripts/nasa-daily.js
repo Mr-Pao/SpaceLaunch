@@ -32,9 +32,11 @@ const { mirrorImages } = require('./lib/image')
 const { loadCache, translateTexts, getZh, saveCache } = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
+// 首轮抓最近 100 天，之后每天补 1 条累积；更早的历史不要
 const APOD_DAYS = Number(process.env.APOD_DAYS || 100)
-// 历史保留上限：每天 +1，不设上限 JSON 会无限膨胀
-const APOD_MAX = Number(process.env.APOD_MAX || 400)
+// 累积上限只作防膨胀保护（防 JSON 无限增长），1000 条约 2.7 年，
+// 正常使用不会触发；真要更长历史把它调大即可
+const APOD_MAX = Number(process.env.APOD_MAX || 1000)
 // EPIC 一天一组约 13 张（DSCOVR 一次完整自转扫描），全取
 const EPIC_KEEP = Number(process.env.EPIC_KEEP || 13)
 
