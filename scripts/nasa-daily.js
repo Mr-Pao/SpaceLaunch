@@ -9,8 +9,8 @@
  * APOD：
  *   用 date 参数遍历最近 N 天（默认 7），每天一张当天的天文图。
  *   不用 count 模式（它返回的是随机历史日期，不是「近期」）。
- *   只保留 media_type=image 的（APOD 偶尔是 YouTube 视频，小程序播不了）。
- *   图片 url 镜像到 COS（apod.nasa.gov 没备案，真机直连白名单过不了）。
+ *   只保留 media_type=image 的（APOD 偶尔是视频，小程序播不了）。
+ *   使用 NASA APOD Basic JSON，不需要 API key；图片 url 镜像到 COS。
  *
  * EPIC：
  *   DSCOVR 卫星拍的地球，每天一组（约 13 张不同角度）。取最新一天的前几张，
@@ -22,8 +22,7 @@
  *   epic.json  { list:[{date,caption,thumb,full}] }
  * 前端首页「每日一览」把这两份和现有「每日一图」混排成轮播。
  *
- * 注意：必须带 ?api_key。DEMO_KEY 可用但有限流（每小时 30 次），
- * CI 里优先用 secret NASA_API_KEY。EPIC 不需要 key。
+ * 注意：APOD Basic JSON 是 NASA Science 的公开 WordPress 接口，无需 API key。
  */
 
 const fs = require('fs')
@@ -32,7 +31,6 @@ const { upload, hasCosConfig } = require('./lib/cos')
 const { mirrorImages } = require('./lib/image')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
-const APOD_KEY = process.env.NASA_API_KEY || 'DEMO_KEY'
 const APOD_DAYS = Number(process.env.APOD_DAYS || 7)
 const EPIC_KEEP = Number(process.env.EPIC_KEEP || 4)
 
@@ -46,6 +44,20 @@ const DATA_VERSION = 14
 
 function ymd(ms) {
 	return new Date(ms).toISOString().slice(0, 10)
+}
+
+function apodCode(date) {
+	return date.slice(2).replace(/-/g, '')
+}
+
+function stripHtml(value) {
+	return String(value || '')
+		.replace(/<br\s*\/?>/gi, '\n')
+		.replace(/<[^>]*>/g, '')
+		.replace(/&nbsp;/gi, ' ')
+		.replace(/&amp;/gi, '&')
+		.replace(/&quot;/gi, '"')
+		.trim()
 }
 
 async function fetchJson(url, retries = 2) {
@@ -77,17 +89,14 @@ async function runApod() {
 		const date = ymd(Date.now() - i * 86400000)
 		try {
 			const a = await fetchJson(
-				`https://api.nasa.gov/planetary/apod?api_key=${APOD_KEY}&date=${date}`
+				`https://science.nasa.gov/wp-json/wp/v2/apod-basic/${apodCode(date)}`
 			)
-			const url = (a && a.url) || ''
+			const url = (a && a.hdurl) || ''
 			// 真实性校验：必须 image 类型、且 url 指向真实图片。
-			// 降级占位响应的 url 落在 science.nasa.gov 的 WP 主题资源目录
-			// （/wp-content/themes/.../assets/），并非天文图，必须丢弃
 			const bad =
 				!a ||
 				a.media_type !== 'image' ||
 				!url ||
-				/\/wp-content\/themes\//.test(url) ||
 				!/^https?:\/\//i.test(url)
 			if (bad) {
 				console.log(`  · APOD ${date}: 非图片/占位响应，跳过`)
@@ -101,10 +110,10 @@ async function runApod() {
 			items.push({
 				date: a.date || date,
 				title: a.title || '',
-				explanation: a.explanation || '',
-				thumb: a.url,
-				full: a.hdurl || a.url,
-				credit: a.copyright || ''
+				explanation: stripHtml(a.explanation),
+				thumb: url,
+				full: url,
+				credit: stripHtml(a.credit || a.copyright || '')
 			})
 			console.log(`  ✓ APOD ${date}: ${a.title}`)
 		} catch (e) {

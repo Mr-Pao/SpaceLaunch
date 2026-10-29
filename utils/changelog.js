@@ -694,5 +694,15 @@ export const CHANGELOG = [
 			'gallery-all 天文 tab 与 today 首页「每日天文」卡均加占位哨兵过滤：丢弃 title="NASA Science" 或 url 落在 WP 主题资源目录的条目',
 			'缓存窗口内坏卡不再渲染，直接落到空态；NASA 恢复后真实天文图自动回填，无需再发版'
 		]
+	},
+	{
+		version: '3.2.30',
+		date: '2026-10-29',
+		title: 'APOD 切换官方 Basic JSON 接口',
+		items: [
+			'APOD 抓取从 api.nasa.gov/planetary/apod 迁移到 NASA Science APOD Basic JSON，无需 NASA_API_KEY 或 DEMO_KEY',
+			'按 YYMMDD 请求单日数据，读取 title、media_type、explanation、hdurl、credit 等字段，保留图片去重与 COS 镜像',
+			'恢复每日天文数据：2026-10-29《The Horns of Venus》及此前有效静态图已通过真实接口抽样验证；10-28 视频按规则跳过'
+		]
 	}
 ]

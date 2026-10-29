@@ -57,6 +57,4 @@ jobs:
           COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
           # 桶本身是私有读，靠单个对象打 public-read 让小程序能拉到
           COS_ACL: public-read
-          # NASA API key：DEMO_KEY 有限流，配了 NASA_API_KEY 就优先用它
-          NASA_API_KEY: ${{ secrets.NASA_API_KEY || 'DEMO_KEY' }}
         run: node nasa-daily.js
