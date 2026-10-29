@@ -120,10 +120,49 @@
 			     以前挂在「我的 → 探索」网格末位，那儿是管理收藏和提醒的地方，
 			     没人会去刷新闻。这里和「近期活动」对调：活动是要照做的日程，
 			     更适合当资料放探索；资讯放首页底部负责「有更新」的提示 -->
+			<!-- 此刻在天上：放在资讯上方，先看人再看外面怎么说 -->
+			<view class="inspace" v-if="inSpace.length">
+				<view class="sec-head">
+					<text class="sec-title">此刻在天上</text>
+					<text class="sec-sub">{{ inSpace.length }} 人</text>
+				</view>
+
+				<view class="inspace-wrap">
+					<scroll-view
+						class="inspace-scroll"
+						scroll-x
+						:scroll-left="astroLeft"
+						scroll-with-animation
+						@scroll="onAstroScroll"
+					>
+						<view class="inspace-row">
+							<view
+								class="acard"
+								v-for="a in inSpace"
+								:key="a.id"
+								hover-class="acard-hover"
+								@click="goAstronaut(a.id)"
+							>
+								<image v-if="a.img" class="acard-img" :src="a.img" mode="aspectFill" lazy-load></image>
+								<view v-else class="acard-img acard-ph"><text>🧑‍🚀</text></view>
+								<text class="acard-name">{{ astroName(a) }}</text>
+								<text class="acard-days">在轨 {{ a.days }} 天</text>
+							</view>
+						</view>
+					</scroll-view>
+
+					<!-- 右边还有内容，但横滑列表不给任何暗示，一屏外的卡片等于不存在。
+					     一块渐隐 + 一个半透明箭头，既有提示也能点着让它自己滑一段 -->
+					<view class="inspace-fade" v-if="!astroMoved">
+						<view class="inspace-nudge" hover-class="inspace-nudge-hover" @click="slideAstro">›</view>
+					</view>
+				</view>
+			</view>
+
 			<news-section ref="news" :limit="3" />
 
 			<!-- 五块都没数据（冷启动 + 全挂了）：给一句人话，别留空白页 -->
-			<view class="empty" v-if="!daily && !next && !otd.length">
+			<view class="empty" v-if="!daily && !inSpace.length && !next && !otd.length">
 				<text class="empty-icon">🛰️</text>
 				<text class="empty-text">{{ loading ? '正在拉取今日数据...' : '今天的数据还没准备好' }}</text>
 				<view class="btn" v-if="!loading" @click="reload">重新加载</view>
@@ -178,7 +217,7 @@
 import spaceData from '@/utils/data.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 // 导入改名：模板只能访问实例上的东西，想直接调就得在 methods 里挂一层
-import { formatDateTime, rocketName } from '@/utils/format.js'
+import { formatDateTime, rocketName, astroName as astroNameOf } from '@/utils/format.js'
 import { fullImageOf } from '@/utils/media.js'
 import { pickDaily } from '@/utils/daily.js'
 import { setAlbum } from '@/utils/album.js'
@@ -214,6 +253,7 @@ export default {
 			fullReady: false,
 			today: '',
 			gallery: [],
+			astronauts: [],
 			upcoming: [],
 			onthisday: [],
 			// NASA 每日天文 / 每日地球（首页「每日一览」轮播数据源）
@@ -227,6 +267,10 @@ export default {
 			otdOpen: false,
 			// 模板要读这个常量，挂到 data 上（options API 的模板访问不到模块作用域）
 			OTD_FOLD,
+			// 此刻在天上的横滑位置：点右侧箭头时累加，让列表自己滑一段
+			astroLeft: 0,
+			// 滑过之后提示就没意义了，收掉
+			astroMoved: false,
 			// 倒计时组件的 net 需要「未来」的那条，用时钟兜住页面长时间不动的场景
 			nowTick: Date.now()
 		}
@@ -327,6 +371,12 @@ export default {
 				})
 			}
 			return cards
+		},
+
+		inSpace() {
+			return this.astronauts
+				.filter((a) => a && a.inSpace)
+				.sort((a, b) => (b.days || 0) - (a.days || 0))
 		},
 
 		next() {
@@ -430,6 +480,26 @@ export default {
 	},
 
 	methods: {
+		/** 模板里用 astroName(a)：中国籍显示中文名 */
+		astroName(a) {
+			return astroNameOf(a)
+		},
+
+		/** 横滑列表滑过之后，右侧的「还有内容」提示就该消失 */
+		onAstroScroll(e) {
+			if (!this.astroMoved && (e.detail.scrollLeft || 0) > 8) this.astroMoved = true
+		},
+
+		/** 点提示箭头：卡片宽 168rpx + 间距 16rpx，一次滑过两屏多一点 */
+		slideAstro() {
+			this.astroLeft += 550
+		},
+
+		goAstronaut(id) {
+			if (!id) return
+			uni.navigateTo({ url: '/pages/astronaut/astronaut?id=' + id })
+		},
+
 		/**
 		 * 后台把每日一图的原图拉下来。
 		 *
@@ -466,8 +536,9 @@ export default {
 		async loadAll(force) {
 			this.loading = true
 
-		const [g, u, o, ap, ep] = await Promise.all([
+		const [g, a, u, o, ap, ep] = await Promise.all([
 			spaceData.load('gallery', { force: !!force }).catch(() => null),
+			spaceData.load('astronauts').catch(() => null),
 			// 待发射列表本身有 15 分钟缓存，下拉时才强制刷
 			spaceData.load('upcoming', { force: !!force }).catch(() => null),
 			spaceData.load('onthisday', { force: !!force }).catch(() => null),
@@ -477,6 +548,7 @@ export default {
 		])
 
 		if (g) this.gallery = (g.list || []).filter((x) => x && x.thumb)
+		if (a) this.astronauts = a.list || []
 		if (u) this.upcoming = u.list || []
 		if (o) this.onthisday = o.list || []
 		// 过滤 NASA 接口降级占位响应（title="NASA Science" / WP 主题资源目录 url），避免脏数据上首页卡片
@@ -816,6 +888,115 @@ export default {
 /* 底部给轮播指示点留白，避免圆点和文字叠在一起 */
 .daily-body {
 	bottom: 46rpx;
+}
+
+/* ---- 此刻在天上（资讯上方） ---- */
+.inspace {
+	margin-bottom: 30rpx;
+}
+
+.inspace-wrap {
+	position: relative;
+}
+
+.inspace-scroll {
+	width: 100%;
+	white-space: nowrap;
+}
+
+.inspace-row {
+	display: flex;
+}
+
+/* 右边缘提示：渐隐层必须 pointer-events:none，否则会把横向滑动手势一起吃掉 */
+.inspace-fade {
+	position: absolute;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	width: 130rpx;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	padding-right: 4rpx;
+	box-sizing: border-box;
+	background: linear-gradient(to right, rgba(10, 14, 23, 0) 0%, rgba(10, 14, 23, 0.86) 58%, #0a0e17 100%);
+	pointer-events: none;
+}
+
+.inspace-nudge {
+	width: 56rpx;
+	height: 56rpx;
+	border-radius: 28rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	/* 卡片是「图 + 名字 + 在轨天数」三行，垂直居中会落在名字上，往上提一点 */
+	margin-bottom: 40rpx;
+	background: rgba(24, 32, 46, 0.76);
+	border: 1rpx solid rgba(255, 255, 255, 0.18);
+	color: rgba(255, 255, 255, 0.78);
+	font-size: 32rpx;
+	line-height: 1;
+	pointer-events: auto;
+}
+
+.inspace-nudge-hover {
+	background: rgba(56, 189, 248, 0.28);
+	border-color: rgba(56, 189, 248, 0.5);
+}
+
+.acard {
+	flex-shrink: 0;
+	width: 168rpx;
+	margin-right: 16rpx;
+	padding: 14rpx 14rpx 18rpx;
+	border-radius: 20rpx;
+	background: #141a26;
+	border: 1rpx solid rgba(255, 255, 255, 0.07);
+	box-sizing: border-box;
+}
+
+.acard-hover {
+	background: #1b2231;
+}
+
+.acard-img {
+	width: 140rpx;
+	height: 140rpx;
+	border-radius: 16rpx;
+	display: block;
+	background: #1b2231;
+}
+
+.acard-ph {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 40rpx;
+}
+
+.acard-name {
+	display: -webkit-box;
+	/* 外文长名一行放不下，截成「Pyotr Dub…」比折行更难看，所以给两行 */
+	height: 58rpx;
+	margin-top: 12rpx;
+	color: #ffffff;
+	font-size: 22rpx;
+	font-weight: 500;
+	line-height: 29rpx;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	white-space: normal;
+}
+
+.acard-days {
+	display: block;
+	margin-top: 4rpx;
+	color: #38bdf8;
+	font-size: 21rpx;
 }
 
 /* ---- 3 下次发射 ---- */

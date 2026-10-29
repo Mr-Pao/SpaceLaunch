@@ -43,29 +43,6 @@
 			</view>
 
 			<view class="content" v-else>
-			<!-- 此刻在天上：从今日页移到发射页顶部，保留横滑与详情入口 -->
-			<view class="inspace" v-if="inSpace.length">
-				<view class="sec-head">
-					<text class="sec-title">此刻在天上</text>
-					<text class="sec-sub">{{ inSpace.length }} 人</text>
-				</view>
-				<view class="inspace-wrap">
-					<scroll-view class="inspace-scroll" scroll-x :scroll-left="astroLeft" scroll-with-animation @scroll="onAstroScroll">
-						<view class="inspace-row">
-							<view class="acard" v-for="a in inSpace" :key="a.id" hover-class="acard-hover" @click="goAstronaut(a.id)">
-								<image v-if="a.img" class="acard-img" :src="a.img" mode="aspectFill" lazy-load></image>
-								<view v-else class="acard-img acard-ph"><text>🧑‍🚀</text></view>
-								<text class="acard-name">{{ astroName(a) }}</text>
-								<text class="acard-days">在轨 {{ a.days }} 天</text>
-							</view>
-						</view>
-					</scroll-view>
-					<view class="inspace-fade" v-if="!astroMoved">
-						<view class="inspace-nudge" hover-class="inspace-nudge-hover" @click="slideAstro">›</view>
-					</view>
-				</view>
-			</view>
-
 			<!-- 控制行：左边待发射/已发射，右边排期/日历。
 			     搜索与筛选挪到右下角悬浮钮，这一行只留「看哪一批」和「怎么看」 -->
 			<view class="mode-bar">
@@ -203,7 +180,7 @@
 <script>
 import { createListMixin } from '@/utils/list-mixin.js'
 import { syncTabBar, setTabBarHidden } from '@/utils/tabbar.js'
-import { isStillUpcoming, rocketName, countryOf, agencyLabel, astroName as astroNameOf } from '@/utils/format.js'
+import { isStillUpcoming, rocketName, countryOf, agencyLabel } from '@/utils/format.js'
 import { launchMatch } from '@/utils/search-match.js'
 import { getConfig } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'
@@ -267,10 +244,8 @@ export default {
 			// 搜索词：与 filters 一起作用于列表，实时生效
 			keyword: '',
 			// 各维度选中值；'' = 不筛选。两个 feed 共用一套，切 feed 时清空
-			filters: { country: '', agency: '', rocket: '' },
-			astronauts: [],
-			astroLeft: 0,
-			astroMoved: false		}
+			filters: { country: '', agency: '', rocket: '' }
+		}
 	},
 
 	computed: {
@@ -377,10 +352,6 @@ export default {
 		 * （快照 100 条 → 归档分片 → 后续排期），翻得越多选项越全。
 		 * 没有这个维度的条目（比如老数据缺轨道）不进候选。
 		 */
-		inSpace() {
-			return this.astronauts.filter((a) => a && a.inSpace).sort((a, b) => (b.days || 0) - (a.days || 0))
-		},
-
 		filterGroups() {
 			const buckets = {}
 			for (const k of FILTER_KEYS) buckets[k] = new Map()
@@ -432,9 +403,7 @@ export default {
 				return
 			}
 			this.getData()
-			spaceData.load('astronauts').then((d) => {
-				if (d) this.astronauts = d.list || []
-			}).catch(() => {})		})
+		})
 	},
 
 	// 从详情页收藏回来时把收藏项顶上去（不重新请求数据）
@@ -485,20 +454,6 @@ export default {
 	},
 
 	methods: {
-		astroName(a) {
-			return astroNameOf(a)
-		},
-		onAstroScroll(e) {
-			if (!this.astroMoved && (e.detail.scrollLeft || 0) > 8) this.astroMoved = true
-		},
-		slideAstro() {
-			this.astroLeft += 550
-		},
-		goAstronaut(id) {
-			if (!id) return
-			uni.navigateTo({ url: '/pages/astronaut/astronaut?id=' + id })
-		},
-
 		goDetail(item) {
 			if (!item || !item.id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + item.id })
@@ -718,21 +673,6 @@ export default {
 	padding: 140rpx 60rpx;
 }
 
-
-/* ---- 此刻在天上 ---- */
-.inspace { margin-bottom: 30rpx; }
-.inspace-wrap { position: relative; }
-.inspace-scroll { width: 100%; white-space: nowrap; }
-.inspace-row { display: flex; }
-.inspace-fade { position: absolute; right: 0; top: 0; bottom: 0; width: 130rpx; display: flex; align-items: center; justify-content: flex-end; padding-right: 4rpx; box-sizing: border-box; background: linear-gradient(to right, rgba(10,14,23,0), rgba(10,14,23,.86) 58%, #0a0e17); pointer-events: none; }
-.inspace-nudge { width: 56rpx; height: 56rpx; border-radius: 28rpx; display: flex; align-items: center; justify-content: center; margin-bottom: 40rpx; background: rgba(24,32,46,.76); border: 1rpx solid rgba(255,255,255,.18); color: rgba(255,255,255,.78); font-size: 32rpx; line-height: 1; pointer-events: auto; }
-.inspace-nudge-hover { background: rgba(56,189,248,.28); border-color: rgba(56,189,248,.5); }
-.acard { flex-shrink: 0; width: 168rpx; margin-right: 16rpx; padding: 14rpx 14rpx 18rpx; border-radius: 20rpx; background: #141a26; border: 1rpx solid rgba(255,255,255,.07); box-sizing: border-box; }
-.acard-hover { background: #1b2231; }
-.acard-img { width: 140rpx; height: 140rpx; border-radius: 16rpx; display: block; background: #1b2231; }
-.acard-ph { display: flex; align-items: center; justify-content: center; font-size: 40rpx; }
-.acard-name { display: -webkit-box; height: 58rpx; margin-top: 12rpx; color: #fff; font-size: 22rpx; font-weight: 500; line-height: 29rpx; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
-.acard-days { display: block; margin-top: 4rpx; color: #38bdf8; font-size: 21rpx; }
 
 /* 列表 */
 .content {

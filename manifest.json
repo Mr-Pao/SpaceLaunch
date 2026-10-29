@@ -2,8 +2,8 @@
     "name" : "SpaceLaunch",
     "appid" : "__UNI__C1A5695",
     "description" : "太空发射任务查询",
-    "versionName" : "3.2.34",
-    "versionCode" : "30234",
+    "versionName" : "3.2.35",
+    "versionCode" : "30235",
     "transformPx" : false,
     /* 5+App特有相关 */
     "app-plus" : {
