@@ -34,8 +34,8 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # 6 主题 × 30 张 × 镜像，15 分钟绰绰有余
-    timeout-minutes: 15
+    # 星云单主题约 316 张 × 两种尺寸镜像，并发 4，留足余量
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +57,6 @@ jobs:
           COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
           # 桶本身是私有读，靠单个对象打 public-read 让小程序能拉到
           COS_ACL: public-read
-          # 每个主题最多取多少张（默认 30）
-          NASA_IMG_PER_THEME: '30'
+          # 每个主题最多取多少张（星云检索总命中约 316，取满）
+          NASA_IMG_PER_THEME: '400'
         run: node nasa-images.js

@@ -35,8 +35,11 @@ const THEMES = [
 	{ key: 'nebula', name: '星云', q: 'nebula' }
 ]
 
-// 每个主题最多取多少张（API 默认一页 100，取前 N 足够撑起一个主题墙）
-const PER_THEME = Number(process.env.NASA_IMG_PER_THEME || 30)
+// 每个主题最多取多少张。默认 400：星云检索总命中约 316，够取满；
+// API 每页 100，需要翻页
+const PER_THEME = Number(process.env.NASA_IMG_PER_THEME || 400)
+// 翻页上限，防止某主题命中数异常大时把 CI 拖死
+const MAX_PAGES = Number(process.env.NASA_IMG_MAX_PAGES || 10)
 
 const API = 'https://images-api.nasa.gov/search'
 const UA = 'SpaceLaunch/1.1 (+https://github.com/Mr-Pao/SpaceLaunch)'
@@ -92,42 +95,52 @@ async function runNasaImages() {
 	const seen = new Set()
 
 	for (const theme of THEMES) {
-		const url = `${API}?q=${encodeURIComponent(theme.q)}&media_type=image`
-		console.log(`  · 主题「${theme.name}」抓取 ${url}`)
-		let items = []
-		try {
-			const json = await fetchJson(url)
-			items = (json && json.collection && json.collection.items) || []
-		} catch (e) {
-			console.warn(`  ! 主题「${theme.name}」抓取失败: ${e.message}`)
-			continue
-		}
-
+		console.log(`  · 主题「${theme.name}」抓取（上限 ${PER_THEME} 张）`)
 		let taken = 0
-		for (const it of items) {
-			if (taken >= PER_THEME) break
-			const d = (it.data && it.data[0]) || {}
-			const nasaId = d.nasa_id
-			if (!nasaId || seen.has(nasaId)) continue
-			const { thumb, full } = pickLinks(it.links)
-			if (!full) continue
-			seen.add(nasaId)
-			collected.push({
-				id: nasaId,
-				theme: theme.key,
-				themeName: theme.name,
-				title: clean(d.title, 80) || theme.name,
-				desc: clean(d.description, 160),
-				date: (d.date_created || '').slice(0, 10),
-				center: d.center || '',
-				// 这两个字段先放 NASA 原地址，下面统一镜像到 COS 再原地替换
-				thumb: thumb || full,
-				full,
-				nasaId
-			})
-			taken++
+		let page = 1
+
+		// API 每页 100 条，翻页直到取满上限或没有更多
+		while (taken < PER_THEME && page <= MAX_PAGES) {
+			const url = `${API}?q=${encodeURIComponent(theme.q)}&media_type=image&page=${page}`
+			let items = []
+			try {
+				const json = await fetchJson(url)
+				items = (json && json.collection && json.collection.items) || []
+			} catch (e) {
+				console.warn(`  ! 主题「${theme.name}」第 ${page} 页抓取失败: ${e.message}`)
+				break
+			}
+			if (!items.length) break
+
+			for (const it of items) {
+				if (taken >= PER_THEME) break
+				const d = (it.data && it.data[0]) || {}
+				const nasaId = d.nasa_id
+				if (!nasaId || seen.has(nasaId)) continue
+				const { thumb, full } = pickLinks(it.links)
+				if (!full) continue
+				seen.add(nasaId)
+				collected.push({
+					id: nasaId,
+					theme: theme.key,
+					themeName: theme.name,
+					title: clean(d.title, 80) || theme.name,
+					desc: clean(d.description, 160),
+					date: (d.date_created || '').slice(0, 10),
+					center: d.center || '',
+					// 这两个字段先放 NASA 原地址，下面统一镜像到 COS 再原地替换
+					thumb: thumb || full,
+					full,
+					nasaId
+				})
+				taken++
+			}
+
+			// 不满一页说明已经到底
+			if (items.length < 100) break
+			page++
 		}
-		console.log(`    → 取 ${taken} 张`)
+		console.log(`    → 取 ${taken} 张（翻到第 ${page} 页）`)
 	}
 
 	console.log(`  共 ${collected.length} 张，开始镜像到 COS（thumb 480px + full 1080px）`)
