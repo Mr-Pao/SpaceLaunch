@@ -1,5 +1,8 @@
 <template>
 	<view class="page">
+		<!-- 全局是 custom 导航，必须自己画返回键 -->
+		<nav-bar :solid="true" :title="navTitle" placeholder />
+
 		<!-- 图片舞台：黑底居中，点一下进系统看图器可缩放 -->
 		<view class="stage" @click="zoom">
 			<image v-if="full" class="img" :src="full" mode="aspectFit"></image>
@@ -30,6 +33,7 @@ export default {
 	data() {
 		return {
 			type: 'apod',
+			navTitle: '每日天文',
 			title: '',
 			sub: '',
 			intro: '',
@@ -40,7 +44,7 @@ export default {
 	onLoad(options) {
 		const type = options && options.type === 'epic' ? 'epic' : 'apod'
 		this.type = type
-		uni.setNavigationBarTitle({ title: type === 'epic' ? '每日地球' : '每日天文' })
+		this.navTitle = type === 'epic' ? '每日地球' : '每日天文'
 		this.fetch()
 	},
 
@@ -74,13 +78,10 @@ export default {
 
 <style lang="scss" scoped>
 .page {
-	position: fixed;
-	left: 0;
-	right: 0;
-	top: 0;
-	bottom: 0;
+	height: 100vh;
 	display: flex;
 	flex-direction: column;
+	box-sizing: border-box;
 	background: #04060a;
 }
 
