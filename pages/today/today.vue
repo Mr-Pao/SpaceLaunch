@@ -39,7 +39,8 @@
 							<text class="daily-name">{{ c.title }}</text>
 							<text class="daily-meta" v-if="c.date">{{ c.date }}</text>
 							<text class="daily-desc" v-if="c.desc">{{ c.desc }}</text>
-							<text class="daily-credit" v-if="c.credit">{{ c.credit }}</text>
+							<!-- 天文/地球卡只留标题与时间，署名收进详情层 -->
+							<text class="daily-credit" v-if="c.credit && c.type === 'sl'">{{ c.credit }}</text>
 							<view class="daily-acts" @click.stop>
 								<view class="daily-link" hover-class="daily-link-hover" @click.stop="viewDetail(c)">
 									<text class="daily-link-text">查看详情</text>
@@ -129,6 +130,33 @@
 			</view>
 		</block>
 
+		<!-- 每日天文 / 每日地球详情层：卡片只留标题与时间，介绍放这里 -->
+		<view class="detail-mask" v-if="detailCard" @click="closeDetail">
+			<view class="detail-panel" @click.stop>
+				<view class="detail-head">
+					<view class="detail-tags">
+						<text class="detail-tag">{{ detailCard.tag }}</text>
+						<text class="detail-date" v-if="detailCard.date">{{ detailCard.date }}</text>
+					</view>
+					<view class="detail-close" hover-class="detail-close-hover" @click="closeDetail">✕</view>
+				</view>
+
+				<text class="detail-title">{{ detailCard.title }}</text>
+
+				<scroll-view class="detail-body" scroll-y>
+					<text class="detail-intro">{{ detailCard.intro || '暂无介绍' }}</text>
+					<text class="detail-credit" v-if="detailCard.credit">图源：{{ detailCard.credit }}</text>
+				</scroll-view>
+
+				<view class="detail-acts">
+					<view class="detail-btn" hover-class="detail-btn-hover" @click="openDetailImage">查看大图</view>
+					<view class="detail-btn ghost" hover-class="detail-btn-hover" @click="moreImgs(detailCard)">
+						更多图片
+					</view>
+				</view>
+			</view>
+		</view>
+
 		<!-- 点图直接进详情页的图片优先态，这里不再放大图弹层 -->
 	</view>
 </template>
@@ -193,6 +221,8 @@ export default {
 			epic: [],
 			// 轮播卡片内图片加载失败的索引，标记后回退底色
 			dailyErr: {},
+			// 每日天文/地球的详情层（点卡片或「查看详情」打开）
+			detailCard: null,
 			// 往年今日是否展开（默认折叠到 OTD_FOLD 条）
 			otdOpen: false,
 			// 模板要读这个常量，挂到 data 上（options API 的模板访问不到模块作用域）
@@ -264,6 +294,23 @@ export default {
 					net: d.net
 				})
 			}
+			// 顺序：每日一图 → 每日天文 → 每日地球。
+			// 天文/地球卡只留标题和时间，长介绍收进 intro，点开详情层再看
+			const apod = this.apod || []
+			if (apod.length) {
+				const x = apod[0]
+				cards.push({
+					type: 'apod',
+					tag: '每日天文',
+					date: x.date || '',
+					title: x.titleZh || x.title || '',
+					desc: '',
+					intro: x.explanationZh || x.explanation || '',
+					src: x.thumb,
+					full: x.full,
+					credit: x.credit || ''
+				})
+			}
 			const epic = this.epic || []
 			if (epic.length) {
 				const x = epic[0]
@@ -272,24 +319,11 @@ export default {
 					tag: '每日地球',
 					date: (x.date || '').slice(0, 10),
 					title: '地球 · DSCOVR',
-					desc: x.caption || '',
+					desc: '',
+					intro: x.captionZh || x.caption || '',
 					src: x.thumb,
 					full: x.full,
 					credit: 'NASA EPIC'
-				})
-			}
-			const apod = this.apod || []
-			if (apod.length) {
-				const x = apod[0]
-				cards.push({
-					type: 'apod',
-					tag: '每日天文',
-					date: x.date || '',
-					title: x.title || '',
-					desc: x.explanation || '',
-					src: x.thumb,
-					full: x.full,
-					credit: x.credit || ''
 				})
 			}
 			return cards
@@ -505,13 +539,25 @@ export default {
 			if (c.type === 'sl') {
 				this.openPhoto({ id: c.launchId, net: c.net })
 			} else {
-				this.previewFull(c)
+				// 天文/地球：打开详情层看介绍，不在卡片上堆长文
+				this.detailCard = c
 			}
+		},
+
+		closeDetail() {
+			this.detailCard = null
+		},
+
+		/** 详情层里的「查看大图」 */
+		openDetailImage() {
+			this.previewFull(this.detailCard)
 		},
 
 		/** 卡片右下「更多图片」：按卡片类型跳到聚合图库对应 tab */
 		moreImgs(c) {
 			if (!c) return
+			// 从详情层点出来时先收起，否则从图库返回会看到还开着的弹层
+			this.detailCard = null
 			if (c.type === 'sl') this.goGalleryAll('image')
 			else if (c.type === 'epic') this.goGalleryAll('earth')
 			else if (c.type === 'apod') this.goGalleryAll('astro')
@@ -895,5 +941,128 @@ export default {
 	color: #0a0e17;
 	font-size: 26rpx;
 	font-weight: 600;
+}
+
+/* ---- 每日天文 / 每日地球详情层 ---- */
+.detail-mask {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 200;
+	display: flex;
+	align-items: flex-end;
+	background: rgba(4, 6, 10, 0.74);
+}
+
+.detail-panel {
+	width: 100%;
+	max-height: 80vh;
+	display: flex;
+	flex-direction: column;
+	padding: 34rpx 36rpx 34rpx;
+	box-sizing: border-box;
+	background: #131a26;
+	border-radius: 32rpx 32rpx 0 0;
+	border-top: 1rpx solid rgba(255, 255, 255, 0.08);
+	padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
+}
+
+.detail-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.detail-tags {
+	display: flex;
+	align-items: center;
+}
+
+.detail-tag {
+	padding: 6rpx 18rpx;
+	border-radius: 20rpx;
+	background: rgba(56, 189, 248, 0.16);
+	color: #38bdf8;
+	font-size: 22rpx;
+}
+
+.detail-date {
+	margin-left: 16rpx;
+	color: #8b95a8;
+	font-size: 22rpx;
+}
+
+.detail-close {
+	width: 56rpx;
+	height: 56rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #8b95a8;
+	font-size: 30rpx;
+}
+
+.detail-close-hover {
+	color: #ffffff;
+}
+
+.detail-title {
+	margin-top: 20rpx;
+	color: #ffffff;
+	font-size: 34rpx;
+	font-weight: 600;
+	line-height: 46rpx;
+}
+
+.detail-body {
+	margin-top: 20rpx;
+	flex: 1;
+	min-height: 0;
+}
+
+.detail-intro {
+	display: block;
+	color: #b9c2d0;
+	font-size: 26rpx;
+	line-height: 44rpx;
+	white-space: pre-wrap;
+}
+
+.detail-credit {
+	display: block;
+	margin-top: 18rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+}
+
+.detail-acts {
+	display: flex;
+	margin-top: 26rpx;
+}
+
+.detail-btn {
+	flex: 1;
+	height: 76rpx;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 38rpx;
+	background: rgba(56, 189, 248, 0.16);
+	border: 1rpx solid rgba(56, 189, 248, 0.42);
+	color: #38bdf8;
+	font-size: 27rpx;
+}
+
+.detail-btn.ghost {
+	margin-left: 20rpx;
+	background: rgba(255, 255, 255, 0.05);
+	border-color: rgba(255, 255, 255, 0.12);
+	color: #b9c2d0;
+}
+
+.detail-btn-hover {
+	opacity: 0.72;
 }
 </style>

@@ -29,6 +29,7 @@ const fs = require('fs')
 const path = require('path')
 const { upload, hasCosConfig } = require('./lib/cos')
 const { mirrorImages } = require('./lib/image')
+const { loadCache, translateTexts, getZh, saveCache } = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 const APOD_DAYS = Number(process.env.APOD_DAYS || 7)
@@ -169,6 +170,34 @@ async function main() {
 
 	const apodItems = await runApod()
 	const epicItems = await runEpic()
+
+	// 翻译标题与说明：卡片和详情页都要求中文，翻不出来就在前端回退英文。
+	// 沿用 sync.js 那套哈希缓存，CI 每轮只增量翻新内容，不会撞免费额度
+	if (apodItems.length || epicItems.length) {
+		try {
+			await loadCache()
+			const texts = []
+			for (const x of apodItems) {
+				if (x.title) texts.push(x.title)
+				if (x.explanation) texts.push(x.explanation)
+			}
+			for (const x of epicItems) {
+				if (x.caption) texts.push(x.caption)
+			}
+			if (texts.length) await translateTexts(texts)
+			for (const x of apodItems) {
+				x.titleZh = getZh(x.title)
+				x.explanationZh = getZh(x.explanation)
+			}
+			for (const x of epicItems) {
+				x.captionZh = getZh(x.caption)
+			}
+			saveCache()
+		} catch (e) {
+			// 翻译失败绝不能影响出数据，前端会回退英文
+			console.warn(`  ! 翻译失败，保留英文: ${e.message}`)
+		}
+	}
 
 	// 图片镜像 COS：缩略图（480px）+ 原图（全尺寸）。无 COS 配置时跳过，保留原 URL
 	if (hasCosConfig()) {
