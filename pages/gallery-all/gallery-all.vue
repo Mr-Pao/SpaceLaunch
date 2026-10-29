@@ -164,7 +164,6 @@
 							<image class="thumb" :src="it.thumb" mode="aspectFill" lazy-load></image>
 							<view class="cap" v-if="it.title">
 								<text class="cap-title">{{ it.title }}</text>
-								<text class="cap-theme" v-if="it.themeName">{{ it.themeName }}</text>
 							</view>
 						</view>
 					</view>
@@ -816,17 +815,6 @@ export default {
 	color: #e2e8f0;
 	font-size: 23rpx;
 	line-height: 32rpx;
-}
-
-.cap-theme {
-	display: inline-block;
-	margin-top: 8rpx;
-	padding: 2rpx 10rpx;
-	border-radius: 4rpx;
-	background: rgba(56, 189, 248, 0.16);
-	color: #7dd3fc;
-	font-size: 18rpx;
-	line-height: 26rpx;
 }
 
 /* ---- 内联播放遮罩（复制自 video-gallery.vue） ---- */

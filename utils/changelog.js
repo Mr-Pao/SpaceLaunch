@@ -855,4 +855,13 @@ export const CHANGELOG = [
 			'清理相关状态与样式（nasaTheme / nasaThemes / pickNasaTheme / .nasa-tabs）'
 		]
 	}
+	{
+		version: '3.2.46',
+		date: '2026-10-29',
+		title: '星云卡片去掉主题标签',
+		items: [
+			'每张星云图片卡片不再显示「星云」小标签，只留标题',
+			'清理不再使用的 .cap-theme 样式'
+		]
+	}
 ]
