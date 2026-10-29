@@ -9,10 +9,12 @@
 			:style="{ height: statusBarH + 44 + 'px' }"
 		></view>
 
-		<!-- 榜单头部：一句话说清「这是什么榜」，顺手给三个横向对比的极值 -->
-		<view class="hero">
+		<!-- 榜单头部：一句话说清「这是什么榜」，顺手给三个横向对比的极值。
+		     审核视角暗门挂在整块头部上（连点 5 次）——
+		     之前只绑在那行 19rpx 的小字上，字又暗又小，几乎点不中 -->
+		<view class="hero" @click="onTitleTap">
 			<view class="hero-top">
-				<text class="hero-kicker" @click="onTitleTap">SPACEDALLY / LAUNCH INDEX</text>
+				<text class="hero-kicker">SPACEDAILY / LAUNCH INDEX</text>
 			</view>
 
 			<!-- 标题和「在役」排在胶囊左侧的安全区，能一直顶到屏幕上部；
