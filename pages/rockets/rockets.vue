@@ -359,7 +359,13 @@ export default {
 					return (b.total_launch_count || 0) - (a.total_launch_count || 0)
 				})
 			} else {
-				arr.sort((a, b) => b.score - a.score || (b.total_launch_count || 0) - (a.total_launch_count || 0))
+				arr.sort((a, b) => {
+					// 从没发射过的型号不占综合榜前排：运力再大也没有实战检验
+					const ta = (a.total_launch_count || 0) > 0 ? 1 : 0
+					const tb = (b.total_launch_count || 0) > 0 ? 1 : 0
+					if (ta !== tb) return tb - ta
+					return b.score - a.score || (b.total_launch_count || 0) - (a.total_launch_count || 0)
+				})
 			}
 
 			return arr
@@ -486,11 +492,22 @@ export default {
 				// 归一化用的分母先算出来，综合分的三项才好加权到同一量纲
 				let maxLaunch = 1
 				let maxLeo = 1
+				let sumOk = 0
+				let sumTried = 0
 				for (const x of list) {
 					if (!x.active) continue
 					maxLaunch = Math.max(maxLaunch, x.total_launch_count || 0)
 					maxLeo = Math.max(maxLeo, x.leo_capacity || 0)
+					sumOk += x.successful_launches || 0
+					sumTried += (x.successful_launches || 0) + (x.failed_launches || 0)
 				}
+
+				// 全局成功率 = 贝叶斯先验均值；RATE_PRIOR 相当于给每个型号
+				// 先垫 10 次「平均表现」的虚拟发射，次数越少越被拉向均值
+				const p0 = sumTried ? sumOk / sumTried : 0.95
+				const RATE_PRIOR = 10
+				// 活跃度对数归一化的分母
+				const LN_MAX = Math.log(1 + maxLaunch)
 
 				this.all = list.map((x) => {
 					// 中英都带构型：中文只给基础名的话，同系列几个构型在榜上长得一模一样
@@ -501,10 +518,14 @@ export default {
 					const tried = ok + bad
 					// 没打过 / 只有成功记录但总数为 0 的，不给成功率，避免 100% 假象
 					const rate = tried > 0 ? ok / tried : 0
+					// 打分用的收缩成功率：小样本向全局均值靠拢，卡片仍显示 rate
+					const rateAdj = (ok + RATE_PRIOR * p0) / (tried + RATE_PRIOR)
 
-					const act = (x.total_launch_count || 0) / maxLaunch
+					// 活跃度取对数：发射从 100→200 的意义远小于 2→100，
+					// 线性归一化会让 642 次的 Falcon 9 把所有型号压扁
+					const act = Math.log(1 + (x.total_launch_count || 0)) / LN_MAX
 					const cap = (x.leo_capacity || 0) / maxLeo
-					const score = 0.45 * act + 0.35 * rate + 0.2 * cap
+					const score = 0.45 * act + 0.35 * rateAdj + 0.2 * cap
 
 					const fams = x.families || []
 					return {
@@ -517,6 +538,7 @@ export default {
 						flag: flagSrc(x.manufacturer),
 						region: regionOf(x),
 						rate,
+						rateAdj,
 						rateText: tried > 0 ? (rate * 100).toFixed(1) + '%' : '—',
 						leoText: x.leo_capacity > 0 ? leoText(x.leo_capacity) : '—',
 						// families[0] 是家族（Falcon / Long March），第二层才是具体系列
