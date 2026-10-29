@@ -159,11 +159,11 @@
 						v-for="t in nasaThemes"
 						:key="t.key"
 						:class="{ active: nasaTheme === t.key }"
-						@click="nasaTheme = t.key"
+						@click="pickNasaTheme(t.key)"
 					>{{ t.name }}</view>
 				</scroll-view>
 
-				<view class="grid" v-if="nasaList.length && nasaFiltered.length">
+				<view class="grid" v-if="nasaList.length && nasaVisible.length">
 					<view class="gcol" v-for="(col, ci) in nasaCols" :key="ci">
 						<view
 							class="card"
@@ -184,6 +184,12 @@
 					<text class="empty-icon">🌌</text>
 					<text class="empty-text">星云影像还在路上</text>
 					<text class="empty-sub">后台正在抓取并转存，过段时间再来看看</text>
+				</view>
+
+				<!-- 分页提示：星云图多，控制首屏节点数 -->
+				<view class="foot" v-if="nasaVisible.length">
+					<text class="foot-text" v-if="nasaHasMore">上滑加载更多（{{ nasaVisible.length }} / {{ nasaFiltered.length }}）</text>
+					<text class="foot-text" v-else>已显示全部 {{ nasaFiltered.length }} 张</text>
 				</view>
 			</block>
 		</block>
@@ -270,6 +276,8 @@ export default {
 			nasaList: [],
 			nasaThemes: [],
 			nasaTheme: 'all',
+			// 已渲染张数（触底 +60）
+			nasaShow: 60,
 			nasaLoading: false,
 			nasaLoaded: false,
 			// 内联播放
@@ -324,8 +332,17 @@ export default {
 			return this.nasaList.filter((x) => x.theme === this.nasaTheme)
 		},
 
+		// 只渲染前 N 张：星云有 300+ 张，一次性铺完节点太多会拖慢滚动
+		nasaVisible() {
+			return this.nasaFiltered.slice(0, this.nasaShow)
+		},
+
 		nasaCols() {
-			return this.split2(this.nasaFiltered)
+			return this.split2(this.nasaVisible)
+		},
+
+		nasaHasMore() {
+			return this.nasaShow < this.nasaFiltered.length
 		},
 
 		tabTitle() {
@@ -351,11 +368,26 @@ export default {
 	},
 
 	onReachBottom() {
-		// 只有图片标签有分页；其余数据量小，无需上拉
-		if (this.tab === 'image') this.loadMore()
+		// 图片标签走分片分页
+		if (this.tab === 'image') {
+			this.loadMore()
+			return
+		}
+		// 星云一次几百张，做增量渲染，避免一次性铺满节点
+		if (this.tab === 'nasa' && this.nasaHasMore) {
+			this.nasaShow += 60
+		}
 	},
 
 	methods: {
+		/** 切星云主题：重置已渲染张数，避免沿用上一个主题的分页位置 */
+		pickNasaTheme(key) {
+			if (this.nasaTheme === key) return
+			this.nasaTheme = key
+			this.nasaShow = 60
+			uni.pageScrollTo({ scrollTop: 0, duration: 0 })
+		},
+
 		// 两列均分（视频 / 地球 / 天文 / NASA 共用）
 		split2(list) {
 			const L = []
@@ -522,6 +554,7 @@ export default {
 					full: x.full || x.thumb || ''
 				}))
 				this.nasaTheme = 'all'
+				this.nasaShow = 60
 				// 主题筛选：全部 + 各主题
 				const themes = (d && d.themes) || []
 				this.nasaThemes = [{ key: 'all', name: '全部' }].concat(
