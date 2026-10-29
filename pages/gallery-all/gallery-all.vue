@@ -139,7 +139,8 @@
 				<view class="empty-box" v-else>
 					<text class="empty-icon">🔭</text>
 					<text class="empty-text">还没有天文图</text>
-					<text class="empty-sub">后台正在抓取并转存，过段时间再来看看</text>
+					<text class="empty-sub">数据每天更新；若已过更新时段仍为空，可手动重试</text>
+					<view class="retry-btn" hover-class="retry-btn-hover" @click="retryApod">重新加载</view>
 				</view>
 			</block>
 		</block>
@@ -481,6 +482,21 @@ export default {
 			} catch (e) {
 				console.warn('[gallery-all] APOD 加载失败', e)
 				this.apodList = []
+			} finally {
+				this.apodLoading = false
+			}
+		},
+
+		/** 空态里的手动重试：force 绕过缓存直接回源，不进 onUpdate */
+		async retryApod() {
+			if (this.apodLoading) return
+			this.apodLoading = true
+			try {
+				const d = await spaceData.load('apod', { force: true }).catch(() => null)
+				this.apodList = this.apodToList(d)
+				console.log('[gallery-all] APOD 重试结果', d && d.count)
+			} catch (e) {
+				console.warn('[gallery-all] APOD 重试失败', e)
 			} finally {
 				this.apodLoading = false
 			}
@@ -882,6 +898,22 @@ export default {
 	align-items: center;
 	justify-content: center;
 	padding: 200rpx 60rpx 0;
+}
+
+/* 空态里的重试按钮：force 回源，绕开本地缓存 */
+.retry-btn {
+	margin-top: 32rpx;
+	padding: 18rpx 52rpx;
+	border-radius: 40rpx;
+	background: rgba(56, 189, 248, 0.14);
+	border: 1rpx solid rgba(56, 189, 248, 0.42);
+	color: #38bdf8;
+	font-size: 26rpx;
+}
+
+.retry-btn-hover {
+	background: rgba(56, 189, 248, 0.26);
+	border-color: rgba(56, 189, 248, 0.7);
 }
 
 .empty-icon {
