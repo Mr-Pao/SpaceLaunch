@@ -225,14 +225,27 @@ async function runTranslateOnly() {
 		return { count: 0, translated: 0, remain: 0 }
 	}
 
-	const todo = list.filter((x) => x && (x.title || x.desc) && !(x.titleZh && x.descZh))
+	// 先把缓存与人工译文表装上：overrides 命中时 getZh 直接返回人工译文，
+	// 于是「改了 translation-overrides.json、但数据里还是旧机翻」也能在这里修回来
+	await loadCache()
+
+	const todo = list.filter((x) => {
+		if (!x || !(x.title || x.desc)) return false
+		// 还缺中文的，必补
+		if (!(x.titleZh && x.descZh)) return true
+		// 已有中文但人工译文表改过这一个词，也要重写
+		const fixedTitle = getZh(x.title)
+		if (fixedTitle && fixedTitle !== x.titleZh) return true
+		const fixedDesc = getZh(x.desc)
+		if (fixedDesc && fixedDesc !== x.descZh) return true
+		return false
+	})
 	if (!todo.length) {
-		console.log(`  全部 ${list.length} 条已有中文，无需补翻`)
+		console.log(`  全部 ${list.length} 条已有中文且与译文表一致，无需补翻`)
 		return { count: list.length, translated: 0, remain: 0 }
 	}
 
-	console.log(`  待补翻 ${todo.length}/${list.length} 条`)
-	await loadCache()
+	console.log(`  待补翻/需修正 ${todo.length}/${list.length} 条`)
 	// 标题优先排队：额度耗尽时至少标题是中文
 	const texts = []
 	for (const x of todo) if (x.title && !x.titleZh) texts.push(x.title)
@@ -240,8 +253,11 @@ async function runTranslateOnly() {
 	await translateTexts(texts)
 
 	for (const x of todo) {
-		if (!x.titleZh) x.titleZh = getZh(x.title)
-		if (!x.descZh) x.descZh = getZh(x.desc)
+		// 只在查到译文时才覆盖，避免一次失败把已有中文清空
+		const tZh = getZh(x.title)
+		if (tZh) x.titleZh = tZh
+		const dZh = getZh(x.desc)
+		if (dZh) x.descZh = dZh
 	}
 
 	const cachePath = saveCache()

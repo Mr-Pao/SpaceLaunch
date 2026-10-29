@@ -17,6 +17,13 @@ name: nasa-images-translate
 on:
   schedule:
     - cron: '0 5 * * *'    # 每天 UTC 05:00 = 北京 13:00
+  push:
+    # 改了人工译文表就立刻回写一次，几分钟就能在详情页看到修正后的中文，
+    # 不用等次日 cron，也不用重跑十几分钟的抓取+镜像
+    paths:
+      - 'scripts/translation-overrides.json'
+      - 'scripts/nasa-images.js'
+      - '.github/workflows/nasa-images-translate.yml'
   workflow_dispatch:
 
 permissions:
