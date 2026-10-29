@@ -1,18 +1,18 @@
 <template>
 	<view class="page">
-		<!-- 原图区：点击放大到系统看图器，可双指缩放 -->
-		<view class="hero" v-if="full" @click="zoom">
-			<image class="hero-img" :src="full" mode="aspectFit"></image>
+		<!-- 图片舞台：黑底居中，点一下进系统看图器可缩放 -->
+		<view class="stage" @click="zoom">
+			<image v-if="full" class="img" :src="full" mode="aspectFit"></image>
+			<text v-else class="tip">图片暂不可用</text>
 		</view>
 
-		<view class="info">
-			<view class="meta-row">
-				<text class="tag">{{ tag }}</text>
-				<text class="date" v-if="date">{{ date }}</text>
-			</view>
-			<text class="title">{{ title }}</text>
-			<text class="intro">{{ intro || '暂无介绍' }}</text>
-			<text class="credit" v-if="credit">图源：{{ credit }}</text>
+		<!-- 底部信息条：标题 + 一行副标题 + 可滚动的中文介绍，不放按钮 -->
+		<view class="bar">
+			<text class="bar-title">{{ title }}</text>
+			<text class="bar-sub" v-if="sub">{{ sub }}</text>
+			<scroll-view class="bar-desc" scroll-y>
+				<text class="desc-text">{{ intro || '暂无介绍' }}</text>
+			</scroll-view>
 		</view>
 	</view>
 </template>
@@ -21,20 +21,18 @@
 import spaceData from '@/utils/data.js'
 
 /**
- * 每日天文 / 每日地球 的图片详情页
+ * 每日天文 / 每日地球 的全屏看图页
  *
- * 只接收 type（apod / epic），不通过 URL 传长文本 —— 说明文字上千字，
- * 塞进 query 会被长度截断。数据都在 spaceData 里，页面自己取第一条即可。
+ * 只接收 type（apod / epic），数据自己从 spaceData 取第一条，
+ * 不通过 URL 传长文本 —— 说明上千字，塞 query 会被截断。
  */
 export default {
 	data() {
 		return {
 			type: 'apod',
-			tag: '每日天文',
 			title: '',
-			date: '',
+			sub: '',
 			intro: '',
-			credit: '',
 			full: ''
 		}
 	},
@@ -42,8 +40,7 @@ export default {
 	onLoad(options) {
 		const type = options && options.type === 'epic' ? 'epic' : 'apod'
 		this.type = type
-		this.tag = type === 'epic' ? '每日地球' : '每日天文'
-		uni.setNavigationBarTitle({ title: this.tag })
+		uni.setNavigationBarTitle({ title: type === 'epic' ? '每日地球' : '每日天文' })
 		this.fetch()
 	},
 
@@ -55,10 +52,16 @@ export default {
 
 			const isEpic = this.type === 'epic'
 			this.title = x.titleZh || x.title || (isEpic ? '地球 · DSCOVR' : '未命名')
-			this.date = (x.date || '').slice(0, 10)
-			this.intro = x.explanationZh || x.explanation || x.captionZh || x.caption || ''
-			this.credit = x.credit || (isEpic ? 'NASA EPIC' : '')
 			this.full = x.full || x.thumb || ''
+			this.intro = x.explanationZh || x.explanation || x.captionZh || x.caption || ''
+
+			// 副标题合成一行：来源 · 日期 · 图源，缺哪个就跳过
+			const parts = [isEpic ? '每日地球' : '每日天文']
+			const date = (x.date || '').slice(0, 10)
+			if (date) parts.push(date)
+			const credit = x.credit || (isEpic ? 'NASA EPIC' : '')
+			if (credit) parts.push('@' + credit.replace(/^@/, ''))
+			this.sub = parts.join(' · ')
 		},
 
 		zoom() {
@@ -71,73 +74,76 @@ export default {
 
 <style lang="scss" scoped>
 .page {
-	min-height: 100vh;
-	background: #0a0e17;
-	padding-bottom: 70rpx;
-	box-sizing: border-box;
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	background: #04060a;
 }
 
-/* 原图区固定在顶部，图本身用 aspectFit 完整显示，不裁切 */
-.hero {
-	width: 100%;
-	height: 640rpx;
+/* 图片区占满剩余空间，aspectFit 完整显示、不裁切 */
+.stage {
+	flex: 1;
+	min-height: 0;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: #000000;
 }
 
-.hero-img {
+.img {
 	width: 100%;
 	height: 100%;
 	display: block;
 }
 
-.info {
-	padding: 30rpx 32rpx 0;
+.tip {
+	color: #4d5a6e;
+	font-size: 26rpx;
 }
 
-.meta-row {
-	display: flex;
-	align-items: center;
+/* 底部信息条：纯黑，与图片区分开 */
+.bar {
+	flex-shrink: 0;
+	padding: 26rpx 32rpx 30rpx;
+	background: #000000;
+	padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
 }
 
-.tag {
-	padding: 6rpx 18rpx;
-	border-radius: 20rpx;
-	background: rgba(56, 189, 248, 0.16);
-	color: #38bdf8;
-	font-size: 22rpx;
-}
-
-.date {
-	margin-left: 16rpx;
-	color: #8b95a8;
-	font-size: 22rpx;
-}
-
-.title {
-	display: block;
-	margin-top: 18rpx;
+.bar-title {
 	color: #ffffff;
-	font-size: 36rpx;
+	font-size: 32rpx;
 	font-weight: 600;
-	line-height: 48rpx;
+	line-height: 44rpx;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
 }
 
-.intro {
+.bar-sub {
 	display: block;
-	margin-top: 22rpx;
-	color: #b9c2d0;
-	font-size: 27rpx;
-	line-height: 46rpx;
-	white-space: pre-wrap;
-}
-
-.credit {
-	display: block;
-	margin-top: 26rpx;
+	margin-top: 10rpx;
 	color: #6b7891;
 	font-size: 22rpx;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* 介绍限高可滚：图片仍是主体，长文不挤压画面 */
+.bar-desc {
+	height: 30vh;
+	margin-top: 20rpx;
+}
+
+.desc-text {
+	color: #b9c2d0;
+	font-size: 26rpx;
+	line-height: 44rpx;
+	white-space: pre-wrap;
 }
 </style>
