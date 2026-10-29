@@ -686,8 +686,8 @@ export default {
 
 .cell {
 	margin-bottom: 12rpx;
-	border-radius: 10rpx;
-	overflow: hidden;
+	/* 不做圆角裁切：overflow hidden + 圆角会把图片四角切掉，
+	   地球/天文/星云要求严格按原比例展示，这里全程不裁 */
 	background: #131a26;
 }
 
