@@ -41,10 +41,10 @@ export default {
 		debrisSection
 	},
 
-	data() {
-		return {
-			tab: 'catalog',
-			navSolid: false,
+		data() {
+			return {
+				tab: 'orbit',
+				navSolid: false,
 			tabs: [
 				{ key: 'orbit', label: '全球在轨' },
 				{ key: 'catalog', label: '卫星百科' },

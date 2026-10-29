@@ -40,12 +40,12 @@
 							<text class="daily-meta" v-if="c.date">{{ c.date }}</text>
 							<text class="daily-desc" v-if="c.desc">{{ c.desc }}</text>
 							<text class="daily-credit" v-if="c.credit">{{ c.credit }}</text>
-							<view class="daily-acts" v-if="c.type === 'sl'" @click.stop>
-								<view class="daily-link" hover-class="daily-link-hover" @click.stop="goLaunch(c.launchId, c.net)">
+							<view class="daily-acts" @click.stop>
+								<view class="daily-link" hover-class="daily-link-hover" @click.stop="viewDetail(c)">
 									<text class="daily-link-text">查看详情</text>
 									<text class="daily-link-arrow">›</text>
 								</view>
-								<view class="daily-link" hover-class="daily-link-hover" @click.stop="goGallery">
+								<view class="daily-link" hover-class="daily-link-hover" @click.stop="moreImgs(c)">
 									<text class="daily-link-text">更多图片</text>
 									<text class="daily-link-arrow">›</text>
 								</view>
@@ -286,30 +286,31 @@ export default {
 		},
 
 		/**
-		 * 首页「每日一览」轮播卡片：把三类每日图混排成一组可滑动卡片。
-		 *   - APOD 近 7 天（type=apod）
-		 *   - EPIC 当天地球（type=epic）
-		 *   - 现有「每日一图」发射现场图（type=sl，保留查看详情/图库出口）
-		 * 顺序让 SL 排最后：用户最熟悉的「今日发射图」不用滑就能看到，
-		 * NASA 两张作为惊喜往前插。
+		 * 首页「每日一览」轮播卡片：固定只出三张每日图，顺序固定
+		 * sl（每日一图）→ epic（每日地球）→ apod（每日天文）。
+		 * 每张只取数据源的第一条（epic/apod 若为空则跳过该卡），
+		 * 三类出口（查看详情 / 更多图片）在模板里统一渲染。
 		 */
 		dailyCards() {
 			const cards = []
-			const apod = this.apod || []
-			for (const x of apod) {
+			const d = this.daily
+			if (d) {
 				cards.push({
-					type: 'apod',
-					tag: '每日天文',
-					date: x.date || '',
-					title: x.title || '',
-					desc: x.explanation || '',
-					src: x.thumb,
-					full: x.full,
-					credit: x.credit || ''
+					type: 'sl',
+					tag: '每日一图',
+					date: this.dailyMeta,
+					title: this.dailyTitle,
+					desc: '',
+					src: this.dailySrc,
+					full: (d.thumb && fullImageOf(d.thumb)) || this.dailySrc,
+					credit: d.credit ? '@' + d.credit : '',
+					launchId: d.id,
+					net: d.net
 				})
 			}
 			const epic = this.epic || []
-			for (const x of epic) {
+			if (epic.length) {
+				const x = epic[0]
 				cards.push({
 					type: 'epic',
 					tag: '每日地球',
@@ -321,19 +322,18 @@ export default {
 					credit: 'NASA EPIC'
 				})
 			}
-			const d = this.daily
-			if (d) {
+			const apod = this.apod || []
+			if (apod.length) {
+				const x = apod[0]
 				cards.push({
-					type: 'sl',
-					tag: '今日发射',
-					date: this.dailyMeta,
-					title: this.dailyTitle,
-					desc: '',
-					src: this.dailySrc,
-					full: (d.thumb && fullImageOf(d.thumb)) || this.dailySrc,
-					credit: d.credit ? '@' + d.credit : '',
-					launchId: d.id,
-					net: d.net
+					type: 'apod',
+					tag: '每日天文',
+					date: x.date || '',
+					title: x.title || '',
+					desc: x.explanation || '',
+					src: x.thumb,
+					full: x.full,
+					credit: x.credit || ''
 				})
 			}
 			return cards
@@ -538,6 +538,36 @@ export default {
 				const url = c.full || c.src
 				if (url) uni.previewImage({ urls: [url], current: url })
 			}
+		},
+
+		/** 全屏看单图：取 full，没有再用 src 兜底 */
+		previewFull(c) {
+			if (!c) return
+			const url = c.full || c.src
+			if (url) uni.previewImage({ urls: [url], current: url })
+		},
+
+		/** 卡片右下「查看详情」：SL 进发射详情图态，NASA 两张全屏看原图 */
+		viewDetail(c) {
+			if (!c) return
+			if (c.type === 'sl') {
+				this.openPhoto({ id: c.launchId, net: c.net })
+			} else {
+				this.previewFull(c)
+			}
+		},
+
+		/** 卡片右下「更多图片」：按卡片类型跳到聚合图库对应 tab */
+		moreImgs(c) {
+			if (!c) return
+			if (c.type === 'sl') this.goGalleryAll('image')
+			else if (c.type === 'epic') this.goGalleryAll('earth')
+			else if (c.type === 'apod') this.goGalleryAll('astro')
+		},
+
+		/** 跳聚合图库：tab 取值 image|video|earth|astro|nasa（gallery-all.vue 读取） */
+		goGalleryAll(tab) {
+			uni.navigateTo({ url: '/pages/gallery-all/gallery-all?tab=' + tab })
 		},
 
 		/** 轮播图加载失败：标记该索引，模板回退到底色，避免裂图 */

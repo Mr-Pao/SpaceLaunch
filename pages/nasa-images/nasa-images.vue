@@ -7,7 +7,8 @@
 		</view>
 
 		<block v-else>
-			<!-- 主题切换：全部 + 各主题，点哪个看哪个 -->
+			<!-- 快速筛选：全部 + 各主题，点哪个看哪个 -->
+			<view class="tabs-label">快速筛选</view>
 			<scroll-view class="tabs" scroll-x :show-scrollbar="false">
 				<view
 					class="tab"
@@ -15,7 +16,7 @@
 					:key="t.key"
 					:class="{ active: active === t.key }"
 					@click="active = t.key"
-				>{{ t.name }}</view>
+				>{{ t.name }}<text v-if="t.count > 0" class="tab-count">{{ t.count }}</text></view>
 			</scroll-view>
 
 			<view class="stat" v-if="shown.length">
@@ -64,8 +65,8 @@
 				loading: true,
 				// 全部图片（已扁平化，带主题）
 				all: [],
-				// 主题 tab：全部 + 各主题
-				tabs: [{ key: 'all', name: '全部' }],
+			// 主题 tab：全部 + 各主题
+			tabs: [{ key: 'all', name: '全部', count: 0 }],
 				active: 'all',
 				shownCount: PAGE
 			}
@@ -129,11 +130,12 @@
 						full: x.full || x.thumb || ''
 					}))
 
-					// 主题 tab 由后端 themes 提供（已是过滤掉空主题后的顺序）
-					const themes = (d && d.themes) || []
-					this.tabs = [{ key: 'all', name: '全部' }].concat(
-						themes.map((t) => ({ key: t.key, name: t.name }))
-					)
+				// 主题 tab 由后端 themes 提供（已是过滤掉空主题后的顺序）
+				const themes = (d && d.themes) || []
+				const total = this.all.length
+				this.tabs = [{ key: 'all', name: '全部', count: total }].concat(
+					themes.map((t) => ({ key: t.key, name: t.name, count: t.count || 0 }))
+				)
 				} catch (e) {
 					console.warn('[nasa-images] 加载失败', e)
 					this.all = []
@@ -171,10 +173,18 @@
 	font-size: 26rpx;
 }
 
+/* 快速筛选标签 */
+.tabs-label {
+	padding: 20rpx 24rpx 4rpx;
+	color: #6b7891;
+	font-size: 22rpx;
+	letter-spacing: 1rpx;
+}
+
 /* 主题切换行 */
 .tabs {
 	white-space: nowrap;
-	padding: 16rpx 12rpx 0;
+	padding: 6rpx 12rpx 12rpx;
 }
 
 .tab {
@@ -192,6 +202,23 @@
 	background: #38bdf8;
 	color: #04121f;
 	font-weight: 600;
+}
+
+/* 主题数量徽标 */
+.tab-count {
+	margin-left: 8rpx;
+	padding: 0 10rpx;
+	border-radius: 999rpx;
+	background: rgba(255, 255, 255, 0.12);
+	color: #8b95a8;
+	font-size: 18rpx;
+	line-height: 28rpx;
+	vertical-align: middle;
+}
+
+.tab.active .tab-count {
+	background: rgba(4, 18, 31, 0.18);
+	color: #04121f;
 }
 
 /* 顶部统计 */

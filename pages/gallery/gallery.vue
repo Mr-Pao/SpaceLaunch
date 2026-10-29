@@ -86,14 +86,6 @@
 				<text class="all-num">{{ total }}</text>
 				<text class="all-arrow">›</text>
 			</view>
-			<view class="all-btn vid" hover-class="all-btn-hover" @click="goVideos">
-				<text class="all-text">看视频</text>
-				<text class="all-arrow">🎬</text>
-			</view>
-			<view class="all-btn nasa" hover-class="all-btn-hover" @click="goNasa">
-				<text class="all-text">NASA 影像</text>
-				<text class="all-arrow">🌌</text>
-			</view>
 		</view>
 
 		<view class="loading" v-if="loading">
@@ -104,14 +96,6 @@
 			<text class="empty-icon">🛰️</text>
 			<text class="empty-text">还没有图片</text>
 			<text class="empty-sub">历史图片正在由后台逐批补齐，过几个小时再来看看</text>
-			<view class="all-btn vid solo" hover-class="all-btn-hover" @click="goVideos">
-				<text class="all-text">看发射视频</text>
-				<text class="all-arrow">🎬</text>
-			</view>
-			<view class="all-btn nasa solo" hover-class="all-btn-hover" @click="goNasa">
-				<text class="all-text">看 NASA 影像</text>
-				<text class="all-arrow">🌌</text>
-			</view>
 		</view>
 	</view>
 </template>
@@ -212,14 +196,6 @@ export default {
 	methods: {
 		goAll() {
 			uni.navigateTo({ url: '/pages/gallery-all/gallery-all' })
-		},
-
-		goVideos() {
-			uni.navigateTo({ url: '/pages/video-gallery/video-gallery' })
-		},
-
-		goNasa() {
-			uni.navigateTo({ url: '/pages/nasa-images/nasa-images' })
 		},
 
 		/**
@@ -544,31 +520,6 @@ export default {
 	color: #38bdf8;
 	font-size: 30rpx;
 	line-height: 1;
-}
-
-/* 视频入口：和「看全部」并排，用略不同的描边区分 */
-.all-btn.vid {
-	margin-left: 16rpx;
-	border-color: rgba(168, 120, 255, 0.4);
-}
-
-.all-btn.vid .all-arrow {
-	color: #b794ff;
-}
-
-/* NASA 影像入口：再一个并排，用星蓝描边区分 */
-.all-btn.nasa {
-	margin-left: 16rpx;
-	border-color: rgba(56, 189, 248, 0.45);
-}
-
-.all-btn.nasa .all-arrow {
-	color: #7dd3fc;
-}
-
-/* 空态里的视频入口：单独成行居中，离上方说明留点间距 */
-.all-btn.vid.solo {
-	margin: 28rpx auto 0;
 }
 
 /* ---- 空态 / 加载 ---- */
