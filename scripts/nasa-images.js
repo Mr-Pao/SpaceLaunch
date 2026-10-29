@@ -146,20 +146,25 @@ async function runNasaImages() {
 
 	console.log(`  共 ${collected.length} 张，开始翻译标题与简介`)
 	// 标题与简介中文化：NASA 原文是英文，详情页要中文；翻不出来前端自动回退英文。
-	// 复用 sync.js 的哈希缓存，按月跑一次、只翻新增内容
+	// 复用 sync.js 的哈希缓存，按月跑一次、只翻新增内容。
+	//
+	// 顺序很关键：先把 316 个标题全部排进队列，再排简介。
+	// MyMemory 匿名只有约 1000 词/天，一旦中途配额耗尽，
+	// 至少能保证「标题全中文」——详情页有中文标题可用，比标题英文、简介中文好得多
 	if (collected.length) {
 		try {
 			await loadCache()
 			const texts = []
-			for (const x of collected) {
-				if (x.title) texts.push(x.title)
-				if (x.desc) texts.push(x.desc)
-			}
+			for (const x of collected) if (x.title) texts.push(x.title)
+			for (const x of collected) if (x.desc) texts.push(x.desc)
 			await translateTexts(texts)
 			for (const x of collected) {
 				x.titleZh = getZh(x.title)
 				x.descZh = getZh(x.desc)
 			}
+			const doneT = collected.filter((x) => x.titleZh).length
+			const doneD = collected.filter((x) => x.descZh).length
+			console.log(`  翻译完成：标题 ${doneT}/${collected.length}，简介 ${doneD}/${collected.length}`)
 			const cachePath = saveCache()
 			// 缓存必须回写 COS：CI 每次全新容器，不上传等于每轮重翻
 			if (hasCosConfig() && cachePath) {
@@ -205,10 +210,72 @@ async function runNasaImages() {
 	return { count: collected.length }
 }
 
-module.exports = { runNasaImages }
+/**
+ * 只补翻译：不重抓、不重镜像，读 COS 上的旧数据把缺的中文补上再回传。
+ *
+ * 为什么需要：星云 316 张的标题 + 简介合计约 1.1 万词，
+ * 超过单日免费翻译额度，一次跑不完。这个模式可以每天跑一轮，
+ * 靠哈希缓存逐日累积，两三天就全部中文化，而且不重复下载 316 张图。
+ */
+async function runTranslateOnly() {
+	const old = await readCosJson(KEY).catch(() => null)
+	const list = (old && old.list) || []
+	if (!list.length) {
+		console.log('  COS 上还没有 NASA 影像数据，跳过补翻')
+		return { count: 0, translated: 0, remain: 0 }
+	}
+
+	const todo = list.filter((x) => x && (x.title || x.desc) && !(x.titleZh && x.descZh))
+	if (!todo.length) {
+		console.log(`  全部 ${list.length} 条已有中文，无需补翻`)
+		return { count: list.length, translated: 0, remain: 0 }
+	}
+
+	console.log(`  待补翻 ${todo.length}/${list.length} 条`)
+	await loadCache()
+	// 标题优先排队：额度耗尽时至少标题是中文
+	const texts = []
+	for (const x of todo) if (x.title && !x.titleZh) texts.push(x.title)
+	for (const x of todo) if (x.desc && !x.descZh) texts.push(x.desc)
+	await translateTexts(texts)
+
+	for (const x of todo) {
+		if (!x.titleZh) x.titleZh = getZh(x.title)
+		if (!x.descZh) x.descZh = getZh(x.desc)
+	}
+
+	const cachePath = saveCache()
+	if (hasCosConfig() && cachePath) {
+		await upload(cachePath, 'space-data/translation-cache.json', 'public, max-age=3600')
+	}
+
+	const doneT = list.filter((x) => x.titleZh).length
+	const doneD = list.filter((x) => x.descZh).length
+	console.log(`  本次补齐后：标题 ${doneT}/${list.length}，简介 ${doneD}/${list.length}`)
+
+	// 更新 generatedAt，前端才会把这份数据当成新数据刷新
+	const payload = Object.assign({}, old, {
+		generatedAt: new Date().toISOString(),
+		list
+	})
+	const filePath = path.join(OUT_DIR, FILE)
+	fs.mkdirSync(OUT_DIR, { recursive: true })
+	fs.writeFileSync(filePath, JSON.stringify(payload), 'utf8')
+	await upload(filePath, KEY, 'public, max-age=86400')
+	console.log(`  → 已回传 ${FILE}`)
+
+	return {
+		count: list.length,
+		translated: doneT,
+		remain: list.length - doneD
+	}
+}
+
+module.exports = { runNasaImages, runTranslateOnly }
 
 if (require.main === module) {
-	runNasaImages()
+	const job = process.env.TRANSLATE_ONLY === '1' ? runTranslateOnly() : runNasaImages()
+	job
 		.then((r) => {
 			console.log('完成:', JSON.stringify(r))
 			process.exit(0)

@@ -103,6 +103,13 @@ function fixTerms(zh) {
 	if (!zh) return zh
 	let s = zh
 	for (const [re, to] of termRules) s = s.replace(re, to)
+	// MyMemory 的记忆库里混进了 CAT 工具的占位符，短标题经常返回
+	// 「蟹状星云object name (optional)」，直接摘掉这截脏尾巴
+	s = String(s)
+		.replace(/object\s*name\s*\(\s*optional\s*\)/gi, '')
+		.replace(/\s*\(\s*optional\s*\)\s*$/i, '')
+		.replace(/\s{2,}/g, ' ')
+		.trim()
 	return s
 }
 
@@ -226,6 +233,11 @@ async function translateByMyMemory(seg) {
 
 // Google 一旦连不上（比如本地网络），后续请求就别再白等 6 秒
 let googleDown = false
+// 连续被 Google 限流的次数。差量任务（每天几十条）撞几次 429 退避一下就过去了，
+// 但 NASA 星云这种一次六百多段的大批量，CI 的 IP 段会被持续限流，
+// 此时死磕 Google 只会把整批耗光 —— 攒够次数就转 MyMemory
+let google429 = 0
+const GOOGLE_429_LIMIT = Number(process.env.TRANSLATE_429_LIMIT || 12)
 
 async function translateSegment(seg) {
 	if (PROVIDER === 'mymemory') return translateByMyMemory(seg)
@@ -234,13 +246,21 @@ async function translateSegment(seg) {
 	// auto：先 Google，失败就永久降级到 MyMemory
 	if (!googleDown) {
 		try {
-			return await translateByGoogle(seg)
+			const out = await translateByGoogle(seg)
+			google429 = 0
+			return out
 		} catch (e) {
-			// 只是被限流的话不算「Google 不可用」，退避重试仍然走 Google，
-			// 否则一次 429 就会把整批流量都甩给只有 1000 词/天的 MyMemory
-			if (isTransient(e)) throw e
-			googleDown = true
-			console.warn(`  · Google 翻译不可用（${e.message}），本次改用 MyMemory`)
+			// 瞬时限流先退避重试，仍然优先用 Google（质量比 MyMemory 好）；
+			// 但连续撞太多次说明这个出口被盯上了，转 MyMemory 保住产出
+			if (isTransient(e)) {
+				google429++
+				if (google429 < GOOGLE_429_LIMIT) throw e
+				googleDown = true
+				console.warn(`  · Google 连续限流 ${google429} 次，本次改用 MyMemory`)
+			} else {
+				googleDown = true
+				console.warn(`  · Google 翻译不可用（${e.message}），本次改用 MyMemory`)
+			}
 		}
 	}
 	return translateByMyMemory(seg)
@@ -290,6 +310,12 @@ async function translateTexts(texts) {
 
 	let idx = 0
 	let consecutiveFail = 0
+	// 连续失败多少条才收手。差量任务几十条时 5 条足够早停，
+	// 但 NASA 星云一次六百多段，5 条就中止等于整批全废 —— 按批量放大
+	const FAIL_LIMIT = Math.max(
+		Number(process.env.TRANSLATE_MAX_FAIL || 30),
+		Math.ceil(todo.length * 0.15)
+	)
 
 	const worker = async () => {
 		while (idx < todo.length) {
@@ -313,7 +339,7 @@ async function translateTexts(texts) {
 				stats.fail++
 				consecutiveFail++
 				// 连续失败多半是被限流，早点收手，别把后面的也拖死
-				if (consecutiveFail >= 5) {
+				if (consecutiveFail >= FAIL_LIMIT) {
 					quotaExhausted = true
 					console.warn(`  ! 连续 ${consecutiveFail} 次失败，中止本轮翻译: ${e.message}`)
 					return

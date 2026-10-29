@@ -59,4 +59,9 @@ jobs:
           COS_ACL: public-read
           # 每个主题最多取多少张（星云检索总命中约 316，取满）
           NASA_IMG_PER_THEME: '400'
+          # 标题与简介中文化。auto = 先用 Google 免费端点，连续被限流才降级 MyMemory。
+          # MyMemory 必须带 de 邮箱才够翻：匿名约 1000 词/天，带邮箱 50000 词/天。
+          # 星云 316 张标题 + 简介合计约 1.1 万词，没邮箱只能翻完标题。
+          TRANSLATE_PROVIDER: auto
+          TRANSLATE_EMAIL: ${{ secrets.TRANSLATE_EMAIL }}
         run: node nasa-images.js

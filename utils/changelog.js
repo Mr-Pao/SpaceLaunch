@@ -903,5 +903,17 @@ export const CHANGELOG = [
 			'翻译缓存补回写 COS（nasa-daily / nasa-images）——之前没上传，CI 每次全新容器等于每轮重翻',
 			'天文介绍去掉开头的「说明：/Explanation:」标签词：抓取时清理英文前缀，前端兜底清理中文前缀'
 		]
+	},
+	{
+		version: '3.2.51',
+		date: '2026-10-29',
+		title: '星云中文修复',
+		items: [
+			'修星云详情页仍是英文：Google 端点被限流时原先只重试不降级，316 条翻译全数失败写进空字段',
+			'Google 连续限流达阈值后自动降级 MyMemory；连续失败中止阈值按批量规模放大（5 条 → 至少 30 条）',
+			'翻译队列改为标题优先，额度不足时先保证标题全中文',
+			'清理 MyMemory 短标题译文里的脏尾巴「object name (optional)」',
+			'新增每日「只补翻译」管道 nasa-images-translate.yml：不重抓不重镜像，逐日累积把 316 条翻完'
+		]
 	}
 ]

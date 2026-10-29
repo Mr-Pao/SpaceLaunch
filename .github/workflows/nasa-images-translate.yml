@@ -1,0 +1,57 @@
+name: nasa-images-translate
+
+# 星云影像的「中文补全」管道。
+#
+# 为什么单独一条：nasa-images 一次要抓 316 张图并镜像两种尺寸，
+# 跑一轮十几分钟；而标题 + 简介合计约 1.1 万词，常超出单日免费翻译额度。
+# 把翻译拆出来每天跑一小轮，靠哈希缓存逐日累积，几天就全部中文化，
+# 且全程不下载图片、不动 COS 上的图，只更新 JSON 里的中文文本。
+#
+# 触发方式：
+#   1. 定时：每天 UTC 05:00 = 北京 13:00（避开 nasa-daily 的 04:00）
+#   2. 手动：workflow_dispatch
+#
+# 幂等：全部条目已有中文时直接跳过，不重传文件，可以放心天天跑。
+# 注意：cron 用 UTC。北京时间 = UTC+8
+
+on:
+  schedule:
+    - cron: '0 5 * * *'    # 每天 UTC 05:00 = 北京 13:00
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nasa-images-translate
+  cancel-in-progress: false
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: 补齐星云标题与简介的中文
+        working-directory: scripts
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET || 'spacelaunch-1258113633' }}
+          COS_REGION: ${{ secrets.COS_REGION || 'ap-chengdu' }}
+          COS_ACL: public-read
+          # 只补翻译：不重抓、不重镜像
+          TRANSLATE_ONLY: '1'
+          TRANSLATE_PROVIDER: auto
+          TRANSLATE_EMAIL: ${{ secrets.TRANSLATE_EMAIL }}
+        run: node nasa-images.js
