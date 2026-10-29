@@ -162,8 +162,10 @@ const SOFT_TTL = {
 	// 给 1 小时软 TTL，配合空列表强制回源，避免旧数据压 12 小时
 	apod: 60 * 60 * 1000,
 	epic: 60 * 60 * 1000,
-	// NASA 影像每月才重抓一次，12 小时软 TTL 足够，不会每次进页面都回源
-	nasaImages: 12 * 60 * 60 * 1000
+	// NASA 影像每月才重抓一次，但历史上出现过「主题从 6 个砍到 1 个、张数从 180
+	// 涨到 316」这种整体换代 —— 12 小时 TTL 会让页面在半天里一直显示旧条数。
+	// 降到 2 小时，配合下面的定时校验，数据换代当天就能跟上
+	nasaImages: 2 * 60 * 60 * 1000
 }
 
 // 硬过期（分级）：超过这个时间的缓存不再无限期驻留 Storage。
@@ -476,13 +478,20 @@ const EMPTY_SUSPECT = { apod: 1, epic: 1 }
  * 后台一次都不刷 —— 页面就永远停在旧条数上，最坏干等满一个 TTL。
  * 这两个集合都很小（APOD 百来条、EPIC 13 条），5 分钟校验一次成本可忽略。
  */
-const DAILY_REVALIDATE = new Set(['apod', 'epic'])
-const REVALIDATE_GAP = 5 * 60 * 1000
+const DAILY_REVALIDATE = new Set(['apod', 'epic', 'nasaImages'])
+// 校验间隔按体积分档：APOD/EPIC 各几十 KB，5 分钟一次无所谓；
+// NASA 影像 300+ 条带中文简介约 150KB，压到 1 小时一次，够快也不浪费流量
+const REVALIDATE_GAP = {
+	apod: 5 * 60 * 1000,
+	epic: 5 * 60 * 1000,
+	nasaImages: 60 * 60 * 1000
+}
 const lastRecheck = {}
 
 function shouldRecheck(name) {
+	const gap = REVALIDATE_GAP[name] || 5 * 60 * 1000
 	const t = lastRecheck[name]
-	if (t && Date.now() - t < REVALIDATE_GAP) return false
+	if (t && Date.now() - t < gap) return false
 	lastRecheck[name] = Date.now()
 	return true
 }

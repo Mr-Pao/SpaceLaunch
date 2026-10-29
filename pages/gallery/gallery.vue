@@ -192,11 +192,31 @@ export default {
 	async onLoad() {
 		// 四类图片混着飘才有「所有图片」的意思：发射图 + 今日地球 + 天文 + 星云。
 		// 并行拉，任一类失败都不影响其它类出图
+		const counts = { launch: 0, earth: 0, astro: 0, nasa: 0 }
+		const sum = () => counts.launch + counts.earth + counts.astro + counts.nasa
+		// 每日类数据集（apod/epic/nasaImages）会自己后台校验，拿到新数据就把总数改过来，
+		// 否则会出现「按钮显示 647 张、线上其实已经 933 张」这种落差
+		const onFresh = (key, d) => {
+			counts[key] = (d && d.count) || ((d && d.list) || []).length
+			this.total = sum()
+		}
+
+		// 兜底超时：单个数据集最多等这么久，超时就当它没有，先把墙铺出来。
+		// 四个并发最坏会连着等满 8 秒的请求超时，页面就一直转「加载中」——
+		// 少几类图下次进来就有，总比白屏干等好
+		const within = (p, ms) => {
+			return Promise.race([
+				p,
+				new Promise((resolve) => setTimeout(() => resolve(null), ms))
+			])
+		}
+
 		const [g, ep, ap, ns] = await Promise.all([
-			spaceData.load('gallery').catch(() => null),
-			spaceData.load('epic').catch(() => null),
-			spaceData.load('apod').catch(() => null),
-			spaceData.load('nasaImages').catch(() => null)
+			// 墙的主体是发射图，给多一点时间；其余三类是锦上添花
+			within(spaceData.load('gallery').catch(() => null), 5000),
+			within(spaceData.load('epic', { onUpdate: (d) => onFresh('earth', d) }).catch(() => null), 3500),
+			within(spaceData.load('apod', { onUpdate: (d) => onFresh('astro', d) }).catch(() => null), 3500),
+			within(spaceData.load('nasaImages', { onUpdate: (d) => onFresh('nasa', d) }).catch(() => null), 3500)
 		])
 
 		const pool = []
@@ -279,12 +299,13 @@ export default {
 
 		this.images = pool
 		// 「看全部」显示的是四类合计：gallery 只加载了第一片，
-		// 用它自己的 count 才是真实全量
-		this.total =
-			((g && g.count) || ((g && g.list) || []).length) +
-			((ep && ep.count) || ((ep && ep.list) || []).length) +
-			((ap && ap.count) || ((ap && ap.list) || []).length) +
-			((ns && ns.count) || ((ns && ns.list) || []).length)
+		// 用它自己的 count 才是真实全量。这里先把基准数记进 counts，
+		// 之后哪一类后台刷到新数据，onFresh 就只会改那一项再重算
+		counts.launch = (g && g.count) || ((g && g.list) || []).length
+		counts.earth = (ep && ep.count) || ((ep && ep.list) || []).length
+		counts.astro = (ap && ap.count) || ((ap && ap.list) || []).length
+		counts.nasa = (ns && ns.count) || ((ns && ns.list) || []).length
+		this.total = sum()
 
 		// 随机取满一屏的用量：每次进图库看到的墙都不一样
 		const picked = shuffle(pool).slice(0, PER_ROW * ROWS)
