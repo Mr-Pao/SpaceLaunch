@@ -456,7 +456,11 @@ export default {
 				const out = []
 				for (const x of (d && d.list) || []) {
 					if (!x || !x.full) continue
-					// 兜底去重：NASA 接口降级时可能写出多张相同图，避免前端再出现「连排重复」
+					// 占位哨兵：NASA 接口降级时会返回 title="NASA Science"、url 落在
+					// science.nasa.gov 的 WP 主题资源目录的占位响应，这种绝不可展示
+					if (x.title === 'NASA Science') continue
+					if (/\/wp-content\/themes\//.test(x.full || x.thumb || '')) continue
+					// 兜底去重：降级可能写出多张相同图，避免「连排重复」
 					if (seen.has(x.full)) continue
 					seen.add(x.full)
 					out.push({ thumb: x.thumb || x.full, full: x.full, title: x.title || '' })

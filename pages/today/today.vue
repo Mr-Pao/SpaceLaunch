@@ -501,7 +501,10 @@ export default {
 		if (a) this.astronauts = a.list || []
 		if (u) this.upcoming = u.list || []
 		if (o) this.onthisday = o.list || []
-		if (ap) this.apod = ap.list || []
+		// 过滤 NASA 接口降级占位响应（title="NASA Science" / WP 主题资源目录 url），避免脏数据上首页卡片
+		if (ap) this.apod = (ap.list || []).filter(
+			(x) => x && x.full && x.title !== 'NASA Science' && !/\/wp-content\/themes\//.test(x.full || x.thumb || '')
+		)
 		if (ep) this.epic = ep.list || []
 
 			this.loading = false

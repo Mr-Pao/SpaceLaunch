@@ -684,5 +684,15 @@ export const CHANGELOG = [
 			'gallery-all 天文 tab 兜底按 full 去重，防止 CI 重跑前 COS 旧重复数据的窗口期再出现连排重复',
 			'接口恢复后次日定时抓取自动回填真实天文图；降级期间该 tab 显示「还没有天文图」空态'
 		]
+	},
+	{
+		version: '3.2.29',
+		date: '2026-10-29',
+		title: '天文占位哨兵前端兜底',
+		items: [
+			'现象：COS 已重写空列表，但小程序 12h 本地缓存仍缓存旧 7 连脏数据，前端去重后露出 1 张「NASA Science」占位卡',
+			'gallery-all 天文 tab 与 today 首页「每日天文」卡均加占位哨兵过滤：丢弃 title="NASA Science" 或 url 落在 WP 主题资源目录的条目',
+			'缓存窗口内坏卡不再渲染，直接落到空态；NASA 恢复后真实天文图自动回填，无需再发版'
+		]
 	}
 ]
