@@ -369,6 +369,9 @@ function fetchDataset(name, bypass) {
 			pastCount: body.pastCount,
 			window: body.window,
 			closest: body.closest,
+			// nasaImages：主题清单，图库 NASA tab 的标签栏靠它渲染。
+			// 这里漏一个字段不会报错，只会让标签静默消失
+			themes: body.themes,
 			list: body.list,
 			savedAt: Date.now()
 		}

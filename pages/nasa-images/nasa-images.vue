@@ -116,7 +116,11 @@
 		methods: {
 			async load() {
 				try {
-					const d = await spaceData.load('nasaImages').catch(() => null)
+					let d = await spaceData.load('nasaImages').catch(() => null)
+					// 老缓存没有 themes（早期 data.js 白名单漏了这个字段），强制回源补齐
+					if (d && !(d.themes && d.themes.length)) {
+						d = await spaceData.load('nasaImages', { force: true }).catch(() => d)
+					}
 					const list = (d && d.list) || []
 					this.all = list.map((x) => ({
 						id: x.id,
