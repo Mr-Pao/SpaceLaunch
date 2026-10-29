@@ -77,7 +77,7 @@
 		</view>
 
 		<!-- 墙的注解：紧贴图片墙下方，只说明怎么用，不掺别的入口 -->
-		<text class="wall-tip" v-if="!loading && rowsA.length">点任意一张看大图</text>
+		<text class="wall-tip" v-if="!loading && rowsA.length">点任意一张看详情</text>
 
 		<!-- 独立入口：和注解分开，各占一行 -->
 		<view class="dock" v-if="!loading && rowsA.length">
@@ -200,25 +200,82 @@ export default {
 		])
 
 		const pool = []
-		// kind 决定点开去哪：launch（发射图）有 id/net，能回发射详情的图片优先态；
-		// 其它三类只有图片，直接进系统看图器
-		const push = (x, title, kind) => {
-			if (!x) return
-			const thumb = x.thumb || x.full
-			if (!thumb) return
-			pool.push({
+		// kind 决定点开去哪：launch（发射图）有 id/net，回发射详情的图片优先态；
+		// photo（其余三类）进图片详情页，和「看全部」里点图完全一样
+		const add = (arr, make) => {
+			for (const x of arr || []) {
+				const it = make(x)
+				if (it && it.thumb) pool.push(it)
+			}
+		}
+
+		add(g && g.list, (x) => {
+			const thumb = x && (x.thumb || x.full)
+			if (!thumb) return null
+			return {
 				thumb,
 				full: x.full || thumb,
-				title: title || x.titleZh || x.title || '',
-				kind: kind || 'photo',
+				title: x.name || '',
+				kind: 'launch',
+				tag: '',
+				date: '',
+				intro: '',
+				credit: '',
 				id: x.id || '',
 				net: x.net || ''
-			})
-		}
-		for (const x of (g && g.list) || []) push(x, '', 'launch')
-		for (const x of (ep && ep.list) || []) push(x, '地球 · DSCOVR')
-		for (const x of (ap && ap.list) || []) push(x)
-		for (const x of (ns && ns.list) || []) push(x)
+			}
+		})
+
+		add(ep && ep.list, (x) => {
+			const thumb = x && (x.thumb || x.full)
+			if (!thumb) return null
+			return {
+				thumb,
+				full: x.full || thumb,
+				title: '地球 · DSCOVR',
+				kind: 'photo',
+				tag: '今日地球',
+				date: (x.date || '').slice(0, 10),
+				intro: x.captionZh || x.caption || '',
+				credit: 'NASA EPIC',
+				id: '',
+				net: ''
+			}
+		})
+
+		add(ap && ap.list, (x) => {
+			const thumb = x && (x.thumb || x.full)
+			if (!thumb) return null
+			return {
+				thumb,
+				full: x.full || thumb,
+				title: x.titleZh || x.title || '',
+				kind: 'photo',
+				tag: '每日天文',
+				date: (x.date || '').slice(0, 10),
+				intro: x.explanationZh || x.explanation || '',
+				credit: x.credit || '',
+				id: '',
+				net: ''
+			}
+		})
+
+		add(ns && ns.list, (x) => {
+			const thumb = x && (x.thumb || x.full)
+			if (!thumb) return null
+			return {
+				thumb,
+				full: x.full || thumb,
+				title: x.titleZh || x.title || '',
+				kind: 'photo',
+				tag: '星云',
+				date: (x.date || '').slice(0, 10),
+				intro: x.descZh || x.desc || '',
+				credit: x.center || '',
+				id: '',
+				net: ''
+			}
+		})
 
 		this.images = pool
 		// 「看全部」显示的是四类合计：gallery 只加载了第一片，
@@ -248,12 +305,13 @@ export default {
 		},
 
 		/**
-		 * 点开看大图。传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
+		 * 点开看详情。传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
 		 *
-		 * 按类型分流：
-		 *   - 发射图 → 进 launchInfo 的图片优先态，底部还能点「查看发射详情」；
-		 *     相册上下文只给同一行的其它发射图，避免滑到星云图却挂着发射的说明。
-		 *   - 地球 / 天文 / 星云 → 直接系统看图器，整行可左右滑。
+		 * 两类都在同一个动作里：点图 → 进详情页，区别只是详情页不同。
+		 *   - 发射图 → launchInfo 的图片优先态，底部可继续看这次发射；
+		 *     相册只给同一行的其它发射图，避免滑到星云图却挂着发射的说明。
+		 *   - 地球 / 天文 / 星云 → photo-detail（原图 + 标题 + 中文介绍），
+		 *     和「看全部」里点图完全一致。介绍上千字，走 Storage 传，不塞 URL。
 		 */
 		preview(row, i) {
 			const list = this.raw[row]
@@ -275,11 +333,19 @@ export default {
 				return
 			}
 
-			// 相册只放非发射图：发射图在 gallery.json 里只有 480px 缩略图，
-			// 混进来滑到时是糊的；它们的原图由 launchInfo 自己去拉
-			const photos = list.filter((x) => x.kind !== 'launch')
-			const urls = photos.map((x) => x.full || x.thumb)
-			uni.previewImage({ urls, current: item.full || item.thumb })
+			try {
+				uni.setStorageSync('_photo_detail', {
+					full: item.full || item.thumb,
+					title: item.title || '',
+					date: item.date || '',
+					intro: item.intro || '',
+					credit: item.credit || '',
+					tag: item.tag || '图片详情'
+				})
+			} catch (e) {
+				console.warn('[gallery] 详情数据暂存失败', e)
+			}
+			uni.navigateTo({ url: '/pages/photo-detail/photo-detail?from=gallery' })
 		}
 	}
 }
