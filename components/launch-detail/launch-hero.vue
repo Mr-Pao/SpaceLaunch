@@ -75,6 +75,8 @@
 </template>
 
 <script>
+import { thumbOf, fullImageOf } from '@/utils/media.js'
+
 export default {
 	name: 'launch-hero',
 
@@ -106,8 +108,10 @@ export default {
 				out.push(u)
 			}
 
-			// 首图固定是本任务自己的图，无论聚合结果怎么排都压在最前
-			push(d.image)
+			// 首图固定是本任务自己的图，无论聚合结果怎么排都压在最前。
+			// 用 480px 缩略版而不是 2000px 原图：首图区一屏要放好几张，
+			// 原图每张几百 KB，弱网下就是盯着黑板等 —— 点开预览时会给原图
+			push(thumbOf(d.image))
 
 			// 再补同系列的照片，让首图区真的轮播起来（以前这里恒返回 1 张，
 			// swiper 分支等于死代码）。信息图是长图、字多，塞进首图很跳，跳过；
@@ -131,9 +135,11 @@ export default {
 
 	methods: {
 		// 点开图片能双指放大，长图信息不点开根本看不清
+		/** 首图区内是 480px 缩略版，点开看大图时换回 2000px 原图 */
 		preview(url) {
 			if (!url) return
-			uni.previewImage({ urls: [url], current: url })
+			const full = fullImageOf(url) || url
+			uni.previewImage({ urls: [full], current: full })
 		},
 
 		/** 首图轮播翻页：下标在父组件里，这里只回传当前页 */

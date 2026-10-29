@@ -35,6 +35,19 @@ export function fullImageOf(url) {
 	return url.replace(/space-img\/([0-9a-f]{16})\.(\w{3,4})(\?.*)?$/, 'space-img/$1_2000.$2')
 }
 
+/**
+ * fullImageOf 的反向：把镜像的原图地址换回 480px 缩略版。
+ *
+ * 用途：首图区一屏要塞好几张，直接拿 2000px 原图当缩略图，
+ * 每张几百 KB，弱网下要等很久才出图（首屏就是一片黑）。
+ * 缩略版在手机上完全够看，点开再看原图。
+ * 非镜像地址原样返回，不去猜 CDN 的缩略图规则。
+ */
+export function thumbOf(url) {
+	if (!url || typeof url !== 'string') return url || ''
+	return url.replace(/(space-img\/[0-9a-f]{16})_2000\.(\w{3,4})/, '$1.$2')
+}
+
 function uniqByUrl(list) {
 	const seen = {}
 	const out = []
