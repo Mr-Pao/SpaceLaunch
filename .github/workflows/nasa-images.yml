@@ -63,5 +63,6 @@ jobs:
           # MyMemory 必须带 de 邮箱才够翻：匿名约 1000 词/天，带邮箱 50000 词/天。
           # 星云 316 张标题 + 简介合计约 1.1 万词，没邮箱只能翻完标题。
           TRANSLATE_PROVIDER: auto
-          TRANSLATE_EMAIL: ${{ secrets.TRANSLATE_EMAIL }}
+          # secret 优先；没配 secret 时回退到项目邮箱，保证额度 5 万词/天够翻完 316 条
+          TRANSLATE_EMAIL: ${{ secrets.TRANSLATE_EMAIL || '492021770@qq.com' }}
         run: node nasa-images.js

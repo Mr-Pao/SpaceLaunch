@@ -53,5 +53,6 @@ jobs:
           # 只补翻译：不重抓、不重镜像
           TRANSLATE_ONLY: '1'
           TRANSLATE_PROVIDER: auto
-          TRANSLATE_EMAIL: ${{ secrets.TRANSLATE_EMAIL }}
+          # secret 优先；没配 secret 时回退到项目邮箱，保证额度 5 万词/天够翻完 316 条
+          TRANSLATE_EMAIL: ${{ secrets.TRANSLATE_EMAIL || '492021770@qq.com' }}
         run: node nasa-images.js
