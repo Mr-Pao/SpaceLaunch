@@ -484,6 +484,27 @@ async function main() {
   }
   if (reClean) console.log(`  · 旧条目摘要重洗 ${reClean} 条`)
 
+  // ---- 2.6 补关联发射 ----
+  // SNAPI 的 launch_id 是「事后」才挂上的：一篇稿子先出现在「最新」那一路
+  // （launches 为空），过一阵才被标进 `has_launch=true` 那一路。
+  // 旧条目一律原样保留，于是 launches 永远停在当初的空数组 ——
+  // 前端那个「发射」标签就再也长不出来，看着像新资讯全都缺按钮。
+  // 这里用这一轮抓到的值补回去。
+  let relinked = 0
+  for (const it of old) {
+    if (!it || it.id == null) continue
+    const nx = incomingById.get(it.id)
+    if (!nx || !Array.isArray(nx.launches) || !nx.launches.length) continue
+    const before = (it.launches || []).join(',')
+    const after = nx.launches.join(',')
+    if (before === after) continue
+    it.launches = nx.launches
+    // 关联变了旧定位就作废，5.6 会按新的 launches 重新算 launchRefs
+    delete it.launchRefs
+    relinked++
+  }
+  if (relinked) console.log(`  · 补关联发射 ${relinked} 条`)
+
   // ---- 3. 翻译（新增条目 + 被重洗的旧摘要）----
   await translate.loadCache()
   const texts = []
