@@ -734,6 +734,8 @@ export default {
 .acard-name { display: -webkit-box; height: 58rpx; margin-top: 12rpx; color: #fff; font-size: 22rpx; font-weight: 500; line-height: 29rpx; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
 .acard-days { display: block; margin-top: 4rpx; color: #38bdf8; font-size: 21rpx; }
 
+/* 列表 */
+.content {
 	position: relative;
 	z-index: 1;
 	padding: 0 24rpx;
