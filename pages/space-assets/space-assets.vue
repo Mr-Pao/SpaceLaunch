@@ -89,7 +89,8 @@ export default {
 <style lang="scss" scoped>
 .page {
 	min-height: 100vh;
-	background: #0a0e17;
+	/* 不设 background：星空是 z-index:-1，页面有不透明底色就会把星点整块盖住。
+	   底色由 pages.json 的 globalStyle 兜住 */
 	box-sizing: border-box;
 }
 

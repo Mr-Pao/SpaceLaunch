@@ -388,8 +388,9 @@ export default {
 .page {
 	position: relative;
 	min-height: 100vh;
-	background: #0a0e17;
-	/* 左右内边距不放在 page 上：身份区要铺满整宽，
+	/* 这里不能设 background：星空组件是 z-index:-1，页面一旦有不透明底色，
+	   160 颗星就会被整块盖住（其它 tab 页都是靠 pages.json 的 globalStyle 兜底色）。
+	   左右内边距不放在 page 上：身份区要铺满整宽，
 	   排版留白由 .hero 与 .content 各自负责 */
 }
 
