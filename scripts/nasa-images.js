@@ -30,13 +30,9 @@ const FILE = 'nasa-images.json'
 const KEY = 'space-data/nasa-images.json'
 
 // 固定主题：精选而非全量。q 用 NASA 站内检索词，挑最能出好图的表述
+// 目前只保留「星云」；其余主题（阿波罗 / 哈勃 / 韦伯 / 火星 / 地球）按需加回即可
 const THEMES = [
-	{ key: 'apollo', name: '阿波罗登月', q: 'Apollo 11 Moon landing' },
-	{ key: 'hubble', name: '哈勃望远镜', q: 'Hubble Space Telescope' },
-	{ key: 'webb', name: '韦伯望远镜', q: 'James Webb Space Telescope' },
-	{ key: 'mars', name: '火星探测', q: 'Mars rover Perseverance' },
-	{ key: 'nebula', name: '星云', q: 'nebula' },
-	{ key: 'earth', name: '蓝色地球', q: 'Earth from space' }
+	{ key: 'nebula', name: '星云', q: 'nebula' }
 ]
 
 // 每个主题最多取多少张（API 默认一页 100，取前 N 足够撑起一个主题墙）
