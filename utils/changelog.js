@@ -854,7 +854,7 @@ export const CHANGELOG = [
 			'列表兜底只取 nebula 主题：本地缓存里若还留着旧的多主题数据，也不会混进星云页',
 			'清理相关状态与样式（nasaTheme / nasaThemes / pickNasaTheme / .nasa-tabs）'
 		]
-	}
+	},
 	{
 		version: '3.2.46',
 		date: '2026-10-29',
