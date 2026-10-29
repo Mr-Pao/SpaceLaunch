@@ -104,9 +104,10 @@
 /**
  * 图库
  *
- * 交互只有一件事：看着它们慢慢飘，喜欢就点开看大图。
+ * 交互只有一件事：看着它们慢慢飘，喜欢就点开。
  * 墙里的图来自四类：发射图片 + 今日地球 + 天文 + 星云，混在一起随机打散，
  * 所以每次进来看到的都不一样；底部 dock 只留一个「看全部」进分类浏览器。
+ * 点开按类型分流：发射图回发射详情的图片优先态，其余三类直接进系统看图器。
  * 漂流墙里不塞视频卡：视频是另一种浏览节奏，混进来会打断「一扇窗」的沉浸感。
  *
  * 为什么每行只放 12 张再复制一份：
@@ -121,6 +122,7 @@
  * 顶部只留一行 HUD 标识（不占布局），墙面从状态栏下一直铺到底部 tabBar。
  */
 import spaceData from '@/utils/data.js'
+import { setAlbum } from '@/utils/album.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import navMixin from '@/utils/nav-mixin.js'
 
@@ -198,17 +200,22 @@ export default {
 		])
 
 		const pool = []
-		const push = (x, title) => {
+		// kind 决定点开去哪：launch（发射图）有 id/net，能回发射详情的图片优先态；
+		// 其它三类只有图片，直接进系统看图器
+		const push = (x, title, kind) => {
 			if (!x) return
 			const thumb = x.thumb || x.full
 			if (!thumb) return
 			pool.push({
 				thumb,
 				full: x.full || thumb,
-				title: title || x.titleZh || x.title || ''
+				title: title || x.titleZh || x.title || '',
+				kind: kind || 'photo',
+				id: x.id || '',
+				net: x.net || ''
 			})
 		}
-		for (const x of (g && g.list) || []) push(x)
+		for (const x of (g && g.list) || []) push(x, '', 'launch')
 		for (const x of (ep && ep.list) || []) push(x, '地球 · DSCOVR')
 		for (const x of (ap && ap.list) || []) push(x)
 		for (const x of (ns && ns.list) || []) push(x)
@@ -243,9 +250,10 @@ export default {
 		/**
 		 * 点开看大图。传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
 		 *
-		 * 墙里混了四类图片，点哪张都只做一件事：把整行当相册交出去，
-		 * 左右滑继续看同一行。发射图原本能点进详情，但那要求每张卡记住自己的类型，
-		 * 混排之后点不同图跳不同地方反而更困惑 —— 这一页的定位就是「看图」。
+		 * 按类型分流：
+		 *   - 发射图 → 进 launchInfo 的图片优先态，底部还能点「查看发射详情」；
+		 *     相册上下文只给同一行的其它发射图，避免滑到星云图却挂着发射的说明。
+		 *   - 地球 / 天文 / 星云 → 直接系统看图器，整行可左右滑。
 		 */
 		preview(row, i) {
 			const list = this.raw[row]
@@ -255,7 +263,22 @@ export default {
 			const item = list[at]
 			if (!item) return
 
-			const urls = list.map((x) => x.full || x.thumb)
+			if (item.kind === 'launch' && item.id) {
+				const shots = list.filter((x) => x.kind === 'launch' && x.id)
+				const idx = shots.indexOf(item)
+				setAlbum(shots, idx > 0 ? idx : 0, 'gallery')
+				uni.navigateTo({
+					url:
+						'/pages/launch/launchInfo?id=' + item.id + '&photo=1' +
+						(item.net ? '&net=' + encodeURIComponent(item.net) : '')
+				})
+				return
+			}
+
+			// 相册只放非发射图：发射图在 gallery.json 里只有 480px 缩略图，
+			// 混进来滑到时是糊的；它们的原图由 launchInfo 自己去拉
+			const photos = list.filter((x) => x.kind !== 'launch')
+			const urls = photos.map((x) => x.full || x.thumb)
 			uni.previewImage({ urls, current: item.full || item.thumb })
 		}
 	}
