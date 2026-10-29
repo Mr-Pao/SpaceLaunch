@@ -23,7 +23,7 @@
 				indicator-active-color="#38bdf8"
 			>
 				<swiper-item v-for="(c, i) in dailyCards" :key="i">
-					<view class="daily-card" @click="openCard(c)">
+					<view :class="['daily-card', c.type === 'epic' ? 'daily-card-earth' : '']" @click="openCard(c)">
 						<image
 							v-if="!dailyErr[i]"
 							:class="['daily-img', c.type === 'epic' ? 'daily-img-earth' : '']"
@@ -694,9 +694,14 @@ export default {
 }
 
 /* 每日地球：方形全彩地球铺满会被裁掉边缘、显得过大，
-   aspectFit 完整显示后左右留白，用深色兜住 */
+   aspectFit 完整显示后左右留白，用纯黑兜住 */
+.daily-card-earth {
+	background: #000000;
+	border-color: rgba(255, 255, 255, 0.05);
+}
+
 .daily-img-earth {
-	background: #0d1420;
+	background: #000000;
 }
 
 /* 底部压黑：图上叠字，不压一层的话浅色天空背景上完全读不出来 */
