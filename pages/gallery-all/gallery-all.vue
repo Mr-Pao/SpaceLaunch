@@ -152,17 +152,7 @@
 			</view>
 
 			<block v-else>
-				<!-- 只剩一个主题时，「全部 / 星云」完全重复，标签栏就不显示了 -->
-				<scroll-view class="nasa-tabs" scroll-x :show-scrollbar="false" v-if="nasaThemes.length > 1">
-					<view
-						class="tab"
-						v-for="t in nasaThemes"
-						:key="t.key"
-						:class="{ active: nasaTheme === t.key }"
-						@click="pickNasaTheme(t.key)"
-					>{{ t.name }}</view>
-				</scroll-view>
-
+				<!-- 只保留星云一个主题，二级筛选栏整块去掉（主标签已经叫星云） -->
 				<view class="grid" v-if="nasaList.length && nasaVisible.length">
 					<view class="gcol" v-for="(col, ci) in nasaCols" :key="ci">
 						<view
@@ -274,8 +264,6 @@ export default {
 			apodLoaded: false,
 			// NASA 影像
 			nasaList: [],
-			nasaThemes: [],
-			nasaTheme: 'all',
 			// 已渲染张数（触底 +60）
 			nasaShow: 60,
 			nasaLoading: false,
@@ -326,10 +314,11 @@ export default {
 			return this.split2(this.apodList)
 		},
 
-		// ---- NASA 标签：按主题筛选 + 两列均分 ----
+		// ---- NASA 标签：只展示星云 ----
 		nasaFiltered() {
-			if (this.nasaTheme === 'all') return this.nasaList
-			return this.nasaList.filter((x) => x.theme === this.nasaTheme)
+			// 缓存里可能还留着旧的多主题数据，这里兜底只取星云；取不到就退回全部
+			const nur = this.nasaList.filter((x) => x.theme === 'nebula')
+			return nur.length ? nur : this.nasaList
 		},
 
 		// 只渲染前 N 张：星云有 300+ 张，一次性铺完节点太多会拖慢滚动
@@ -380,14 +369,6 @@ export default {
 	},
 
 	methods: {
-		/** 切星云主题：重置已渲染张数，避免沿用上一个主题的分页位置 */
-		pickNasaTheme(key) {
-			if (this.nasaTheme === key) return
-			this.nasaTheme = key
-			this.nasaShow = 60
-			uni.pageScrollTo({ scrollTop: 0, duration: 0 })
-		},
-
 		// 两列均分（视频 / 地球 / 天文 / NASA 共用）
 		split2(list) {
 			const L = []
@@ -553,13 +534,7 @@ export default {
 					thumb: x.thumb || '',
 					full: x.full || x.thumb || ''
 				}))
-				this.nasaTheme = 'all'
 				this.nasaShow = 60
-				// 主题筛选：全部 + 各主题
-				const themes = (d && d.themes) || []
-				this.nasaThemes = [{ key: 'all', name: '全部' }].concat(
-					themes.map((t) => ({ key: t.key, name: t.name }))
-				)
 				this.nasaLoaded = true
 			} catch (e) {
 				console.warn('[gallery-all] NASA 影像加载失败', e)
@@ -653,12 +628,6 @@ export default {
 	background: #38bdf8;
 	color: #04121f;
 	font-weight: 600;
-}
-
-/* NASA 标签内的二级主题筛选行 */
-.nasa-tabs {
-	white-space: nowrap;
-	padding: 8rpx 12rpx 0;
 }
 
 /* ---- 图片标签：瀑布流墙（保留原样式） ---- */
