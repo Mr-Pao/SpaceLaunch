@@ -120,7 +120,9 @@ async function runApod(haveDates) {
 			items.push({
 				date: a.date || date,
 				title: a.title || '',
-				explanation: stripHtml(a.explanation),
+				// APOD 原文以 "Explanation:" 开头，去掉这层标签词，正文直接开始；
+				// 先去掉再翻译，中文就不会出现「说明：」前缀
+				explanation: stripHtml(a.explanation).replace(/^\s*Explanation\s*[:：]\s*/i, ''),
 				thumb: url,
 				full: url,
 				credit: stripHtml(a.credit || a.copyright || '')
@@ -212,7 +214,11 @@ async function main() {
 			for (const x of epicItems) {
 				x.captionZh = getZh(x.caption)
 			}
-			saveCache()
+			const cachePath = saveCache()
+			// 缓存回写 COS：CI 每次全新容器，不上传等于每轮重翻
+			if (hasCosConfig() && cachePath) {
+				await upload(cachePath, 'space-data/translation-cache.json', 'public, max-age=3600')
+			}
 		} catch (e) {
 			// 翻译失败绝不能影响出数据，前端会回退英文
 			console.warn(`  ! 翻译失败，保留英文: ${e.message}`)

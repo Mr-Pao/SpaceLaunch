@@ -24,6 +24,7 @@ const fs = require('fs')
 const path = require('path')
 const { hasCosConfig, readCosJson, upload } = require('./lib/cos')
 const { mirrorImages } = require('./lib/image')
+const { loadCache, translateTexts, getZh, saveCache } = require('./lib/translate')
 
 const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 const FILE = 'nasa-images.json'
@@ -143,7 +144,33 @@ async function runNasaImages() {
 		console.log(`    → 取 ${taken} 张（翻到第 ${page} 页）`)
 	}
 
-	console.log(`  共 ${collected.length} 张，开始镜像到 COS（thumb 480px + full 1080px）`)
+	console.log(`  共 ${collected.length} 张，开始翻译标题与简介`)
+	// 标题与简介中文化：NASA 原文是英文，详情页要中文；翻不出来前端自动回退英文。
+	// 复用 sync.js 的哈希缓存，按月跑一次、只翻新增内容
+	if (collected.length) {
+		try {
+			await loadCache()
+			const texts = []
+			for (const x of collected) {
+				if (x.title) texts.push(x.title)
+				if (x.desc) texts.push(x.desc)
+			}
+			await translateTexts(texts)
+			for (const x of collected) {
+				x.titleZh = getZh(x.title)
+				x.descZh = getZh(x.desc)
+			}
+			const cachePath = saveCache()
+			// 缓存必须回写 COS：CI 每次全新容器，不上传等于每轮重翻
+			if (hasCosConfig() && cachePath) {
+				await upload(cachePath, 'space-data/translation-cache.json', 'public, max-age=3600')
+			}
+		} catch (e) {
+			console.warn(`  ! 翻译失败，保留英文: ${e.message}`)
+		}
+	}
+
+	console.log(`  开始镜像到 COS（thumb 480px + full 1080px）`)
 	if (hasCosConfig() && collected.length) {
 		await mirrorImages(collected, [
 			{ path: 'thumb', preset: 'thumb' },

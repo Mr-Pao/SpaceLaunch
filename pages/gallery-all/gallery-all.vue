@@ -576,11 +576,11 @@ export default {
 					id: x.id,
 					theme: x.theme || '',
 					themeName: x.themeName || '',
-					title: x.title || '',
+					title: x.titleZh || x.title || '',
 					thumb: x.thumb || '',
 					full: x.full || x.thumb || '',
 					date: (x.date || '').slice(0, 10),
-					intro: x.desc || '',
+					intro: x.descZh || x.desc || '',
 					credit: x.center || ''
 				}))
 				this.nasaShow = 60

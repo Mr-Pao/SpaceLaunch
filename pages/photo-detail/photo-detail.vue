@@ -52,7 +52,7 @@ export default {
 			}
 			this.navTitle = c.tag || '图片详情'
 			this.title = c.title || ''
-			this.intro = c.intro || ''
+			this.intro = this.cleanIntro(c.intro)
 			this.full = c.full || ''
 			const parts = [c.tag, c.date, c.credit ? '@' + String(c.credit).replace(/^@/, '') : '']
 			this.sub = parts.filter(Boolean).join(' · ')
@@ -66,6 +66,11 @@ export default {
 	},
 
 	methods: {
+		/** 去掉介绍开头的「说明：/解释：/Explanation:」标签词 */
+		cleanIntro(s) {
+			return String(s || '').replace(/^\s*(说明|解释|Explanation)\s*[:：]\s*/i, '')
+		},
+
 		async fetch() {
 			const d = await spaceData.load(this.type).catch(() => null)
 			const x = ((d && d.list) || [])[0]
@@ -74,7 +79,7 @@ export default {
 			const isEpic = this.type === 'epic'
 			this.title = x.titleZh || x.title || (isEpic ? '地球 · DSCOVR' : '未命名')
 			this.full = x.full || x.thumb || ''
-			this.intro = x.explanationZh || x.explanation || x.captionZh || x.caption || ''
+			this.intro = this.cleanIntro(x.explanationZh || x.explanation || x.captionZh || x.caption)
 
 			// 副标题合成一行：来源 · 日期 · 图源，缺哪个就跳过
 			const parts = [isEpic ? '每日地球' : '每日天文']
