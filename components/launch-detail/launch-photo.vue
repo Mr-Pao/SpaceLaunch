@@ -99,9 +99,11 @@ export default {
 			}
 			return out
 		},
-		// 图片优先态改「底部按钮跳详情」后，图片层恒占满整屏、不再随滚动收缩
+		// 图片优先态改「底部按钮跳详情」后，图片层恒占满整屏、不再随滚动收缩。
+		// 高度用 top/bottom 撑，不写死 windowHeight —— 后者不含部分机型的安全区，
+		// 算出来的像素比真实可视高度差一截，底部那条缝一滑就露出下层详情
 		stageStyle() {
-			return `height:${this.winH}px`
+			return 'top:0;bottom:0'
 		},
 		// 看图器恒满屏、不随滚动收缩：完整显示层恒显示、裁切层恒隐藏
 		fillOpacity() {

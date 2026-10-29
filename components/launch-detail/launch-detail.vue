@@ -3,7 +3,9 @@
 	     首图先占满整屏当看图器，底部「查看发射详情」按钮跳到这条发射的详情页。
 	     内容拆成了 launch-photo（看图器）/ launch-hero（首图）/ launch-content（正文）/
 	     launch-poster（分享海报）四个子组件，这里只留状态、加载与页面级能力 -->
-	<view class="page">
+	<!-- 图片优先态时整页锁死：看图器是 fixed 满屏，但页面本身仍能滚
+	     （下面的详情内容比一屏高），一滑就把底下的详情顶出来，看着像「两层页面」 -->
+	<view class="page" :class="{ 'page-lock': photoOn }">
 		<!-- 看图器：只在图片优先态下挂载。横滑换图由 onPhotoSwitch 跟着换 curId -->
 		<launch-photo
 			v-if="photoOn"
@@ -580,6 +582,22 @@ export default {
 	min-height: 100vh;
 	background: #0a0e17;
 	padding-bottom: 60rpx;
+}
+
+/* 图片优先态：整页钉住、禁止滚动。
+   stage 本身是 fixed，但只盖住一屏 —— 页面要是还能滚，滑动时详情内容
+   会从底下顶上来，那层「看不见但能滚的页面」就这么来的。
+   定位改 fixed 后 min-height 失效，靠 top/bottom 撑满；padding 也要清掉，
+   否则底部会多出 60rpx 的滚动余量 */
+.page-lock {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	min-height: 0;
+	padding-bottom: 0;
+	overflow: hidden;
 }
 
 .loading,
