@@ -440,8 +440,14 @@ export function load(name, opts) {
 			age > ttl ||
 			((name === 'apod' || name === 'epic') && !(data.list && data.list.length))
 
-		// 过期了就在后台刷一次，不阻塞本次返回
-		if (isStale) {
+		// 每日类数据（apod/epic）每天都会换，但缓存没到 TTL 时 isStale 是 false，
+		// 后台压根不会去校验 —— 结果就是「线上已经 89 条，页面还停在 6 条」，
+		// 最坏要干等满一个 TTL。这里给它们加一次轻量校验：
+		// 内存里记上次校验时间，5 分钟内不重复请求，既不刷爆流量又能及时跟上。
+		const needCheck = isStale || (DAILY_REVALIDATE.has(name) && shouldRecheck(name))
+
+		// 过期了（或每日类到点校验）就在后台刷一次，不阻塞本次返回
+		if (needCheck) {
 			refreshInBackground(name, data.generatedAt, opts.onUpdate)
 		}
 
@@ -461,6 +467,25 @@ export function load(name, opts) {
  * 之后无论请求多少次都还是空。空结果不该被信任，必须换唯一 URL 回源确认。
  */
 const EMPTY_SUSPECT = { apod: 1, epic: 1 }
+
+/**
+ * 每日类数据集，缓存没到期也要做一次轻量校验。
+ *
+ * 场景：APOD 从最近 7 天扩到 100 天、EPIC 从 4 张扩到 13 张时，
+ * 线上数据早就更新了，但用户本地缓存还在 TTL 内，isStale 是 false，
+ * 后台一次都不刷 —— 页面就永远停在旧条数上，最坏干等满一个 TTL。
+ * 这两个集合都很小（APOD 百来条、EPIC 13 条），5 分钟校验一次成本可忽略。
+ */
+const DAILY_REVALIDATE = new Set(['apod', 'epic'])
+const REVALIDATE_GAP = 5 * 60 * 1000
+const lastRecheck = {}
+
+function shouldRecheck(name) {
+	const t = lastRecheck[name]
+	if (t && Date.now() - t < REVALIDATE_GAP) return false
+	lastRecheck[name] = Date.now()
+	return true
+}
 function fetchOrRetryEmpty(name) {
 	return fetchShared(name).then((d) => {
 		if (EMPTY_SUSPECT[name] && !(d && d.list && d.list.length)) {
