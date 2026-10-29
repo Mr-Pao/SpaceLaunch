@@ -481,18 +481,14 @@ export default {
 		async loadEpic() {
 			this.epicLoading = true
 			try {
-				const d = await spaceData.load('epic').catch(() => null)
-				const list = (d && d.list) || []
-				this.epicList = list
-					.filter((x) => x && x.full)
-					.map((x) => ({
-						thumb: x.thumb || x.full,
-						full: x.full,
-						title: '地球 · DSCOVR',
-						date: (x.date || '').slice(0, 10),
-						intro: x.captionZh || x.caption || '',
-						credit: 'NASA EPIC'
-					}))
+				// 接 onUpdate：命中旧缓存时先渲染缓存，后台刷新到新数据再自动回填。
+				// 不接就永远停在旧结果上（EPIC 从 4 张扩到 13 张时，页面一直显示 4 张）
+				const d = await spaceData.load('epic', {
+					onUpdate: (fresh) => {
+						this.epicList = this.epicToList(fresh)
+					}
+				}).catch(() => null)
+				this.epicList = this.epicToList(d)
 				this.epicLoaded = true
 			} catch (e) {
 				console.warn('[gallery-all] EPIC 加载失败', e)
@@ -525,6 +521,20 @@ export default {
 				})
 			}
 			return out
+		},
+
+		/** 把一份 epic 数据集转成列表。EPIC 一组 13 张（一次完整自转扫描），不去重 */
+		epicToList(d) {
+			return ((d && d.list) || [])
+				.filter((x) => x && x.full)
+				.map((x) => ({
+					thumb: x.thumb || x.full,
+					full: x.full,
+					title: '地球 · DSCOVR',
+					date: (x.date || '').slice(0, 10),
+					intro: x.captionZh || x.caption || '',
+					credit: 'NASA EPIC'
+				}))
 		},
 
 		async loadApod() {

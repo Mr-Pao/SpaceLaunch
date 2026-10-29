@@ -915,5 +915,14 @@ export const CHANGELOG = [
 			'清理 MyMemory 短标题译文里的脏尾巴「object name (optional)」',
 			'新增每日「只补翻译」管道 nasa-images-translate.yml：不重抓不重镜像，逐日累积把 316 条翻完'
 		]
+	},
+	{
+		version: '3.2.52',
+		date: '2026-10-29',
+		title: '今日地球补齐到 13 张',
+		items: [
+			'修「今日地球」只显示 4 张：EPIC 加载没接 onUpdate，命中 1 小时缓存后后台刷新到 13 条也不会回填',
+			'图库与首页两处的 epic 加载都接上 onUpdate，数据更新后自动重渲染，不用等缓存过期'
+		]
 	}
 ]

@@ -515,7 +515,12 @@ export default {
 			spaceData.load('onthisday', { force: !!force }).catch(() => null),
 			// 接 onUpdate：命中旧缓存时先返回缓存、后台再刷；不接就永远停在旧结果
 			spaceData.load('apod', { onUpdate: (fresh) => this.applyApod(fresh) }).catch(() => null),
-			spaceData.load('epic').catch(() => null)
+			// 同样接 onUpdate：EPIC 从 4 张扩到 13 张后，不接就还停在旧缓存上
+			spaceData.load('epic', {
+				onUpdate: (fresh) => {
+					this.epic = (fresh && fresh.list) || []
+				}
+			}).catch(() => null)
 		])
 
 		if (g) this.gallery = (g.list || []).filter((x) => x && x.thumb)
