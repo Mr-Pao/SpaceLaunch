@@ -152,7 +152,8 @@
 			</view>
 
 			<block v-else>
-				<scroll-view class="nasa-tabs" scroll-x :show-scrollbar="false" v-if="nasaThemes.length">
+				<!-- 只剩一个主题时，「全部 / 星云」完全重复，标签栏就不显示了 -->
+				<scroll-view class="nasa-tabs" scroll-x :show-scrollbar="false" v-if="nasaThemes.length > 1">
 					<view
 						class="tab"
 						v-for="t in nasaThemes"
@@ -180,9 +181,9 @@
 				</view>
 
 				<view class="empty-box" v-else>
-					<text class="empty-icon">🛰️</text>
-					<text class="empty-text">NASA 影像还在路上</text>
-					<text class="empty-sub">后台正在按主题抓取并转存，过段时间再来看看</text>
+					<text class="empty-icon">🌌</text>
+					<text class="empty-text">星云影像还在路上</text>
+					<text class="empty-sub">后台正在抓取并转存，过段时间再来看看</text>
 				</view>
 			</block>
 		</block>
@@ -247,11 +248,11 @@ export default {
 			// 当前分类
 			tab: 'image',
 			tabs: [
-				{ key: 'image', name: '图片' },
-				{ key: 'video', name: '视频' },
+				{ key: 'image', name: '发射图片' },
+				{ key: 'video', name: '发射视频' },
 				{ key: 'earth', name: '地球' },
 				{ key: 'astro', name: '天文' },
-				{ key: 'nasa', name: 'NASA' }
+				{ key: 'nasa', name: '星云' }
 			],
 			// 视频
 			videos: [],
