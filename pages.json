@@ -72,6 +72,15 @@
 			}
 		},
 		{
+			"path": "pages/photo-detail/photo-detail",
+			"style": {
+				"navigationBarTitleText": "每日天文",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#0a0e17"
+			}
+		},
+		{
 			"path": "pages/launch/launchInfo",
 			"style": {
 				"navigationBarTitleText": "发射任务详情"
