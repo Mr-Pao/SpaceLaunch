@@ -448,24 +448,35 @@ export default {
 			}
 		},
 
+		/** 把一份 apod 数据集转成列表：过滤占位哨兵 + 按图去重 */
+		apodToList(d) {
+			const seen = new Set()
+			const out = []
+			for (const x of (d && d.list) || []) {
+				if (!x || !x.full) continue
+				// 占位哨兵：NASA 接口降级时会返回 title="NASA Science"、url 落在
+				// science.nasa.gov 的 WP 主题资源目录的占位响应，这种绝不可展示
+				if (x.title === 'NASA Science') continue
+				if (/\/wp-content\/themes\//.test(x.full || x.thumb || '')) continue
+				// 兜底去重：降级可能写出多张相同图，避免「连排重复」
+				if (seen.has(x.full)) continue
+				seen.add(x.full)
+				out.push({ thumb: x.thumb || x.full, full: x.full, title: x.title || '' })
+			}
+			return out
+		},
+
 		async loadApod() {
 			this.apodLoading = true
 			try {
-				const d = await spaceData.load('apod').catch(() => null)
-				const seen = new Set()
-				const out = []
-				for (const x of (d && d.list) || []) {
-					if (!x || !x.full) continue
-					// 占位哨兵：NASA 接口降级时会返回 title="NASA Science"、url 落在
-					// science.nasa.gov 的 WP 主题资源目录的占位响应，这种绝不可展示
-					if (x.title === 'NASA Science') continue
-					if (/\/wp-content\/themes\//.test(x.full || x.thumb || '')) continue
-					// 兜底去重：降级可能写出多张相同图，避免「连排重复」
-					if (seen.has(x.full)) continue
-					seen.add(x.full)
-					out.push({ thumb: x.thumb || x.full, full: x.full, title: x.title || '' })
-				}
-				this.apodList = out
+				// 传 onUpdate：命中旧缓存时 load 会先返回缓存、后台再刷。
+				// 不接这个回调，页面就永远停在旧结果上（缓存 TTL 12h，等不起）
+				const d = await spaceData.load('apod', {
+					onUpdate: (fresh) => {
+						this.apodList = this.apodToList(fresh)
+					}
+				}).catch(() => null)
+				this.apodList = this.apodToList(d)
 				this.apodLoaded = true
 			} catch (e) {
 				console.warn('[gallery-all] APOD 加载失败', e)

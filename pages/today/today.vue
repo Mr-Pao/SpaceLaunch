@@ -437,7 +437,8 @@ export default {
 			// 待发射列表本身有 15 分钟缓存，下拉时才强制刷
 			spaceData.load('upcoming', { force: !!force }).catch(() => null),
 			spaceData.load('onthisday', { force: !!force }).catch(() => null),
-			spaceData.load('apod').catch(() => null),
+			// 接 onUpdate：命中旧缓存时先返回缓存、后台再刷；不接就永远停在旧结果
+			spaceData.load('apod', { onUpdate: (fresh) => this.applyApod(fresh) }).catch(() => null),
 			spaceData.load('epic').catch(() => null)
 		])
 
@@ -445,12 +446,17 @@ export default {
 		if (u) this.upcoming = u.list || []
 		if (o) this.onthisday = o.list || []
 		// 过滤 NASA 接口降级占位响应（title="NASA Science" / WP 主题资源目录 url），避免脏数据上首页卡片
-		if (ap) this.apod = (ap.list || []).filter(
-			(x) => x && x.full && x.title !== 'NASA Science' && !/\/wp-content\/themes\//.test(x.full || x.thumb || '')
-		)
+		if (ap) this.applyApod(ap)
 		if (ep) this.epic = ep.list || []
 
 			this.loading = false
+		},
+
+		/** apod 数据落地：前台返回与后台 onUpdate 刷新都走这里，保证同一套过滤 */
+		applyApod(d) {
+			this.apod = ((d && d.list) || []).filter(
+				(x) => x && x.full && x.title !== 'NASA Science' && !/\/wp-content\/themes\//.test(x.full || x.thumb || '')
+			)
 		},
 
 		reload() {

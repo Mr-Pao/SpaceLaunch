@@ -158,9 +158,10 @@ const SOFT_TTL = {
 	neoNears: 3 * 60 * 60 * 1000,
 	// 资讯每 3 小时一轮，1 小时软过期已经够新；单份才 30~50KB
 	news: 60 * 60 * 1000,
-	// APOD/EPIC 都是每天才换一次，给 12 小时软 TTL 足够新鲜，且不会每次进首页都回源
-	apod: 12 * 60 * 60 * 1000,
-	epic: 12 * 60 * 60 * 1000,
+	// APOD/EPIC 每天才换一次，但上游（NASA）故障后恢复需要尽快可见：
+	// 给 1 小时软 TTL，配合空列表强制回源，避免旧数据压 12 小时
+	apod: 60 * 60 * 1000,
+	epic: 60 * 60 * 1000,
 	// NASA 影像每月才重抓一次，12 小时软 TTL 足够，不会每次进页面都回源
 	nasaImages: 12 * 60 * 60 * 1000
 }
@@ -420,7 +421,12 @@ export function load(name, opts) {
 		const data = hit.data
 		const age = hit.age != null ? hit.age : Date.now() - data.savedAt
 		// 硬过期的缓存（Storage 副本已腾掉）按 stale 处理：照常渲染 + 后台刷新
-		const isStale = hit.expired || age > ttl
+		// 每日类数据（apod/epic）空列表几乎总是上游故障留下的：即使没到 TTL 也当过期，
+		// 否则一旦缓存了空数据，最长要等满 TTL 才会重新回源
+		const isStale =
+			hit.expired ||
+			age > ttl ||
+			((name === 'apod' || name === 'epic') && !(data.list && data.list.length))
 
 		// 过期了就在后台刷一次，不阻塞本次返回
 		if (isStale) {
