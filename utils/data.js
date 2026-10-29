@@ -324,11 +324,17 @@ function request(url) {
 // neoNears 一天才变一次，同样没有理由每分钟换个戳去回源
 const HOURLY_CACHE = new Set(['satellites', 'orbitStats', 'debrisEvents', 'neoNears', 'apod', 'epic', 'nasaImages'])
 
-function fetchDataset(name) {
+function fetchDataset(name, bypass) {
 	// 高频更新的数据集（即将发射等）仍用分钟级，保证新鲜度；
 	// GCAT 体量大、变化慢，用小时级让 CDN 边缘缓存生效
 	const granularity = HOURLY_CACHE.has(name) ? 3600000 : 60000
-	const url = CDN_BASE + '/' + FILES[name] + '?t=' + Math.floor(Date.now() / granularity)
+	let url = CDN_BASE + '/' + FILES[name] + '?t=' + Math.floor(Date.now() / granularity)
+	// bypass：追加唯一随机参数。COS 对象带 Cache-Control: max-age=3600，
+	// 小时级 t 在同一小时内不变，客户端/运行时会把旧的空响应缓存整整一小时，
+	// 光靠 force 走网络也没用——URL 没变，缓存照样命中
+	if (bypass) {
+		url += '&r=' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
+	}
 
 	return request(url).then((body) => {
 		// 版本不一致不拒绝，只提示：字段都是后加的，旧数据照样能用（前端对缺失字段有回退）。
@@ -378,15 +384,18 @@ function fetchDataset(name) {
  * 带并发去重的网络抓取：同一数据集在途时复用同一个 Promise。
  * 无论成败都清理，失败后的下一次调用允许重新发请求。
  */
-function fetchShared(name) {
-	if (inflight[name]) return inflight[name]
+function fetchShared(name, bypass) {
+	// bypass 的 URL 每次都不同，不能复用同一个在途 Promise
+	if (!bypass && inflight[name]) return inflight[name]
 
-	const p = fetchDataset(name)
-	inflight[name] = p
-	const clear = () => {
-		if (inflight[name] === p) delete inflight[name]
+	const p = fetchDataset(name, bypass)
+	if (!bypass) {
+		inflight[name] = p
+		const clear = () => {
+			if (inflight[name] === p) delete inflight[name]
+		}
+		p.then(clear, clear)
 	}
-	p.then(clear, clear)
 	return p
 }
 
@@ -412,7 +421,7 @@ export function load(name, opts) {
 
 	// ---------- 强制刷新 ----------
 	if (opts.force) {
-		return fetchShared(name).then((d) => decorate(d, false))
+		return fetchShared(name, true).then((d) => decorate(d, false))
 	}
 
 	// ---------- 有缓存 ----------
@@ -438,11 +447,29 @@ export function load(name, opts) {
 
 	// ---------- 无缓存，必须等网络 ----------
 	// fetchShared 去重：预热与页面 onLoad 同时到达只发一次请求
-	return fetchShared(name).then((d) => decorate(d, false))
+	return fetchOrRetryEmpty(name).then((d) => decorate(d, false))
+}
+
+/**
+ * 每日类数据（apod/epic）拿到空列表时自动绕缓存再取一次。
+ *
+ * 原因：COS 对象带 Cache-Control: max-age=3600，小时级 ?t= 在同一小时内不变，
+ * 一旦某次请求在数据更新前拿到了空响应，客户端运行时就会把这份「空」压住一小时，
+ * 之后无论请求多少次都还是空。空结果不该被信任，必须换唯一 URL 回源确认。
+ */
+const EMPTY_SUSPECT = { apod: 1, epic: 1 }
+function fetchOrRetryEmpty(name) {
+	return fetchShared(name).then((d) => {
+		if (EMPTY_SUSPECT[name] && !(d && d.list && d.list.length)) {
+			return fetchShared(name, true)
+		}
+		return d
+	})
 }
 
 function refreshInBackground(name, oldGeneratedAt, onUpdate) {
-	fetchShared(name)
+	// 后台刷新的目的就是拿最新，必须 bypass，否则又被 max-age 缓存挡回去
+	fetchShared(name, true)
 		.then((fresh) => {
 			// generatedAt 没变说明线上还没更新，不必打扰页面
 			if (onUpdate && fresh.generatedAt !== oldGeneratedAt) {

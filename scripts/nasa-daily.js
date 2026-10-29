@@ -208,8 +208,10 @@ async function main() {
 	console.log(`  → ${APOD_FILE} ${apodItems.length} 条 / ${EPIC_FILE} ${epicItems.length} 条`)
 
 	if (hasCosConfig()) {
-		await upload(apodPath, APOD_KEY_COS, 'public, max-age=3600')
-		await upload(epicPath, EPIC_KEY_COS, 'public, max-age=3600')
+		// 显式 no-cache：这两份每天才变一次，回源成本可忽略；
+		// 若用 max-age，上游故障期写入的空数据会被客户端压住整个缓存周期
+		await upload(apodPath, APOD_KEY_COS, 'no-cache')
+		await upload(epicPath, EPIC_KEY_COS, 'no-cache')
 	}
 }
 
