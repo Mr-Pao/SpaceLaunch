@@ -55,45 +55,6 @@
 				</swiper-item>
 			</swiper>
 
-			<!-- 2 此刻在天上 -->
-			<view class="inspace" v-if="inSpace.length">
-				<view class="sec-head">
-					<text class="sec-title">此刻在天上</text>
-					<text class="sec-sub">{{ inSpace.length }} 人</text>
-				</view>
-
-				<view class="inspace-wrap">
-					<scroll-view
-						class="inspace-scroll"
-						scroll-x
-						:scroll-left="astroLeft"
-						scroll-with-animation
-						@scroll="onAstroScroll"
-					>
-						<view class="inspace-row">
-							<view
-								class="acard"
-								v-for="a in inSpace"
-								:key="a.id"
-								hover-class="acard-hover"
-								@click="goAstronaut(a.id)"
-							>
-								<image v-if="a.img" class="acard-img" :src="a.img" mode="aspectFill" lazy-load></image>
-								<view v-else class="acard-img acard-ph"><text>🧑‍🚀</text></view>
-								<text class="acard-name">{{ astroName(a) }}</text>
-								<text class="acard-days">在轨 {{ a.days }} 天</text>
-							</view>
-						</view>
-					</scroll-view>
-
-					<!-- 右边还有内容，但横滑列表不给任何暗示，一屏外的卡片等于不存在。
-					     一块渐隐 + 一个半透明箭头，既有提示也能点着让它自己滑一段 -->
-					<view class="inspace-fade" v-if="!astroMoved">
-						<view class="inspace-nudge" hover-class="inspace-nudge-hover" @click="slideAstro">›</view>
-					</view>
-				</view>
-			</view>
-
 			<!-- 3 下次发射：直接用发射页那张卡（next-launch 组件），
 			     两个页面看到的是同一个东西 —— 自己再画一张，改版时必然画歪 -->
 			<view class="next-wrap" v-if="next">
