@@ -77,7 +77,7 @@
 		</view>
 
 		<!-- 墙的注解：紧贴图片墙下方，只说明怎么用，不掺别的入口 -->
-		<text class="wall-tip" v-if="!loading && rowsA.length">点任意一张查看发射详情</text>
+		<text class="wall-tip" v-if="!loading && rowsA.length">点任意一张看大图</text>
 
 		<!-- 独立入口：和注解分开，各占一行 -->
 		<view class="dock" v-if="!loading && rowsA.length">
@@ -104,9 +104,9 @@
 /**
  * 图库
  *
- * 交互只有一件事：看着它们慢慢飘，喜欢就点开看原图。
- * 没有分类、没有搜索 —— 视频入口（「看视频」）与 NASA 影像入口（「NASA 影像」）
- * 单独放在底部 dock，分别跳到 video-gallery / nasa-images 页。
+ * 交互只有一件事：看着它们慢慢飘，喜欢就点开看大图。
+ * 墙里的图来自四类：发射图片 + 今日地球 + 天文 + 星云，混在一起随机打散，
+ * 所以每次进来看到的都不一样；底部 dock 只留一个「看全部」进分类浏览器。
  * 漂流墙里不塞视频卡：视频是另一种浏览节奏，混进来会打断「一扇窗」的沉浸感。
  *
  * 为什么每行只放 12 张再复制一份：
@@ -121,7 +121,6 @@
  * 顶部只留一行 HUD 标识（不占布局），墙面从状态栏下一直铺到底部 tabBar。
  */
 import spaceData from '@/utils/data.js'
-import { setAlbum } from '@/utils/album.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import navMixin from '@/utils/nav-mixin.js'
 
@@ -131,6 +130,18 @@ const PER_ROW = 12
 // 之前 4 行只有约 400px，屏幕下半截空出一大块，提示被迫浮在空白里。
 const ROWS = 6
 
+/** Fisher-Yates 洗牌。图池近千张，每次进图库都重新打散，看到的墙不重样 */
+function shuffle(arr) {
+	const a = arr.slice()
+	for (let i = a.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1))
+		const t = a[i]
+		a[i] = a[j]
+		a[j] = t
+	}
+	return a
+}
+
 export default {
 	mixins: [navMixin],
 
@@ -138,8 +149,8 @@ export default {
 		return {
 			loading: true,
 			images: [],
-			// 图库总张数（全量、去重后），底部「看全部」用它。
-			// 和 images.length 不是一回事：images 只是第 0 片
+			// 四类图片合计张数（发射图 + 今日地球 + 天文 + 星云），底部「看全部」用它。
+			// 和 images.length 不是一回事：images 是实际拉到的图池，不是全量
 			total: 0,
 			// 各行原始图（渲染时再拼一份副本）
 			raw: [[], [], [], [], [], []]
@@ -177,15 +188,46 @@ export default {
 	},
 
 	async onLoad() {
-		const g = await spaceData.load('gallery').catch(() => null)
-		const list = ((g && g.list) || []).filter((x) => x && x.thumb)
+		// 四类图片混着飘才有「所有图片」的意思：发射图 + 今日地球 + 天文 + 星云。
+		// 并行拉，任一类失败都不影响其它类出图
+		const [g, ep, ap, ns] = await Promise.all([
+			spaceData.load('gallery').catch(() => null),
+			spaceData.load('epic').catch(() => null),
+			spaceData.load('apod').catch(() => null),
+			spaceData.load('nasaImages').catch(() => null)
+		])
 
-		this.images = list
-		this.total = (g && g.count) || list.length
+		const pool = []
+		const push = (x, title) => {
+			if (!x) return
+			const thumb = x.thumb || x.full
+			if (!thumb) return
+			pool.push({
+				thumb,
+				full: x.full || thumb,
+				title: title || x.titleZh || x.title || ''
+			})
+		}
+		for (const x of (g && g.list) || []) push(x)
+		for (const x of (ep && ep.list) || []) push(x, '地球 · DSCOVR')
+		for (const x of (ap && ap.list) || []) push(x)
+		for (const x of (ns && ns.list) || []) push(x)
 
-		// 各行交错分配：i % ROWS，这样同一场发射的相邻图不会挤在同一行
+		this.images = pool
+		// 「看全部」显示的是四类合计：gallery 只加载了第一片，
+		// 用它自己的 count 才是真实全量
+		this.total =
+			((g && g.count) || ((g && g.list) || []).length) +
+			((ep && ep.count) || ((ep && ep.list) || []).length) +
+			((ap && ap.count) || ((ap && ap.list) || []).length) +
+			((ns && ns.count) || ((ns && ns.list) || []).length)
+
+		// 随机取满一屏的用量：每次进图库看到的墙都不一样
+		const picked = shuffle(pool).slice(0, PER_ROW * ROWS)
+
+		// 各行交错分配：i % ROWS，这样相近来源的图不会挤在同一行
 		const buckets = [[], [], [], [], [], []]
-		list.slice(0, PER_ROW * ROWS).forEach((x, i) => {
+		picked.forEach((x, i) => {
 			buckets[i % ROWS].push(x)
 		})
 		this.raw = buckets
@@ -199,11 +241,11 @@ export default {
 		},
 
 		/**
-		 * 点开看大图：直接进详情页的「图片优先态」。
-		 * 传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
+		 * 点开看大图。传进来的是「复制后」数组的下标，对行长度取模还原成真实位置。
 		 *
-		 * 把整行作为相册上下文交出去：进去以后左右滑继续看同一行，
-		 * 底部「查看发射详情」直接跳到这条发射的详情 —— 不用在图库和详情页之间来回退。
+		 * 墙里混了四类图片，点哪张都只做一件事：把整行当相册交出去，
+		 * 左右滑继续看同一行。发射图原本能点进详情，但那要求每张卡记住自己的类型，
+		 * 混排之后点不同图跳不同地方反而更困惑 —— 这一页的定位就是「看图」。
 		 */
 		preview(row, i) {
 			const list = this.raw[row]
@@ -213,12 +255,8 @@ export default {
 			const item = list[at]
 			if (!item) return
 
-			setAlbum(list, at, 'gallery')
-			uni.navigateTo({
-				url:
-					'/pages/launch/launchInfo?id=' + item.id + '&photo=1' +
-					(item.net ? '&net=' + encodeURIComponent(item.net) : '')
-			})
+			const urls = list.map((x) => x.full || x.thumb)
+			uni.previewImage({ urls, current: item.full || item.thumb })
 		}
 	}
 }
