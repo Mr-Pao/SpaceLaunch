@@ -94,8 +94,9 @@
 			</view>
 
 			<!-- 最近一次发射 + 倒计时。放在列表上方当视觉焦点（只对「待发射」有意义） -->
-			<!-- 搜索时让位：用户已经在找具体某次发射了，倒计时卡片只会把结果往下挤 -->
-			<view class="next-wrap" v-if="nextLaunch && visible.length && !keyword.trim()">
+			<!-- 搜索或筛选时让位：用户已经在找具体的某几次发射了，倒计时只会把结果往下挤。
+			     hasFilter 已含 keyword（activeCount 两者都算），一个条件覆盖两种状态 -->
+			<view class="next-wrap" v-if="nextLaunch && visible.length && !hasFilter">
 				<next-launch :item="nextLaunch" @select="goDetail" />
 			</view>
 
