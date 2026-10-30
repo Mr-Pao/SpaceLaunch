@@ -175,9 +175,35 @@ export default {
 		this.loading = false
 	},
 
+	// 标题：空间站中文名 + 当前乘组人数（人数为 0 时只说名字，别写成「0 人在轨」）
+	onShareAppMessage() {
+		const st = this.station || {}
+		return {
+			title: this.stationShareTitle(),
+			path: '/pages/station/station?id=' + (st.id || ''),
+			...(st.img ? { imageUrl: st.img } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const st = this.station || {}
+		return {
+			title: this.stationShareTitle(),
+			query: 'id=' + (st.id || ''),
+			...(st.img ? { imageUrl: st.img } : {})
+		}
+	},
+
 	methods: {
 		stationName(name) {
 			return stationNameOf(name)
+		},
+
+		stationShareTitle() {
+			const st = this.station || {}
+			const name = stationNameOf(st.name) || st.name || '空间站'
+			const n = (st.crew || []).length
+			return n ? name + ' · 在轨 ' + n + ' 人' : name
 		},
 
 		expeditionName(name) {

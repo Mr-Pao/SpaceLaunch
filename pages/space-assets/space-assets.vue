@@ -74,7 +74,31 @@ export default {
 		}
 	},
 
+	// 数据都在子组件里，页面拿不到张数：标题按当前 tab 描述这一块看的是什么
+	onShareAppMessage() {
+		return {
+			title: this.shareTitleOf(this.tab),
+			path: '/pages/space-assets/space-assets?tab=' + this.tab
+		}
+	},
+
+	onShareTimeline() {
+		return {
+			title: this.shareTitleOf(this.tab),
+			query: 'tab=' + this.tab
+		}
+	},
+
 	methods: {
+		shareTitleOf(tab) {
+			const map = {
+				orbit: '全球在轨卫星 · 按国家与用途分类',
+				catalog: '卫星百科 · 在册卫星资料检索',
+				debris: '解体与再入 · 太空垃圾事件时间线'
+			}
+			return map[tab] || '太空资产 · 在轨 · 卫星 · 解体再入'
+		},
+
 		setTab(key) {
 			if (key === this.tab) return
 			this.tab = key

@@ -307,6 +307,25 @@ export default {
 		this.loading = false
 	},
 
+	// 分享标题用 astroName：中文名优先，直接拼 a.name 会把中国航天员退回英文
+	onShareAppMessage() {
+		const a = this.a || {}
+		return {
+			title: '宇航员 · ' + (this.astroName(a) || '人物档案'),
+			path: '/pages/astronaut/astronaut?id=' + (a.id || ''),
+			...(a.img ? { imageUrl: a.img } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const a = this.a || {}
+		return {
+			title: '宇航员 · ' + (this.astroName(a) || '人物档案'),
+			query: 'id=' + (a.id || ''),
+			...(a.img ? { imageUrl: a.img } : {})
+		}
+	},
+
 	methods: {
 		// 模板只能看见实例成员，模块作用域的函数要转一层
 		stationName(name) {

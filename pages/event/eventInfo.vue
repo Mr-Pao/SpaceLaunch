@@ -129,9 +129,20 @@ export default {
 	onShareAppMessage() {
 		const e = this.ev
 		return {
-			title: e ? e.name : '近期活动',
+			// 标题走 eventName：优先中文名，直接读 e.name 会退回英文原串
+			title: (e && this.eventName(e)) || '近期活动',
 			path: '/pages/event/eventInfo?id=' + this.id,
-			imageUrl: (e && e.feature_image) || ''
+			// 没有配图就不传 imageUrl：空串在部分安卓机上会让卡片闪白
+			...(e && e.feature_image ? { imageUrl: e.feature_image } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const e = this.ev
+		return {
+			title: (e && this.eventName(e)) || '近期活动',
+			query: 'id=' + this.id,
+			...(e && e.feature_image ? { imageUrl: e.feature_image } : {})
 		}
 	},
 

@@ -116,7 +116,31 @@ export default {
 		this.loadMore()
 	},
 
+	// 列表页：标题给总量，封面用第一条活动的配图
+	onShareAppMessage() {
+		const first = this.list[0] || {}
+		return {
+			title: this.eventShareTitle(),
+			path: '/pages/event/event',
+			...(first.feature_image ? { imageUrl: first.feature_image } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const first = this.list[0] || {}
+		return {
+			title: this.eventShareTitle(),
+			query: '',
+			...(first.feature_image ? { imageUrl: first.feature_image } : {})
+		}
+	},
+
 	methods: {
+		eventShareTitle() {
+			const n = this.total || this.list.length
+			return n ? '正在追踪的 ' + n + ' 场太空活动' : '近期太空活动 · EVA · 飞掠 · 轨道插入'
+		},
+
 		eventName(ev) {
 			return eventNameOf(ev)
 		},

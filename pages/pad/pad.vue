@@ -178,10 +178,37 @@ export default {
 		this.loading = false
 	},
 
+	// 标题「工位名 · 所属地点」，与页面标题、标签同源（padShort / placeZh 带缩写展开）
+	onShareAppMessage() {
+		const pad = this.pad || {}
+		return {
+			title: this.padShareTitle(),
+			path: '/pages/pad/pad?id=' + (pad.id || this.padId),
+			...((pad.map_image || pad.image) ? { imageUrl: pad.map_image || pad.image } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const pad = this.pad || {}
+		return {
+			title: this.padShareTitle(),
+			query: 'id=' + (pad.id || this.padId),
+			...((pad.map_image || pad.image) ? { imageUrl: pad.map_image || pad.image } : {})
+		}
+	},
+
 	methods: {
 		// 模板只能看见实例成员，模块函数要转一层
 		placeZh(loc) {
 			return placeZh(loc)
+		},
+
+		/** 分享标题：工位短名 + 所在地点，缺哪个就少哪一段 */
+		padShareTitle() {
+			const pad = this.pad || {}
+			const name = padShortOf(pad.name) || pad.name || '发射工位'
+			const place = placeZh(pad.location && pad.location.name)
+			return place ? name + ' · ' + place : name
 		},
 
 		agencyLabel(name) {

@@ -460,7 +460,33 @@ export default {
 		else this.loadMoreUpcoming()
 	},
 
+	// tab 页：path 不能带参数（switchTab 不接受 query），条目参数会丢，也给不了
+	onShareAppMessage() {
+		const first = this.visible[0] || {}
+		return {
+			title: this.feedShareTitle(),
+			path: '/pages/index/index',
+			...(first.image ? { imageUrl: first.image } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const first = this.visible[0] || {}
+		return {
+			title: this.feedShareTitle(),
+			query: '',
+			...(first.image ? { imageUrl: first.image } : {})
+		}
+	},
+
 	methods: {
+		/** 列表页概述：待发射说「正在追踪」，已发射说「已完成」，数字取后端的全量 count */
+		feedShareTitle() {
+			const n = this.total || this.list.length
+			if (!n) return '全球航天发射排期'
+			return (this.feed === 'previous' ? '已完成的 ' : '正在追踪的 ') + n + ' 次航天发射'
+		},
+
 		goDetail(item) {
 			if (!item || !item.id) return
 			uni.navigateTo({ url: '/pages/launch/launchInfo?id=' + item.id })

@@ -456,7 +456,31 @@ export default {
 		if (news) news.loadMore()
 	},
 
+	// tab 页不能带 query（switchTab 不接受）：path 只给页面本身
+	// 标题用当日每日一图的任务名，比「今日太空」四个字有信息量
+	onShareAppMessage() {
+		const d = this.daily || {}
+		return {
+			title: this.dailyShareTitle(),
+			path: '/pages/today/today',
+			...(d.thumb ? { imageUrl: d.thumb } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const d = this.daily || {}
+		return {
+			title: this.dailyShareTitle(),
+			query: '',
+			...(d.thumb ? { imageUrl: d.thumb } : {})
+		}
+	},
+
 	methods: {
+		dailyShareTitle() {
+			return this.dailyTitle ? this.dailyTitle + ' · 今日太空' : '今日太空 · 每日一图与发射排期'
+		},
+
 		/** 模板里用 astroName(a)：中国籍显示中文名 */
 		astroName(a) {
 			return astroNameOf(a)

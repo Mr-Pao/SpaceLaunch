@@ -235,10 +235,40 @@ export default {
 		this.loadRelated()
 	},
 
+	// 标题：机构名 + 类型（商业航天 / 政府机构…），实拍图优先，没有再用 logo
+	onShareAppMessage() {
+		const a = this.agency || {}
+		const cover = a.image_url || a.logo_url || ''
+		return {
+			title: this.agencyShareTitle(),
+			path: '/pages/agencies/agencies?id=' + (a.id || ''),
+			...(cover ? { imageUrl: cover } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const a = this.agency || {}
+		const cover = a.image_url || a.logo_url || ''
+		return {
+			title: this.agencyShareTitle(),
+			query: 'id=' + (a.id || ''),
+			...(cover ? { imageUrl: cover } : {})
+		}
+	},
+
 	methods: {
 		// 模板只能看见实例成员，模块作用域的函数必须转一层
 		agencyLabel(name) {
 			return agencyLabelOf(name)
+		},
+
+		agencyShareTitle() {
+			const a = this.agency || {}
+			const name = a.name || '航天机构'
+			const parts = [name]
+			if (this.typeText) parts.push(this.typeText)
+			else if (this.countryText) parts.push(this.countryText)
+			return parts.join(' · ')
 		},
 
 		toggleAll() {

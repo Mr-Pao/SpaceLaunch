@@ -185,6 +185,25 @@ export default {
 		this.loading = false
 	},
 
+	// 标题用 pageTitle：系列有多个构型时是系列名，只有一个时是型号名（都走 rocketName/seriesName）
+	onShareAppMessage() {
+		const first = this.images[0] || this.videos[0] || {}
+		return {
+			title: this.pageTitle + ' · 图片与视频',
+			path: '/pages/media/media?id=' + this.rocketId,
+			...(first.thumb ? { imageUrl: first.thumb } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const first = this.images[0] || this.videos[0] || {}
+		return {
+			title: this.pageTitle + ' · 图片与视频',
+			query: 'id=' + this.rocketId,
+			...(first.thumb ? { imageUrl: first.thumb } : {})
+		}
+	},
+
 	methods: {
 		async load() {
 			try {

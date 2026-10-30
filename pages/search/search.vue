@@ -132,7 +132,27 @@ export default {
 		}
 	},
 
+	// 搜索页没有「某一条内容」：有关键词就带上关键词，没有就说明能搜什么
+	onShareAppMessage() {
+		return {
+			title: this.searchShareTitle(),
+			path: '/pages/search/search'
+		}
+	},
+
+	onShareTimeline() {
+		return {
+			title: this.searchShareTitle(),
+			query: ''
+		}
+	},
+
 	methods: {
+		searchShareTitle() {
+			const kw = this.keyword.trim()
+			return kw ? '在 SpaceLaunch 搜「' + kw + '」' : '搜索航天发射、火箭、宇航员与工位'
+		},
+
 		goBack() {
 			const pages = getCurrentPages()
 			if (pages.length > 1) uni.navigateBack()

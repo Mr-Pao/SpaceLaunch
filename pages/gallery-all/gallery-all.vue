@@ -384,7 +384,52 @@ export default {
 		}
 	},
 
+	// 分享带当前分类：对方打开落在他正在看的这一栏，而不是回到发射图片
+	onShareAppMessage() {
+		const first = this.tabFirst()
+		return {
+			title: this.galleryShareTitle(),
+			path: '/pages/gallery-all/gallery-all?tab=' + this.tab,
+			...(first.thumb ? { imageUrl: first.thumb } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const first = this.tabFirst()
+		return {
+			title: this.galleryShareTitle(),
+			query: 'tab=' + this.tab,
+			...(first.thumb ? { imageUrl: first.thumb } : {})
+		}
+	},
+
 	methods: {
+		/** 当前分类的第一张（缩略图），没有就返回空对象 */
+		tabFirst() {
+			const list =
+				this.tab === 'image' ? this.items
+				: this.tab === 'video' ? this.videos
+				: this.tab === 'earth' ? this.epicList
+				: this.tab === 'astro' ? this.apodList
+				: this.nasaList
+			return (list && list[0]) || {}
+		},
+
+		/** 标题：分类名 + 该类已有多少张（视频按「段」数） */
+		galleryShareTitle() {
+			const t = this.tabs.find((x) => x.key === this.tab) || { name: '图库' }
+			const list =
+				this.tab === 'image' ? this.items
+				: this.tab === 'video' ? this.videos
+				: this.tab === 'earth' ? this.epicList
+				: this.tab === 'astro' ? this.apodList
+				: this.nasaList
+			let n = (list && list.length) || 0
+			if (this.tab === 'image') n = this.total || n
+			if (!n) return '太空图库 · ' + t.name
+			return '太空图库 · ' + t.name + ' ' + n + (this.tab === 'video' ? ' 段' : ' 张')
+		},
+
 		/**
 		 * 瀑布流两列：按已累计高度择优落列，高度由 id 哈希决定（同图恒定）。
 		 * 地球 / 天文 / 星云共用，和图片 tab 的排列观感保持一致。

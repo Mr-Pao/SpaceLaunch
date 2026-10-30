@@ -812,7 +812,15 @@ export default {
 		 */
 		syncShare() {
 			const name = this.seriesTitle || (this.config && this.config.name) || ''
-			if (name) this.shareTitle = name + ' · 太空发射任务'
+			if (name) {
+				// 带累计发射次数：只写型号名的话，卡片看不出这型火箭的份量
+				// statsTotal 是页面上已格式化的字段，缺数据时是「—」
+				const total = this.statsTotal
+				this.shareTitle =
+					total && total !== '—'
+						? name + ' · 累计发射 ' + total + ' 次'
+						: name + ' · 太空运载火箭'
+			}
 			const s = this.heroSlides && this.heroSlides[0]
 			if (s && s.thumb) this.shareImage = s.thumb
 		},

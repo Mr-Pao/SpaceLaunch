@@ -49,6 +49,21 @@ export default {
 			const last = CHANGELOG[CHANGELOG.length - 1]
 			return last ? last.version : '—'
 		}
+	},
+
+	// 纯工具页：标题带上当前版本号就够，没有配图
+	onShareAppMessage() {
+		return {
+			title: 'SpaceLaunch ' + this.current + ' 版本更新记录',
+			path: '/pages/version/version'
+		}
+	},
+
+	onShareTimeline() {
+		return {
+			title: 'SpaceLaunch ' + this.current + ' 版本更新记录',
+			query: ''
+		}
 	}
 }
 </script>

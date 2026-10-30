@@ -116,6 +116,25 @@
 			}
 		},
 
+		// 列表页：标题给总量，封面用第一段视频的封面（数据里已经是缩略图）
+		onShareAppMessage() {
+			const first = this.all[0] || {}
+			return {
+				title: '航天发射视频 · ' + this.all.length + ' 段',
+				path: '/pages/video-gallery/video-gallery',
+				...(first.thumb ? { imageUrl: first.thumb } : {})
+			}
+		},
+
+		onShareTimeline() {
+			const first = this.all[0] || {}
+			return {
+				title: '航天发射视频 · ' + this.all.length + ' 段',
+				query: '',
+				...(first.thumb ? { imageUrl: first.thumb } : {})
+			}
+		},
+
 		methods: {
 			async load() {
 				try {

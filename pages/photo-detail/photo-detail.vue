@@ -22,6 +22,8 @@
 
 <script>
 import spaceData from '@/utils/data.js'
+// 分享封面用缩略图：full 是 2000px 原图，分享卡片只要 5:4 的小图
+import { thumbOf } from '@/utils/media.js'
 
 /**
  * 每日天文 / 每日地球 的全屏看图页
@@ -54,6 +56,8 @@ export default {
 			this.title = c.title || ''
 			this.intro = this.cleanIntro(c.intro)
 			this.full = c.full || ''
+			// 分享要用：这种进入方式的内容只在本地 Storage 里，分享出去对方打不开同一张
+			this._fromGallery = true
 			const parts = [c.tag, c.date, c.credit ? '@' + String(c.credit).replace(/^@/, '') : '']
 			this.sub = parts.filter(Boolean).join(' · ')
 			return
@@ -63,6 +67,37 @@ export default {
 		this.type = type
 		this.navTitle = type === 'epic' ? '每日地球' : '每日天文'
 		this.fetch()
+	},
+
+	/**
+	 * 分享：type 入口（每日天文 / 每日地球）直接分享本页，对方打开是同一张；
+	 * 图库入口的图在对方设备的 Storage 里并不存在，分享本页只会得到空图，
+	 * 这种情况改分享「天文」图库分类，对方打开是完整页面。
+	 */
+	onShareAppMessage() {
+		const cover = thumbOf(this.full)
+		if (this._fromGallery) {
+			return {
+				title: (this.title || this.navTitle) + ' · 太空图库',
+				path: '/pages/gallery-all/gallery-all?tab=astro',
+				...(cover ? { imageUrl: cover } : {})
+			}
+		}
+		return {
+			title: this.navTitle + (this.title ? ' · ' + this.title : ''),
+			path: '/pages/photo-detail/photo-detail?type=' + this.type,
+			...(cover ? { imageUrl: cover } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const cover = thumbOf(this.full)
+		// 朋友圈只能分享当前页：type 入口按类型带参，图库入口退回当日天文图（本页可正常打开）
+		return {
+			title: this.navTitle + (this.title ? ' · ' + this.title : ''),
+			query: 'type=' + this.type,
+			...(cover ? { imageUrl: cover } : {})
+		}
 	},
 
 	methods: {

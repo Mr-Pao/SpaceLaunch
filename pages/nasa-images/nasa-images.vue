@@ -113,7 +113,32 @@
 			}
 		},
 
+		// 列表页：标题带当前主题与张数，封面用该主题第一张缩略图
+		onShareAppMessage() {
+			const first = this.filtered[0] || {}
+			return {
+				title: this.nasaShareTitle(),
+				path: '/pages/nasa-images/nasa-images',
+				...(first.thumb ? { imageUrl: first.thumb } : {})
+			}
+		},
+
+		onShareTimeline() {
+			const first = this.filtered[0] || {}
+			return {
+				title: this.nasaShareTitle(),
+				query: '',
+				...(first.thumb ? { imageUrl: first.thumb } : {})
+			}
+		},
+
 		methods: {
+			nasaShareTitle() {
+				const tab = this.tabs.find((x) => x.key === this.active) || { name: '全部' }
+				const n = this.filtered.length
+				return 'NASA 影像库 · ' + tab.name + (n ? ' ' + n + ' 张' : '')
+			},
+
 			async load() {
 				try {
 					let d = await spaceData.load('nasaImages').catch(() => null)

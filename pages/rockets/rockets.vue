@@ -450,7 +450,30 @@ export default {
 		if (this.tapTimer) clearTimeout(this.tapTimer)
 	},
 
+	// tab 页不能带参数；标题给型号库规模，封面用榜单第一名（都是缩略图）
+	onShareAppMessage() {
+		const top = this.pool[0] || {}
+		return {
+			title: this.rocketsShareTitle(),
+			path: '/pages/rockets/rockets',
+			...(top.image ? { imageUrl: top.image } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const top = this.pool[0] || {}
+		return {
+			title: this.rocketsShareTitle(),
+			query: '',
+			...(top.image ? { imageUrl: top.image } : {})
+		}
+	},
+
 	methods: {
+		rocketsShareTitle() {
+			return this.total ? '运载火箭资料库 · ' + this.total + ' 种型号' : '运载火箭资料库'
+		},
+
 		onTitleTap() {
 			this.taps++
 			if (this.tapTimer) clearTimeout(this.tapTimer)

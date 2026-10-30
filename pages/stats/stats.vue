@@ -338,7 +338,27 @@ export default {
 		this.getData(true).then(() => uni.stopPullDownRefresh())
 	},
 
+	// 标题带年份与当年发射次数：只写「数据统计」的话，转发出去看不出是哪一年
+	onShareAppMessage() {
+		return {
+			title: this.statsShareTitle(),
+			path: '/pages/stats/stats'
+		}
+	},
+
+	onShareTimeline() {
+		return {
+			title: this.statsShareTitle(),
+			query: ''
+		}
+	},
+
 	methods: {
+		statsShareTitle() {
+			const n = this.total
+			return this.year + ' 年全球航天发射' + (n ? ' ' + n + ' 次' : '统计')
+		},
+
 		goBack() {
 			const pages = getCurrentPages()
 			if (pages.length > 1) {

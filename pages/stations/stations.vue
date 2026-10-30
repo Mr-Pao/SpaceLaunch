@@ -63,6 +63,25 @@ export default {
 		this.loading = false
 	},
 
+	// 列表页：标题给规模（几座站），封面用排在最前的在役空间站主图
+	onShareAppMessage() {
+		const first = this.list[0] || {}
+		return {
+			title: '人类空间站档案 · ' + this.list.length + ' 座',
+			path: '/pages/stations/stations',
+			...(first.img ? { imageUrl: first.img } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const first = this.list[0] || {}
+		return {
+			title: '人类空间站档案 · ' + this.list.length + ' 座',
+			query: '',
+			...(first.img ? { imageUrl: first.img } : {})
+		}
+	},
+
 	methods: {
 		stationName(name) {
 			return stationNameOf(name)

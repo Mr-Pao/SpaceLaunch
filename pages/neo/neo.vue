@@ -32,6 +32,21 @@ export default {
 	onPageScroll(e) {
 		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid
+	},
+
+	// 数据在 neo-section 组件里，页面拿不到条目：标题用这块内容的定位描述
+	onShareAppMessage() {
+		return {
+			title: '近地天体 · 未来一周掠过地球的小行星',
+			path: '/pages/neo/neo'
+		}
+	},
+
+	onShareTimeline() {
+		return {
+			title: '近地天体 · 未来一周掠过地球的小行星',
+			query: ''
+		}
 	}
 }
 </script>

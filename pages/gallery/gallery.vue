@@ -320,7 +320,31 @@ export default {
 		this.loading = false
 	},
 
+	// tab 页不能带参数；标题给图库总量，封面用墙上第一张缩略图
+	onShareAppMessage() {
+		const first = this.images[0] || {}
+		return {
+			title: this.galleryShareTitle(),
+			path: '/pages/gallery/gallery',
+			...(first.thumb ? { imageUrl: first.thumb } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const first = this.images[0] || {}
+		return {
+			title: this.galleryShareTitle(),
+			query: '',
+			...(first.thumb ? { imageUrl: first.thumb } : {})
+		}
+	},
+
 	methods: {
+		galleryShareTitle() {
+			const n = this.total || this.images.length
+			return n ? '太空图库 · ' + n + ' 张发射与天文影像' : '太空图库'
+		},
+
 		goAll() {
 			uni.navigateTo({ url: '/pages/gallery-all/gallery-all' })
 		},

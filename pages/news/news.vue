@@ -145,6 +145,29 @@ export default {
 		if (hit) this.open(hit)
 	},
 
+	// 详情弹窗开着就分享那一条（对方带 ?id= 进来会直接弹出），否则分享列表总览
+	onShareAppMessage() {
+		const d = this.detail
+		const first = this.items[0] || {}
+		const cover = (d && d.image) || first.image || ''
+		return {
+			title: (d && (d.titleZh || d.title)) || '航天资讯 · ' + (this.total || this.items.length) + ' 条',
+			path: '/pages/news/news' + (d && d.id != null ? '?id=' + d.id : ''),
+			...(cover ? { imageUrl: cover } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const d = this.detail
+		const first = this.items[0] || {}
+		const cover = (d && d.image) || first.image || ''
+		return {
+			title: (d && (d.titleZh || d.title)) || '航天资讯 · ' + (this.total || this.items.length) + ' 条',
+			query: d && d.id != null ? 'id=' + d.id : '',
+			...(cover ? { imageUrl: cover } : {})
+		}
+	},
+
 	methods: {
 		/** 封面加载失败：记住这一条，模板会换成占位图标 */
 		onImgErr(n) {

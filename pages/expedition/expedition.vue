@@ -104,9 +104,37 @@ export default {
 		this.loading = false
 	},
 
+	// 标题：远征队中文名 + 乘组人数；封面用队徽（这一页没有实拍主图）
+	onShareAppMessage() {
+		const e = this.exp || {}
+		const patch = (e.patches && e.patches[0]) || ''
+		return {
+			title: this.expShareTitle(),
+			path: '/pages/expedition/expedition?id=' + (e.id || ''),
+			...(patch ? { imageUrl: patch } : {})
+		}
+	},
+
+	onShareTimeline() {
+		const e = this.exp || {}
+		const patch = (e.patches && e.patches[0]) || ''
+		return {
+			title: this.expShareTitle(),
+			query: 'id=' + (e.id || ''),
+			...(patch ? { imageUrl: patch } : {})
+		}
+	},
+
 	methods: {
 		expeditionName(name) {
 			return expeditionNameOf(name)
+		},
+
+		expShareTitle() {
+			const e = this.exp || {}
+			const name = expeditionNameOf(e.name) || e.name || '远征队'
+			const n = (e.crew || []).length
+			return n ? name + ' · ' + n + ' 名航天员' : name
 		},
 
 		dayOf(v) {

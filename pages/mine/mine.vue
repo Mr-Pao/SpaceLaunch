@@ -234,6 +234,21 @@ export default {
 		this.loadMine()
 	},
 
+	// tab 页不能带参数（也不该把别人的收藏带出去）；标题只说自己的足迹规模
+	onShareAppMessage() {
+		return {
+			title: this.mineShareTitle(),
+			path: '/pages/mine/mine'
+		}
+	},
+
+	onShareTimeline() {
+		return {
+			title: this.mineShareTitle(),
+			query: ''
+		}
+	},
+
 	computed: {
 		current() {
 			const last = CHANGELOG[CHANGELOG.length - 1]
@@ -242,6 +257,13 @@ export default {
 	},
 
 	methods: {
+		mineShareTitle() {
+			const parts = []
+			if (this.favCount) parts.push('收藏 ' + this.favCount + ' 次发射')
+			if (this.rocketCount) parts.push('关注 ' + this.rocketCount + ' 型火箭')
+			return parts.length ? '我的太空足迹 · ' + parts.join(' · ') : 'SpaceLaunch · 追踪全球航天发射'
+		},
+
 		fmtShort(v) {
 			return formatShort(v)
 		},
