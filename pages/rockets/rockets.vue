@@ -103,11 +103,11 @@
 			<text class="board-count">{{ ranked.length }} 个结果</text>
 		</view>
 
-		<view class="loading" v-if="loading && !all.length">
+		<view class="loading" v-if="loading && !total">
 			<skeleton-card v-for="i in 4" :key="i" />
 		</view>
 
-		<view class="empty" v-else-if="!all.length">
+		<view class="empty" v-else-if="!total">
 			<text class="empty-icon">🛰️</text>
 			<text class="hint-text">型号库还没同步好，稍后再来看看</text>
 			<view class="btn" @click="getData(true)">重新加载</view>
@@ -256,7 +256,11 @@ export default {
 
 	data() {
 		return {
-			all: [],
+			// 型号总数：模板只需要知道「有没有数据」，整份型号库不放进响应式
+			total: 0,
+			// 型号库版本号。全量库挂在实例的 _all 上（非响应式，也不进 setData），
+			// 重载后 +1 让依赖榜单的 computed 重算
+			libVersion: 0,
 			loading: true,
 			keyword: '',
 			sort: 'overall',
@@ -276,6 +280,19 @@ export default {
 
 	computed: {
 		/**
+		 * 全量型号库（原始数组，非响应式）。
+		 *
+		 * 532 条 / 700KB+ 全塞进 data() 会让每次 setData 都跟着走一遍；
+		 * 放进响应式还会让下面几个 computed 的每次遍历都过 proxy getter。
+		 * 挂在实例的 _all 上，再读一下 libVersion 建立依赖 —— 重载后版本号 +1，
+		 * 榜单才会重算。
+		 */
+		lib() {
+			void this.libVersion
+			return this._all || []
+		},
+
+		/**
 		 * 榜单的候选池：只排现役型号，按地区收窄，再按型号名去重。
 		 *
 		 * 型号库里同一型火箭会有多个构型记录（Starship / Starship V2…），
@@ -283,9 +300,10 @@ export default {
 		 * 同名只保留综合分最高的那条，其余构型在详情页的「同系列构型」里能看到。
 		 */
 		pool() {
+			const src = this.lib
 			// 先按型号名分组，再在组内挑代表：分数最高者上榜
 			const groups = new Map()
-			for (const x of this.all) {
+			for (const x of src) {
 				if (!x.active) continue
 				if (this.region !== 'all' && x.region !== this.region) continue
 
@@ -318,9 +336,10 @@ export default {
 
 		/** 归一化的分母，整个榜单共用一套，换筛选时名次才有可比性 */
 		maxes() {
+			const src = this.lib
 			let maxLaunch = 1
 			let maxLeo = 1
-			for (const x of this.all) {
+			for (const x of src) {
 				if (!x.active) continue
 				maxLaunch = Math.max(maxLaunch, x.total_launch_count || 0)
 				maxLeo = Math.max(maxLeo, x.leo_capacity || 0)
@@ -333,13 +352,9 @@ export default {
 			let list = this.pool
 
 			if (q) {
-				list = list.filter((x) => {
-					const hay = [x.zhName, x.name, x.full_name, x.manufacturer, x.family, x.variant]
-						.filter(Boolean)
-						.join(' ')
-						.toLowerCase()
-					return hay.indexOf(q) !== -1
-				})
+				// hay 是落库时一次拼好的小写检索串（见 getData），
+				// 这里不再每条重拼 6 个字段 + toLowerCase
+				list = list.filter((x) => x.hay.indexOf(q) !== -1)
 			}
 
 			const arr = list.slice()
@@ -511,7 +526,10 @@ export default {
 				// 活跃度对数归一化的分母
 				const LN_MAX = Math.log(1 + maxLaunch)
 
-				this.all = list.map((x) => {
+				this._all = list.map((x) => {
+					// 详情页才用得到的长字段在这里就丢掉：description 约 129KB、
+					// descriptionZh 约 48KB，加上外链与 families/pads，整份库能瘦掉六成
+					const { description, descriptionZh, info_url, wiki_url, families, pads, ...rest } = x
 					// 中英都带构型：中文只给基础名的话，同系列几个构型在榜上长得一模一样
 					const zh = rocketFullName(x)
 					const en = x.full_name || x.name || ''
@@ -529,9 +547,9 @@ export default {
 					const cap = (x.leo_capacity || 0) / maxLeo
 					const score = 0.45 * act + 0.35 * rateAdj + 0.2 * cap
 
-					const fams = x.families || []
+					const fams = families || []
 					return {
-						...x,
+						...rest,
 						zhName: zh,
 						// 英文名和中文名不同才占一行
 						enName: en && en !== zh ? en : '',
@@ -553,10 +571,18 @@ export default {
 				// 同中文名的型号（Starship / Starship V3 都叫「星舰」）补上构型后缀，
 				// 否则榜单上会出现两条一模一样的名字
 				const cnt = {}
-				for (const x of this.all) if (x.active) cnt[x.zhName] = (cnt[x.zhName] || 0) + 1
-				for (const x of this.all) {
+				for (const x of this._all) if (x.active) cnt[x.zhName] = (cnt[x.zhName] || 0) + 1
+				for (const x of this._all) {
 					if (x.active && cnt[x.zhName] > 1) x.zhName = rocketFullName(x)
+					// 搜索串一次拼好：搜索时只做一次 indexOf，不再每键重拼 6 个字段。
+					// 必须放在 zhName 定稿之后，否则去重改名的那批搜不到新名字
+					x.hay = [x.zhName, x.name, x.full_name, x.manufacturer, x.family, x.variant]
+						.filter(Boolean)
+						.join(' ')
+						.toLowerCase()
 				}
+				this.total = this._all.length
+				this.libVersion++
 			} catch (e) {
 				console.warn('[rockets] 获取型号库失败', e)
 			} finally {

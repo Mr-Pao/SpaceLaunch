@@ -35,21 +35,28 @@ export default {
 
 	methods: {
 		/**
-		 * 预热各 tab 页的数据。
+		 * 预热首屏真正要用的数据。
 		 *
-		 * 每个tab 页是独立 webview，首次切入的卡顿主要来自：
+		 * 每个 tab 页是独立 webview，首次切入的卡顿主要来自：
 		 * 同一瞬间要「读 Storage 大 JSON + JSON.parse + 首屏渲染」三件事一起干。
 		 * 启动后错开几百毫秒把数据读到内存缓存，等用户真的切过去时
 		 * 数据层直接命中内存，首切只剩渲染一件事。
+		 *
+		 * 清单只留「启动页自己的、且体积小的」两份：
+		 *   onthisday  9KB   —— 今日页「往年今日」，首屏直接要
+		 *   news      81KB   —— 今日页资讯组件，首屏直接要
+		 * 原来那五份（launchers 697KB / previous 300KB / events 18KB /
+		 * agencies 180KB / stats 210KB）没有一个是启动页要的，合计 1.1MB，
+		 * 启动期就占掉微信单域名约 6 个并发连接里的一半 —— 把今日页那份
+		 * 719KB 的宇航员库挤进了队列。launchers 697KB 的 Storage 反序列化
+		 * 还会在 600ms 时点卡主线程一下。用户点进对应页面多等 200ms 无感，
+		 * 不值得在启动期抢连接，所以全部删掉。
 		 * 顺序按「用户最可能先逛的页面」排，load 全程 catch 静默。
 		 */
 		warmData() {
 			const warm = [
-				['launchers', 600],
-				['previous', 1400],
-				['events', 2200],
-				['agencies', 3000],
-				['stats', 3800]
+				['onthisday', 1500],
+				['news', 2000]
 			]
 			for (const pair of warm) {
 				setTimeout(() => {

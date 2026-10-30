@@ -387,23 +387,28 @@ export default {
 	},
 
 	onLoad() {
+		// 数据立刻发，不等审核开关：app-config.json 只有 32 字节，却要占掉
+		// 一次完整的 CDN 往返（真机 4G 冷启动 300-800ms）。开关晚到只决定
+		// 「要不要跳走」，和列表数据无关。
+		this.getData()
+
 		// 审核态：首页不放内容，直接把入口切到火箭大全（tabBar 已隐藏，
 		// 审核员看到的就是一个纯粹的火箭参数查询工具）；本机切「展示」后也一样
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-			if (this.reviewMode) {
-				// switchTab 偶发失败（页面栈未就绪等）时审核员会停在空首页，
-				// 兜底 reLaunch 重试一次
-				uni.switchTab({
-					url: '/pages/rockets/rockets',
-					fail: () => {
-						uni.reLaunch({ url: '/pages/rockets/rockets' })
-					}
-				})
-				return
-			}
-			this.getData()
-		})
+		getConfig()
+			.catch(() => null)
+			.then((c) => {
+				this.reviewMode = Boolean(c && c.review)
+				if (this.reviewMode) {
+					// switchTab 偶发失败（页面栈未就绪等）时审核员会停在空首页，
+					// 兜底 reLaunch 重试一次
+					uni.switchTab({
+						url: '/pages/rockets/rockets',
+						fail: () => {
+							uni.reLaunch({ url: '/pages/rockets/rockets' })
+						}
+					})
+				}
+			})
 	},
 
 	// 从详情页收藏回来时把收藏项顶上去（不重新请求数据）

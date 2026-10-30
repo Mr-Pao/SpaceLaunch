@@ -282,6 +282,8 @@ async function runImages() {
 
 	// ---- 写分片：内容没变的跳过上传 ----
 	// 老图扫完后绝大多数分片不会变，不比对的话每小时白传 700KB。
+	// 比对的是「片内容 + 片内元信息」的签名，元信息里的 count/chunks 一变签名就变，
+	// 否则第 0 片（索引）会带着过期的 count 被跳过上传。
 	//
 	// generatedAt 必须跟着**数据变化**走，不能每轮取 now：它一旦每轮都变，
 	// 每个分片的 JSON 每轮都不同，比对就永远判定"变了"，等于白比对。
@@ -296,8 +298,18 @@ async function runImages() {
 	const written = []
 	for (let i = 0; i < chunks; i++) {
 		const slice = list.slice(i * CHUNK, (i + 1) * CHUNK)
-		// 片级签名只算内容：片号/总数变了才需要重传
-		const s = md5(JSON.stringify(slice))
+		// 片级签名必须**连同元信息一起算**，不能只对 slice 求哈希。
+		// 只算内容的话，补老图时按 net 倒序追加在尾部，前面几片一字未变 →
+		// 签名不变 → 第 0 片（它同时就是索引 gallery.json）会在下面的
+		// prevSig 比对里被跳过，里面的 count/chunks 永远停在旧值。
+		// 2026-08 线上就是这么卡住的：count=515、chunks=2，实际 614 张，
+		// 前端少显示了 99 张图，而同一轮的 gallery-all.json / gallery/1.json 都是新的。
+		// launchTotal 只写在索引（第 0 片）里，所以只有第 0 片把它算进签名。
+		const meta =
+			i === 0
+				? { count: list.length, chunks, total }
+				: { count: list.length, chunks }
+		const s = md5(JSON.stringify(Object.assign({ slice }, meta)))
 		sig[i] = s
 
 		const body = {

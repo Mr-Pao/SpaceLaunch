@@ -219,6 +219,18 @@ function heightOf(id) {
 	return HEIGHTS[(h >>> 0) % HEIGHTS.length]
 }
 
+/**
+ * 落地时就把高度算好挂到条目上。
+ *
+ * 高度只跟 id 有关，算一次就恒定；放进 items 里，cols 每次重算直接取，
+ * 不用再跑一遍 N 次哈希（第 0 片就有 500 条）。
+ */
+function withHeight(list) {
+	return (list || [])
+		.filter((x) => x && x.thumb)
+		.map((x) => ({ ...x, h: heightOf(x.id) }))
+}
+
 const TAB_KEYS = ['image', 'video', 'earth', 'astro', 'nasa']
 
 export default {
@@ -227,6 +239,8 @@ export default {
 			loading: true,
 			loadingMore: false,
 			items: [],
+			// 已渲染张数（触底 +60）。第 0 片就有 500 条，一次铺满节点首屏会明显变慢
+			imageShow: 60,
 			// 已加载的分片数（第 0 片算 1）
 			loaded: 0,
 			chunks: 1,
@@ -265,15 +279,23 @@ export default {
 
 	computed: {
 		// ---- 图片标签：两列瀑布流（保留原逻辑）----
+		// 只渲染前 N 张，和星云标签一个套路：节点数压到一屏能铺完的规模
+		imageVisible() {
+			return this.items.slice(0, this.imageShow)
+		},
+
 		cols() {
 			const L = []
 			const R = []
 			let hl = 0
 			let hr = 0
-			for (let gi = 0; gi < this.items.length; gi++) {
-				const it = this.items[gi]
-				const h = heightOf(it.id)
-				// gi 是全局下标，弹层要拿它定位到 items 里的位置
+			const list = this.imageVisible
+			for (let gi = 0; gi < list.length; gi++) {
+				const it = list[gi]
+				// 高度在落地时已经算好（见 withHeight），这里直接取
+				const h = it.h || heightOf(it.id)
+				// gi 是全局下标，弹层要拿它定位到 items 里的位置。
+				// imageVisible 是 items 的前缀切片，两者下标一致
 				if (hl <= hr) {
 					L.push({ it, h, gi })
 					hl += h
@@ -336,7 +358,7 @@ export default {
 
 		// 图片标签默认立即加载（保留原行为）
 		const g = await spaceData.load('gallery').catch(() => null)
-		this.items = ((g && g.list) || []).filter((x) => x && x.thumb)
+		this.items = withHeight(g && g.list)
 		this.total = (g && g.count) || this.items.length
 		this.chunks = Math.max(1, (g && g.chunks) || 1)
 		this.loaded = this.items.length ? 1 : 0
@@ -347,8 +369,12 @@ export default {
 	},
 
 	onReachBottom() {
-		// 图片标签走分片分页
+		// 图片标签：先把已加载的这一片铺完，铺满了才去拉下一片
 		if (this.tab === 'image') {
+			if (this.imageShow < this.items.length) {
+				this.imageShow += 60
+				return
+			}
 			this.loadMore()
 			return
 		}
@@ -610,7 +636,7 @@ export default {
 
 			try {
 				const d = await spaceData.galleryChunk(this.loaded)
-				const add = ((d && d.list) || []).filter((x) => x && x.thumb)
+				const add = withHeight(d && d.list)
 
 				if (add.length) this.items = this.items.concat(add)
 

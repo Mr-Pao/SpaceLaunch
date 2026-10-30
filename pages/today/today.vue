@@ -399,23 +399,29 @@ export default {
 	onLoad() {
 		this.today = todayText()
 
+		// 数据立刻发，不等审核开关：app-config.json 只有 32 字节，
+		// 但冷启动时它要占掉一次完整的 CDN 往返（真机 4G 300-800ms），
+		// 让六份数据排在它后面等于白等。开关晚到只影响「要不要跳走」，
+		// 和数据本身无关。
+		this.loadAll()
+
 		// 审核态：今日页是**启动页**，光把内容藏起来不够 —— 审核员打开小程序
 		// 第一眼会停在一片空白上。这里和发射页用同一套：先 switchTab 去火箭大全，
 		// 失败再 reLaunch 兜底（页面栈未就绪时 switchTab 会偶发失败）。
 		// tabBar 在审核态是隐藏的，所以跳过去就回不来，不会又落回空页面。
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-			if (this.reviewMode) {
-				uni.switchTab({
-					url: '/pages/rockets/rockets',
-					fail: () => {
-						uni.reLaunch({ url: '/pages/rockets/rockets' })
-					}
-				})
-				return
-			}
-			this.loadAll()
-		})
+		getConfig()
+			.catch(() => null)
+			.then((c) => {
+				this.reviewMode = Boolean(c && c.review)
+				if (this.reviewMode) {
+					uni.switchTab({
+						url: '/pages/rockets/rockets',
+						fail: () => {
+							uni.reLaunch({ url: '/pages/rockets/rockets' })
+						}
+					})
+				}
+			})
 	},
 
 	onShow() {
@@ -501,48 +507,98 @@ export default {
 		},
 
 		/**
-		 * 四块并行加载，各自 catch。
-		 * 用 allSettled 的语义：一块失败不能让其他三块陪葬
+		 * 六块各自加载、各自上屏。
+		 *
+		 * 原来用 Promise.all 等六份齐了一次性赋值：最慢的宇航员库（719KB）会把
+		 * 只要 9KB 的「往年今日」一起拖住，整页干等到最慢那份。
+		 * 现在谁先到谁先渲染；loading 的语义从「全部就绪」变成「全部结束」，
+		 * 只给空态文案用，不再挡渲染。一块失败只影响自己。
 		 */
-		async loadAll(force) {
+		loadAll(force) {
 			this.loading = true
 
-		const [g, a, u, o, ap, ep] = await Promise.all([
-			spaceData.load('gallery', { force: !!force }).catch(() => null),
-			spaceData.load('astronauts').catch(() => null),
-			// 待发射列表本身有 15 分钟缓存，下拉时才强制刷。
-			// 接 onUpdate：停在今日页时后台刷到新排期也能自动顶上，不用退出去再进
-			spaceData.load('upcoming', {
-				force: !!force,
-				onUpdate: (fresh) => {
-					this.upcoming = (fresh && fresh.list) || []
-				}
-			}).catch(() => null),
-			spaceData.load('onthisday', {
-				force: !!force,
-				onUpdate: (fresh) => {
-					this.onthisday = (fresh && fresh.list) || []
-				}
-			}).catch(() => null),
-			// 接 onUpdate：命中旧缓存时先返回缓存、后台再刷；不接就永远停在旧结果
-			spaceData.load('apod', { onUpdate: (fresh) => this.applyApod(fresh) }).catch(() => null),
-			// 同样接 onUpdate：EPIC 从 4 张扩到 13 张后，不接就还停在旧缓存上
-			spaceData.load('epic', {
-				onUpdate: (fresh) => {
-					this.epic = (fresh && fresh.list) || []
-				}
-			}).catch(() => null)
-		])
+			// 六块都各自 catch 过，所以计数一定走到 0；
+			// 收口写在 catch 之后的 then 里，不依赖 Promise.prototype.finally
+			let pending = 6
+			const done = () => {
+				if (--pending === 0) this.loading = false
+			}
 
-		if (g) this.gallery = (g.list || []).filter((x) => x && x.thumb)
-		if (a) this.astronauts = a.list || []
-		if (u) this.upcoming = u.list || []
-		if (o) this.onthisday = o.list || []
-		// 过滤 NASA 接口降级占位响应（title="NASA Science" / WP 主题资源目录 url），避免脏数据上首页卡片
-		if (ap) this.applyApod(ap)
-		if (ep) this.epic = ep.list || []
+			const tasks = [
+				spaceData
+					.load('gallery', { force: !!force })
+					.then((g) => {
+						if (g) this.gallery = (g.list || []).filter((x) => x && x.thumb)
+					})
+					.catch(() => {})
+					.then(done),
 
-			this.loading = false
+				// 862 条里只有 11 条 inSpace：全量塞进响应式 data 要把 719KB 的
+				// 数组整个反序列化 + 给每个字段建 setter，而模板只用「在天上的」那几条。
+				// inSpace computed 里的 filter 保留（对已筛过的数据是幂等的）
+				spaceData
+					.load('astronauts')
+					.then((a) => {
+						if (a) this.astronauts = (a.list || []).filter((x) => x && x.inSpace)
+					})
+					.catch(() => {})
+					.then(done),
+
+				// 待发射列表本身有 15 分钟缓存，下拉时才强制刷。
+				// 接 onUpdate：停在今日页时后台刷到新排期也能自动顶上，不用退出去再进
+				spaceData
+					.load('upcoming', {
+						force: !!force,
+						onUpdate: (fresh) => {
+							this.upcoming = (fresh && fresh.list) || []
+						}
+					})
+					.then((u) => {
+						if (u) this.upcoming = u.list || []
+					})
+					.catch(() => {})
+					.then(done),
+
+				spaceData
+					.load('onthisday', {
+						force: !!force,
+						onUpdate: (fresh) => {
+							this.onthisday = (fresh && fresh.list) || []
+						}
+					})
+					.then((o) => {
+						if (o) this.onthisday = o.list || []
+					})
+					.catch(() => {})
+					.then(done),
+
+				// 接 onUpdate：命中旧缓存时先返回缓存、后台再刷；不接就永远停在旧结果
+				spaceData
+					.load('apod', { onUpdate: (fresh) => this.applyApod(fresh) })
+					.then((ap) => {
+						// 过滤 NASA 接口降级占位响应（title="NASA Science" / WP 主题资源目录 url），
+						// 避免脏数据上首页卡片
+						if (ap) this.applyApod(ap)
+					})
+					.catch(() => {})
+					.then(done),
+
+				// 同样接 onUpdate：EPIC 从 4 张扩到 13 张后，不接就还停在旧缓存上
+				spaceData
+					.load('epic', {
+						onUpdate: (fresh) => {
+							this.epic = (fresh && fresh.list) || []
+						}
+					})
+					.then((ep) => {
+						if (ep) this.epic = ep.list || []
+					})
+					.catch(() => {})
+					.then(done)
+			]
+
+			// 下拉刷新要等全部结束，所以仍然返回一个总 Promise（各块已 catch，不会 reject）
+			return Promise.all(tasks)
 		},
 
 		/** apod 数据落地：前台返回与后台 onUpdate 刷新都走这里，保证同一套过滤 */

@@ -230,6 +230,15 @@ export default {
 		this.refreshReview()
 	},
 
+	beforeUnmount() {
+		// 延迟聚合还没触发就卸载了（快速返回 / 切页）：把 timer 收掉，
+		// 否则回调里虽然会被 _seq 挡住，但 timer 本身会一直挂着
+		if (this._mediaTimer) {
+			clearTimeout(this._mediaTimer)
+			this._mediaTimer = null
+		}
+	},
+
 	methods: {
 		/**
 		 * 看图器横滑换图：子组件只回传下标，curId / curNet 是加载的触发条件，
@@ -272,6 +281,11 @@ export default {
 			const id = this.curId
 			const seq = (this._seq = (this._seq || 0) + 1)
 
+			// 换任务了：上一次还没触发的延迟聚合直接撤掉
+			if (this._mediaTimer) {
+				clearTimeout(this._mediaTimer)
+				this._mediaTimer = null
+			}
 			if (!id) {
 				this.loading = false
 				this.detail = null
@@ -320,8 +334,16 @@ export default {
 			if (!this.photoOn) this.loadNews(id, seq)
 
 			// 首图上的「图片库」入口数字：聚合同系列媒体，和媒体页同一口径。
-			// 不阻塞首屏，算完前入口只是不显示
-			if (this._seq === seq) this.loadMedia(seq)
+			// 这份聚合要同时拉 launchers / previous / upcoming / videos 四份数据
+			// （合计 1.5MB），跟着首屏一起发会把图片和正文挤在后面。
+			// 首图本身有 detail.image 可显示，所以压到首屏之后再做，观感无损。
+			if (this._seq === seq) {
+				this._mediaTimer = setTimeout(() => {
+					this._mediaTimer = null
+					// 双重校验：这一秒多里用户可能已经返回或滑到别的发射了
+					if (this._seq === seq) this.loadMedia(seq)
+				}, 1200)
+			}
 
 			const providerId = d && d.launch_service_provider && d.launch_service_provider.id
 			if (providerId) {
