@@ -26,7 +26,7 @@
 				<view v-else class="avatar avatar-ph"><text>🧑‍🚀</text></view>
 
 				<view class="head-body">
-					<text class="name">{{ a.name }}</text>
+					<text class="name">{{ astroName(a) }}</text>
 					<view class="tags">
 						<text class="tag tag-on" v-if="a.inSpace">在轨</text>
 						<text class="tag" v-else-if="statusZh" :class="statusClass">{{ statusZh }}</text>
@@ -166,6 +166,7 @@ import spaceData from '@/utils/data.js'
 import {
 	agencyLabel,
 	nationZh,
+	astroName as astroNameOf,
 	stationName as stationNameOf,
 	stationStatusZh as stationStatusZhOf,
 	dayOf as dayOfOf,
@@ -310,6 +311,11 @@ export default {
 		// 模板只能看见实例成员，模块作用域的函数要转一层
 		stationName(name) {
 			return stationNameOf(name)
+		},
+
+		// 标题用中文名：搜索「阿姆斯特朗」点进来，落地页不该又变回英文
+		astroName(a) {
+			return astroNameOf(a)
 		},
 
 		preview(url) {

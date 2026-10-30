@@ -234,10 +234,148 @@ async function pruneStaleUpcoming(list, readCosJson) {
 }
 
 /**
+ * 宇航员中文名（nameZh）
+ *
+ * 862 条里 LL2 只给英文 name，搜「阿姆斯特朗」「加加林」完全搜不到
+ * （utils/search-match.js 早就写好 nameZh 判断，缺的只是数据）。
+ * 三顺位补齐，前者命中就不往下走：
+ *   1. lib/astro-names-zh.json —— 427 个知名宇航员的人工译名，质量基线，零成本
+ *   2. translate.getZh()       —— 翻译缓存里的历史结果（上一轮机翻的）
+ *   3. 机翻                    —— 剩下的冷门名字，每轮限量，靠缓存跨轮累积
+ *
+ * 中国籍整条跳过：前端 CHINA_ASTRO_ZH 是权威表，而 astroName 里 nameZh 优先级
+ * 更高，机翻拼音名（Yang Liwei → 杨立伟 之类）写进去反而会盖掉正确译名。
+ */
+const ASTRO_NAME_FILE = path.resolve(__dirname, 'lib', 'astro-names-zh.json')
+
+/**
+ * 每轮机翻上限。
+ *
+ * MyMemory 匿名限额约 1000 词/天，而名字平均 2 个词 —— 人工表外还剩 403 个名字
+ * （约 800 词），一口气跑完刚好把当天配额烧光，一旦后半段撞限额就整批白跑。
+ * 280 条按 2 并发 + 350ms 间隔算约 2 分钟，给 9 个 LL2 分页请求（约 80 秒）
+ * 和图片镜像留出余量，不会顶到 sync.yml 的 30 分钟上限。
+ * 翻成的结果落进 translation-cache.json 并回传 COS，下一轮从这里继续，
+ * CI 每天一轮的话两轮补全。
+ */
+const ASTRO_NAME_LIMIT = 280
+
+let astroNamesZh = null
+
+function loadAstroNamesZh() {
+	if (astroNamesZh) return astroNamesZh
+	astroNamesZh = {}
+	try {
+		const obj = JSON.parse(fs.readFileSync(ASTRO_NAME_FILE, 'utf8'))
+		for (const [k, v] of Object.entries(obj || {})) {
+			if (k.startsWith('_') || typeof v !== 'string' || !v.trim()) continue
+			astroNamesZh[k] = v
+		}
+		console.log(`  宇航员译名: 人工表 ${Object.keys(astroNamesZh).length} 条`)
+	} catch (e) {
+		// 表坏了就全走机翻，不能因此让 astronauts 数据集失败
+		console.warn(`  ! 宇航员译名表不可读，本轮全走机翻: ${e.message}`)
+	}
+	return astroNamesZh
+}
+
+/** 译文里至少得有一个汉字，否则等于没翻（免费接口偶尔原样回吐英文） */
+function hasHan(s) {
+	return /[\u4e00-\u9fa5]/.test(s)
+}
+
+async function fillAstronautNames(list) {
+	if (!Array.isArray(list) || !list.length) return
+
+	const table = loadAstroNamesZh()
+	const queue = []
+	const queued = new Set()
+	let hitTable = 0
+	let hitCache = 0
+
+	// 先给每条一个确定的 ''，避免后面漏掉留下 undefined（validate 会报）
+	for (const a of list) {
+		a.nameZh = ''
+		const en = String(a.name || '').trim()
+		if (!en || a.nation === 'China') continue
+
+		const human = table[en]
+		if (human) {
+			a.nameZh = human
+			hitTable++
+			continue
+		}
+
+		const zh = translate.getZh(en)
+		if (zh && hasHan(zh)) {
+			a.nameZh = zh
+			hitCache++
+			continue
+		}
+
+		// 同名重复条目（极少数重名）只排一次队，省额度
+		if (!queued.has(en)) {
+			queued.add(en)
+			queue.push(en)
+		}
+	}
+
+	console.log(
+		`  宇航员中文名: 人工 ${hitTable} / 缓存 ${hitCache} / 待翻 ${queue.length}（本轮上限 ${ASTRO_NAME_LIMIT}）`
+	)
+
+	if (!queue.length) return
+
+	const batch = queue.slice(0, ASTRO_NAME_LIMIT)
+	await translate.translateTexts(batch)
+
+	// 机翻结果不直接返回，统一从缓存回读：getZh 出口还会跑一遍术语纠正
+	let filled = 0
+	const echoed = new Set()
+	for (const a of list) {
+		if (a.nameZh) continue
+		const en = String(a.name || '').trim()
+		if (!en || a.nation === 'China') continue
+		const zh = translate.getZh(en)
+		if (zh && hasHan(zh)) {
+			a.nameZh = zh
+			filled++
+		} else if (zh) {
+			// 译文里没有汉字 —— 纯人名最常见的失败形态是原样回吐英文
+			echoed.add(zh)
+		}
+	}
+	console.log(`  ✓ 宇航员本轮新增中文名 ${filled} 条`)
+
+	// 原样回吐的条目在缓存里等于一条「已翻完」的假记录，下一轮会被当成命中
+	// 直接跳过、永远不再重试。MyMemory 就是这种表现（它不做人名音译），
+	// Google 会正常音译，所以少量回吐按个例处理：从缓存剔除，下一轮换后端再试。
+	//
+	// 但如果过半都在回吐（含 Google 中途被限流、整批转 MyMemory 的情况），
+	// 说明这次的出口就是不认人名，此时剔除只会让同一批名字每轮都排在队首重翻、
+	// 后面的名字永远轮不上，不如留在缓存里当「已知翻不出来」的标记，
+	// nameZh 留空、前端回落英文原文。
+	if (echoed.size && echoed.size < batch.length * 0.5) {
+		const bag = translate.dumpCache()
+		let dropped = 0
+		for (const key of Object.keys(bag)) {
+			const row = bag[key]
+			if (row && echoed.has(row.zh)) {
+				delete bag[key]
+				dropped++
+			}
+		}
+		console.log(`  · 机翻原样回吐 ${echoed.size} 条，已从缓存剔除待重试（${dropped} 条）`)
+	} else if (echoed.size) {
+		console.warn(`  ! ${echoed.size} 个名字机翻原样回吐，本轮后端不做人名音译，先留空`)
+	}
+}
+
+/**
  * 宇航员「浅字段」：列表卡片能显示出来的全部内容。
  *
  * 启动页「此刻在天上」= 头像 + 名字 + 在轨天数，名字走 format.js 的 astroName
- * （读 name + nation，中国籍查本地表换中文名），所以卡片版要 img。
+ * （优先 nameZh，其次中国籍查本地表，兜底英文原文），所以卡片版要 img。
  *
  * 搜索页的结果行也带头像（68rpx 圆图，无图静默不显示）：不加 img 的话，
  * 轻量集上线后搜索结果会突然比「404 降级到全量库」那条路径少一圈头像，
@@ -246,10 +384,12 @@ async function pruneStaleUpcoming(list, readCosJson) {
  * 详情页本来就是拿 id 单独进 /pages/astronaut，不该让列表替它下载。
  *
  * 注意机构字段原名是 `agencyName`（slim.js:544），中文名在前端用 agencyLabel
- * 查表；线上 862 条的 nameZh / nationZh / agencyZh 全为空，所以不能挑这三个。
+ * 查表；线上 862 条的 nationZh / agencyZh 仍为空，不能挑这两个。
+ * nameZh 是本仓库回填的（见 fillAstronautNames），必须带上 —— 搜索页靠它命中
+ * 「阿姆斯特朗」这类中文词，缺了等于回到只能搜英文的老样子。
  */
-const ASTRO_CARD_FIELDS = ['id', 'name', 'nation', 'agencyName', 'days', 'inSpace', 'img']
-const ASTRO_SEARCH_FIELDS = ['id', 'name', 'nation', 'agencyName', 'days', 'inSpace', 'img']
+const ASTRO_CARD_FIELDS = ['id', 'name', 'nameZh', 'nation', 'agencyName', 'days', 'inSpace', 'img']
+const ASTRO_SEARCH_FIELDS = ['id', 'name', 'nameZh', 'nation', 'agencyName', 'days', 'inSpace', 'img']
 
 function pickFields(fields) {
 	return (a) => {
@@ -480,6 +620,8 @@ const DATASETS = {
 		cacheControl: 'public, max-age=86400',
 		images: ['img'],
 		localize: localizeAstronauts,
+		// 英文名 → 中文名，人工表 + 缓存 + 限量机翻（见 fillAstronautNames）
+		fillNames: fillAstronautNames,
 		/**
 		 * 宇航员库：862 人、limit=100 → 9 页。detailed 才有 in_space /
 		 * time_in_space / bio 这些字段。单页实测约 8 秒，每天一轮可接受。
@@ -505,7 +647,8 @@ const DATASETS = {
 		/**
 		 * 两个派生轻量产物（主文件 719KB 对这两个页面都是白拉）：
 		 *   astronauts-inspace.json 启动页用，只留 inSpace 的十来条（实测 11 条 / 2.2KB）
-		 *   astronauts-search.json  搜索页用，862 条浅字段（实测 172.7KB，含头像）
+		 *   astronauts-search.json  搜索页用，862 条浅字段
+		 *                           （172.7KB 含头像；带上 nameZh 后约 192KB）
 		 * 三个文件在同一轮里生成，generatedAt 共用同一个时间戳。
 		 */
 		derive: [
@@ -748,6 +891,19 @@ async function runDataset(name) {
 		} catch (e) {
 			// 翻译是增强项，失败不能拖垮整个同步
 			console.warn(`  ! 中文回填失败，本次仍输出英文: ${e.message}`)
+		}
+	}
+
+	// 宇航员中文名：翻译全挂了也只能让 nameZh 退化成空串，
+	// 绝不能让 astronauts 这份数据集整体失败（搜索会连带掉回只能搜英文）
+	if (ds.fillNames) {
+		try {
+			await ds.fillNames(list)
+		} catch (e) {
+			console.warn(`  ! 宇航员中文名回填失败（本轮 nameZh 全空）: ${e.message}`)
+		}
+		for (const item of list) {
+			if (typeof item.nameZh !== 'string') item.nameZh = ''
 		}
 	}
 

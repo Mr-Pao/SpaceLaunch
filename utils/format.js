@@ -248,15 +248,19 @@ const CHINA_ASTRO_ZH = {
 }
 
 /**
- * 航天员显示名：中国籍换成中文，其余保留原拼写。
- * 只认 nation === 'China'，避免同名的外籍人士被误译。
+ * 航天员显示名，三顺位：
+ *   1. a.nameZh        —— CI 回填的中文名（scripts/sync.js 的 fillAstronautNames）
+ *   2. CHINA_ASTRO_ZH  —— 中国籍本地表。放在 nameZh 之前是因为它才是权威译名，
+ *                         机翻拼音名会翻出同音错字（Yang Liwei → 杨立伟）
+ *   3. 英文原文
+ * 外籍在 nameZh 缺失时保留原拼写，不猜。
  */
 export function astroName(a) {
 	if (!a) return ''
 	// 上游个别条目会带首尾空格（历史上 'Liu Boming ' 就是这样），不 trim 查不到表
 	const raw = (a.name || '').trim()
-	if (a.nation !== 'China') return raw
-	return CHINA_ASTRO_ZH[raw] || raw
+	if (a.nation === 'China') return CHINA_ASTRO_ZH[raw] || String(a.nameZh || '').trim() || raw
+	return String(a.nameZh || '').trim() || raw
 }
 
 /**
