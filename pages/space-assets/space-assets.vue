@@ -53,6 +53,16 @@ export default {
 		}
 	},
 
+	/**
+	 * 深链落地：分享钩子与搜索页引导都用 ?tab= 指到具体分段，
+	 * 但这里原来没有 onLoad，参数一直被忽略、永远停在默认的「全球在轨」。
+	 * 只接受三个合法值，别的一律退回默认，防止脏参数把页面搞成空白。
+	 */
+	onLoad(query) {
+		const t = query && query.tab
+		if (t === 'orbit' || t === 'catalog' || t === 'debris') this.tab = t
+	},
+
 	onPageScroll(e) {
 		const solid = e.scrollTop > NAV_SOLID_SCROLL
 		if (solid !== this.navSolid) this.navSolid = solid

@@ -51,6 +51,10 @@
 			<view class="empty" v-if="!groups.length && !searching && !extrasLoading">
 				<text class="empty-icon">🔍</text>
 				<text class="empty-text">没有找到「{{ keyword.trim() }}」相关内容</text>
+				<!-- 卫星（GCAT 两万多颗）不在全局搜索范围：分 26 片约 8MB，这里最多只覆盖第一片 800 条，
+				     搜"哈勃"命中与否纯看运气，半截结果比没有更误导。所以引导去太空资产页 ——
+				     那边的页内搜索是逐个分片加载的，搜的是真实全量。 -->
+				<text class="empty-link" @click="goCatalogSearch">去「太空资产 · 卫星百科」搜卫星 ›</text>
 			</view>
 		</view>
 
@@ -148,6 +152,11 @@ export default {
 	},
 
 	methods: {
+		// 卫星没进全局搜索，空态里给一条去太空资产页的引导（那边有页内搜索）
+		goCatalogSearch() {
+			uni.navigateTo({ url: '/pages/space-assets/space-assets?tab=catalog' })
+		},
+
 		searchShareTitle() {
 			const kw = this.keyword.trim()
 			return kw ? '在 SpaceLaunch 搜「' + kw + '」' : '搜索航天发射、火箭、宇航员与工位'
@@ -527,6 +536,18 @@ export default {
 .empty-text {
 	color: #6b7891;
 	font-size: 28rpx;
+	text-align: center;
+}
+
+/* 空态里的跳转引导：不抢「没找到」的主视觉，用和图库链接同色系的青蓝 */
+.empty-link {
+	margin-top: 28rpx;
+	padding: 16rpx 28rpx;
+	border-radius: 999rpx;
+	border: 1rpx solid rgba(56, 189, 248, 0.35);
+	background: rgba(56, 189, 248, 0.08);
+	color: #38bdf8;
+	font-size: 26rpx;
 	text-align: center;
 }
 
