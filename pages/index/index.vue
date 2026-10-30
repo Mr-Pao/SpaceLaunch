@@ -422,6 +422,10 @@ export default {
 	onHide() {
 		// 抽屉还开着就切走了的话，tabBar 会一直保持隐藏，回来时底部是空的
 		if (this.sheetVisible) this.closeSheet()
+		// 抽屉里的输入框焦点要一起清掉，否则切回来键盘会自己弹起
+		try {
+			uni.hideKeyboard()
+		} catch (e) {}
 	},
 
 	onPullDownRefresh() {

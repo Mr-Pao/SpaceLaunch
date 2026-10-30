@@ -430,6 +430,14 @@ export default {
 		syncTabBar(3)
 	},
 
+	// 离开本页时把键盘收掉：搜索框是常驻节点，留着焦点的话
+	// 下次 switchTab 回到本页，微信会把它恢复成聚焦态，键盘自己弹出来
+	onHide() {
+		try {
+			uni.hideKeyboard()
+		} catch (e) {}
+	},
+
 	// 滚过榜单头以后给顶栏加毛玻璃，标题不悬空在内容上
 	onPageScroll(e) {
 		const solid = (e && e.scrollTop ? e.scrollTop : 0) > NAV_SOLID_SCROLL

@@ -163,6 +163,14 @@ Component({
 			if (index === this.data.selected) return
 			if (!this.data.list[index]) return
 
+			// 切 tab 前先把键盘收掉。
+			// 火箭页搜索框是常驻的、发射页的搜索框在筛选抽屉里，只要还带着焦点，
+			// switchTab 之后键盘会跟到目标页、甚至在新页面自己重新弹起来。
+			// 放在 setData 之前，让收键盘和转场在同一帧发起。
+			try {
+				wx.hideKeyboard({ fail() {} })
+			} catch (err) {}
+
 			this.setData({ selected: index })
 			wx.switchTab({ url: '/' + this.data.list[index].pagePath })
 		}
