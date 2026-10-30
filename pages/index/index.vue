@@ -94,7 +94,8 @@
 			</view>
 
 			<!-- 最近一次发射 + 倒计时。放在列表上方当视觉焦点（只对「待发射」有意义） -->
-			<view class="next-wrap" v-if="nextLaunch && visible.length">
+			<!-- 搜索时让位：用户已经在找具体某次发射了，倒计时卡片只会把结果往下挤 -->
+			<view class="next-wrap" v-if="nextLaunch && visible.length && !keyword.trim()">
 				<next-launch :item="nextLaunch" @select="goDetail" />
 			</view>
 
