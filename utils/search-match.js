@@ -59,11 +59,14 @@ export function rocketMatch(x, kw) {
 /**
  * 宇航员：中英文本名、国籍、所属机构都算命中面。
  *
- * 两套数据源字段不完全一样，都要认：
- *   - astronautsSearch（轻量搜索集）：nameZh / nation / nationZh / agency / agencyZh
- *   - astronauts（全量 719KB 降级用）：name / nation / agencyName，没有中文名字段
- * 后者靠 format.js 的 CHINA_ASTRO_ZH 查表（astroName）与 NATION_ZH（nationZh）
- * 补出中文，所以老数据下搜「杨利伟」「中国」也能命中。
+ * 实测线上两套数据源**都没有中文名字段**：astronautsSearch（862 条浅字段）
+ * 与全量 astronauts（719KB）里 nameZh / nationZh / agencyZh 三个键根本不存在
+ * （不是空值，是没有这个字段）。所以中文命中全靠 format.js 的两张本地表：
+ *   CHINA_ASTRO_ZH（astroName，「杨利伟」）与 NATION_ZH（nationZh，「中国」）
+ * 机构字段两套都叫 agencyName（不是 agency）。
+ *
+ * nameZh / nationZh / agencyZh / agency 那几个 hit() 是给日后回填中文字段留的，
+ * 字段缺失时 hit() 首行 `if (!haystack) return false` 直接吃掉，不会报错。
  */
 export function astronautMatch(x, kw) {
 	if (!x || !kw) return false
