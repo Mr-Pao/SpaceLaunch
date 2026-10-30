@@ -3,7 +3,7 @@
 		<!-- 满屏漂流墙：不留导航条，图从屏幕最上沿开始，四面渐隐融进背景 -->
 		<view class="stage" v-if="!loading && rowsA.length">
 			<view class="bands">
-				<view class="band">
+				<view class="band band-w">
 					<view class="track t1">
 						<view class="cell wide" v-for="(img, i) in row1" :key="'a' + i" @click="preview(0, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
@@ -12,7 +12,7 @@
 					</view>
 				</view>
 
-				<view class="band">
+				<view class="band band-t">
 					<view class="track t2">
 						<view class="cell tall" v-for="(img, i) in row2" :key="'b' + i" @click="preview(1, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
@@ -21,7 +21,7 @@
 					</view>
 				</view>
 
-				<view class="band">
+				<view class="band band-w">
 					<view class="track t3">
 						<view class="cell wide" v-for="(img, i) in row3" :key="'c' + i" @click="preview(2, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
@@ -30,7 +30,7 @@
 					</view>
 				</view>
 
-				<view class="band">
+				<view class="band band-t">
 					<view class="track t4">
 						<view class="cell tall" v-for="(img, i) in row4" :key="'d' + i" @click="preview(3, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
@@ -39,7 +39,7 @@
 					</view>
 				</view>
 
-				<view class="band">
+				<view class="band band-w">
 					<view class="track t5">
 						<view class="cell wide" v-for="(img, i) in row5" :key="'e' + i" @click="preview(4, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
@@ -48,7 +48,7 @@
 					</view>
 				</view>
 
-				<view class="band">
+				<view class="band band-t">
 					<view class="track t6">
 						<view class="cell tall" v-for="(img, i) in row6" :key="'f' + i" @click="preview(5, i)">
 							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
@@ -399,11 +399,9 @@ export default {
 <style lang="scss" scoped>
 .page {
 	position: relative;
-	min-height: 100vh;
+	height: 100vh;
 	display: flex;
 	flex-direction: column;
-	/* 底部给悬浮胶囊 tabBar 让位 */
-	padding-bottom: 200rpx;
 	box-sizing: border-box;
 	overflow: hidden;
 	/* 冷色光晕压在黑底上：画面之外还有一层空间，而不是纯黑边框 */
@@ -412,23 +410,38 @@ export default {
 		#070b12;
 }
 
-/* 墙面铺满剩余高度，不再上下居中留空 */
+/* 墙面铺满整个页面：从屏幕最上沿一直到最下沿（含悬浮胶囊 tabBar 后面），
+   提示与按钮改为浮在墙上，所以这里不再给底部让位 */
 .stage {
-	position: relative;
-	flex: 1;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
 	overflow: hidden;
 	display: flex;
-	align-items: center;
+	align-items: stretch;
+	z-index: 0;
 }
 
 .bands {
 	width: 100%;
-	padding: 0;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
 }
 
 .band {
 	overflow: hidden;
 	margin-bottom: 8rpx;
+	min-height: 0;
+	/* 高度不再写死，按原来的 232:164 比例把整屏高度分给六条 */
+	flex: 232 1 0%;
+}
+
+/* 窄行：与宽行的高度比沿用原始值，六条铺满后仍保持疏密节奏 */
+.band-t {
+	flex: 164 1 0%;
 }
 
 .band:last-child {
@@ -440,6 +453,8 @@ export default {
 	/* max-content 不认的老内核靠 inline-flex 的 shrink-to-fit 兜底，
 	   两种写法都能让 track 宽度 = 内容宽度，动画的 -50% 才有意义 */
 	width: max-content;
+	/* 撑满所属行的高度，格子才能跟着整屏伸缩 */
+	height: 100%;
 	will-change: transform;
 }
 
@@ -498,14 +513,15 @@ export default {
 }
 
 /* 行高与行宽的差异刻意拉大：四行节奏分明，才不会像四根等宽的带子 */
+/* 高度交给 flex 行高决定（整屏高度变化时自动伸缩），只固定宽度 */
 .wide {
 	width: 336rpx;
-	height: 232rpx;
+	height: 100%;
 }
 
 .tall {
 	width: 232rpx;
-	height: 164rpx;
+	height: 100%;
 }
 
 .cell-img {
@@ -628,23 +644,40 @@ export default {
 }
 
 /* ---- 底部悬浮入口 ---- */
+/* 墙铺满整屏后，注解与入口都浮在图上，不再占布局高度 */
 /* 墙的注解：紧贴墙面的一条说明，轻呼吸，不抢画面 */
 .wall-tip {
-	flex-shrink: 0;
-	padding: 22rpx 0 0;
+	position: absolute;
+	left: 0;
+	right: 0;
+	/* 悬浮胶囊 tabBar 高 112rpx + 上下留白，再让出按钮自身高度与间距 */
+	bottom: 240rpx;
+	bottom: calc(240rpx + constant(safe-area-inset-bottom));
+	bottom: calc(240rpx + env(safe-area-inset-bottom));
 	text-align: center;
+	z-index: 2;
+	/* 浮层不接管点击，让下方墙照常可点 */
+	pointer-events: none;
 	color: rgba(200, 214, 232, 0.6);
 	font-size: 21rpx;
 	letter-spacing: 1rpx;
+	text-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.85);
 	animation: tipBreath 3.4s ease-in-out infinite;
 }
 
 /* 独立入口行 */
 .dock {
-	flex-shrink: 0;
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 152rpx;
+	bottom: calc(152rpx + constant(safe-area-inset-bottom));
+	bottom: calc(152rpx + env(safe-area-inset-bottom));
 	display: flex;
 	justify-content: center;
-	padding: 22rpx 0 0;
+	z-index: 2;
+	/* 整行是全宽的浮层，只有按钮本身接点击，其余交给下面的墙 */
+	pointer-events: none;
 }
 
 @keyframes tipBreath {
