@@ -7,6 +7,6 @@ unpackage/
 .workbuddy/
 package.json.flip-countdown.bak
 node_modules/
-minitool/.cache/
-minitool/out/
+minitool/
+.skill/
 project.private.config.json
