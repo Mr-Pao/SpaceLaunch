@@ -195,7 +195,7 @@
 
 <script>
 import spaceData from '@/utils/data.js'
-import { rocketName, rocketFullName, agencyLabel, flagSrc } from '@/utils/format.js'
+import { rocketFullName, agencyLabel, flagSrc } from '@/utils/format.js'
 import { syncTabBar } from '@/utils/tabbar.js'
 import { setOverride, getDebugInfo } from '@/utils/config.js'
 import navMixin from '@/utils/nav-mixin.js'

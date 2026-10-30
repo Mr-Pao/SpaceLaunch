@@ -340,7 +340,6 @@ import {
 	rocketFullName,
 	seriesKey,
 	agencyLabel,
-	countryOf,
 	isStillUpcoming,
 	textUnits,
 	coreStatus,

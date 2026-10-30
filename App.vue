@@ -12,7 +12,6 @@ export default {
 	},
 
 	onLaunch() {
-		console.log('App Launch')
 		this.checkUpdate()
 		// 预热远程展示开关：首页 / tabBar / 详情页各自会取，
 		// 这里先发一次请求，各处就能共享这份内存缓存（失败静默，走兜底）
@@ -32,14 +31,6 @@ export default {
 			})
 		} catch (e) {}
 		// #endif
-	},
-
-	onShow() {
-		console.log('App Show')
-	},
-
-	onHide() {
-		console.log('App Hide')
 	},
 
 	methods: {
