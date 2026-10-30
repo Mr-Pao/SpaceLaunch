@@ -9,7 +9,16 @@
  * 不能写成 `name || nameZh` 再去命中 —— name 恒存在，nameZh 永远轮不到，
  * 搜「嫦娥」「星链」会整组落空（2026-10-24 复审的 P1-1）。
  */
-import { rocketName, launchTitle } from './format.js'
+import {
+	rocketName,
+	launchTitle,
+	astroName,
+	nationZh,
+	agencyLabel,
+	padShort,
+	placeZh,
+	countryOf
+} from './format.js'
 
 export function hit(haystack, kw) {
 	if (!haystack) return false
@@ -44,5 +53,62 @@ export function rocketMatch(x, kw) {
 		hit(x.manufacturer, kw) ||
 		hit(rocketName(x), kw) ||
 		(Array.isArray(x.families) && x.families.some((f) => hit(f, kw)))
+	)
+}
+
+/**
+ * 宇航员：中英文本名、国籍、所属机构都算命中面。
+ *
+ * 两套数据源字段不完全一样，都要认：
+ *   - astronautsSearch（轻量搜索集）：nameZh / nation / nationZh / agency / agencyZh
+ *   - astronauts（全量 719KB 降级用）：name / nation / agencyName，没有中文名字段
+ * 后者靠 format.js 的 CHINA_ASTRO_ZH 查表（astroName）与 NATION_ZH（nationZh）
+ * 补出中文，所以老数据下搜「杨利伟」「中国」也能命中。
+ */
+export function astronautMatch(x, kw) {
+	if (!x || !kw) return false
+	return (
+		hit(x.name, kw) ||
+		hit(x.nameZh, kw) ||
+		hit(astroName(x), kw) ||
+		hit(x.nation, kw) ||
+		hit(x.nationZh, kw) ||
+		hit(nationZh(x.nation), kw) ||
+		hit(x.agency, kw) ||
+		hit(x.agencyName, kw) ||
+		hit(x.agencyZh, kw) ||
+		hit(agencyLabel(x.agencyName || x.agency), kw)
+	)
+}
+
+/**
+ * 发射工位：name / padShort / 场地（含中文化）/ 国家 / 国家码 / 运营机构。
+ *
+ * pads 里没有任何中文字段，中文命中只能靠 format.js 的三张本地表：
+ * PLACE_ZH（placeZh →「文昌航天发射场」）、COUNTRY_ZH（countryOf →「中国」）
+ * 与 AGENCY_ZH（agencyLabel →「中国航天科技」）。
+ * 注意 placeZh 命中即返回（文昌工位不会再返回「中国」），所以国家要单独用
+ * countryOf 判一次，否则搜「中国」只能搜到零星几个机构名带中国二字的工位。
+ */
+export function padMatch(x, kw) {
+	if (!x || !kw) return false
+	const loc = x.location && x.location.name
+	const agencies = Array.isArray(x.agencies) ? x.agencies : []
+	return (
+		hit(x.name, kw) ||
+		hit(padShort(x.name), kw) ||
+		hit(x.nameZh, kw) ||
+		hit(loc, kw) ||
+		hit(placeZh(loc), kw) ||
+		hit(countryOf({ pad: x }), kw) ||
+		hit(x.country, kw) ||
+		hit(x.countryZh, kw) ||
+		hit(x.country_code, kw) ||
+		agencies.some(
+			(a) =>
+				hit(a && a.name, kw) ||
+				hit(a && a.agencyZh, kw) ||
+				hit(a && agencyLabel(a.name), kw)
+		)
 	)
 }

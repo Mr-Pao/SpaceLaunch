@@ -533,11 +533,11 @@ export default {
 					.catch(() => {})
 					.then(done),
 
-				// 862 条里只有 11 条 inSpace：全量塞进响应式 data 要把 719KB 的
-				// 数组整个反序列化 + 给每个字段建 setter，而模板只用「在天上的」那几条。
-				// inSpace computed 里的 filter 保留（对已筛过的数据是幂等的）
+				// 只拉 inSpace 的十来条轻量版（实测 11 条 / 2.2KB），
+				// 不再为 11 张卡片拖 719KB 全量库。
+				// inSpace computed 里的 filter 保留：数据集若混进脏数据，这里还能兜住
 				spaceData
-					.load('astronauts')
+					.load('astronautsInspace')
 					.then((a) => {
 						if (a) this.astronauts = (a.list || []).filter((x) => x && x.inSpace)
 					})

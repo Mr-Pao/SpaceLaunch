@@ -233,6 +233,32 @@ async function pruneStaleUpcoming(list, readCosJson) {
 	console.log(`  · 陈旧状态：修正 ${patched} 条 / 剔除 ${drop.size} 条`)
 }
 
+/**
+ * 宇航员「浅字段」：列表卡片能显示出来的全部内容。
+ *
+ * 启动页「此刻在天上」= 头像 + 名字 + 在轨天数，名字走 format.js 的 astroName
+ * （读 name + nation，中国籍查本地表换中文名），所以卡片版要 img。
+ *
+ * 搜索页的结果行也带头像（68rpx 圆图，无图静默不显示）：不加 img 的话，
+ * 轻量集上线后搜索结果会突然比「404 降级到全量库」那条路径少一圈头像，
+ * 看起来像功能回归。862 条约 +80KB，换搜索页懒加载时多这 80KB 是值的。
+ * 其余字段（missions 280KB / evas 96KB / bio+bioZh / wiki）只有详情页要，
+ * 详情页本来就是拿 id 单独进 /pages/astronaut，不该让列表替它下载。
+ *
+ * 注意机构字段原名是 `agencyName`（slim.js:544），中文名在前端用 agencyLabel
+ * 查表；线上 862 条的 nameZh / nationZh / agencyZh 全为空，所以不能挑这三个。
+ */
+const ASTRO_CARD_FIELDS = ['id', 'name', 'nation', 'agencyName', 'days', 'inSpace', 'img']
+const ASTRO_SEARCH_FIELDS = ['id', 'name', 'nation', 'agencyName', 'days', 'inSpace', 'img']
+
+function pickFields(fields) {
+	return (a) => {
+		const o = {}
+		for (const k of fields) o[k] = a[k]
+		return o
+	}
+}
+
 const DATASETS = {
 	/**
 	 * 发射工位（pad）全量：/pads/ 共 251 条，**必须翻页**。
@@ -475,7 +501,26 @@ const DATASETS = {
 			}
 
 			return { count, list: all.map(slimAstronaut) }
-		}
+		},
+		/**
+		 * 两个派生轻量产物（主文件 719KB 对这两个页面都是白拉）：
+		 *   astronauts-inspace.json 启动页用，只留 inSpace 的十来条（实测 11 条 / 2.2KB）
+		 *   astronauts-search.json  搜索页用，862 条浅字段（实测 172.7KB，含头像）
+		 * 三个文件在同一轮里生成，generatedAt 共用同一个时间戳。
+		 */
+		derive: [
+			{
+				file: 'astronauts-inspace.json',
+				dataset: 'astronautsInspace',
+				filter: (a) => a.inSpace === true,
+				pick: pickFields(ASTRO_CARD_FIELDS)
+			},
+			{
+				file: 'astronauts-search.json',
+				dataset: 'astronautsSearch',
+				pick: pickFields(ASTRO_SEARCH_FIELDS)
+			}
+		]
 	},
 
 	// 空间站（/space_stations/，mode=detailed，仅 15 个，一页抓完）。
@@ -735,10 +780,15 @@ async function runDataset(name) {
 		}
 	}
 
+	// 主文件与派生产物必须共用这一个时间戳：前端靠 generatedAt 判断
+	// 「线上是否已更新」（data.js 的 refreshInBackground 里比对），
+	// 各取一次 new Date() 会让三个文件的更新时刻对不上
+	const generatedAt = new Date().toISOString()
+
 	const payload = {
 		v: DATA_VERSION,
 		dataset: name,
-		generatedAt: new Date().toISOString(),
+		generatedAt,
 		count: count ?? list.length,
 		served: list.length,
 		list
@@ -751,6 +801,20 @@ async function runDataset(name) {
 	console.log(`  → ${ds.file}  ${list.length} 条 / ${kb} KB / ${((Date.now() - started) / 1000).toFixed(1)}s`)
 
 	await upload(filePath, `space-data/${ds.file}`, ds.cacheControl)
+
+	// 派生产物：从刚生成的全量 list 里裁，独立落盘 + 独立上传
+	// （上传是逐个文件显式调的，不是扫 dist 目录，漏一条就上不去）
+	for (const d of ds.derive || []) {
+		const sub = (d.filter ? list.filter(d.filter) : list).map(d.pick)
+		const body = { v: DATA_VERSION, dataset: d.dataset, generatedAt, count: sub.length, list: sub }
+		const subPath = path.join(OUT_DIR, d.file)
+		fs.writeFileSync(subPath, JSON.stringify(body), 'utf8')
+
+		const subKb = (fs.statSync(subPath).size / 1024).toFixed(1)
+		console.log(`  → ${d.file}  ${sub.length} 条 / ${subKb} KB`)
+
+		await upload(subPath, `space-data/${d.file}`, ds.cacheControl)
+	}
 
 	return { name, count: payload.count, served: payload.served, kb, file: ds.file }
 }

@@ -73,6 +73,13 @@ const FILES = {
 	// 宇航员库（862 人，detailed）：in_space 筛「此刻在天上」，
 	// bio 只保留了在轨人员的（详情页入口只有这张卡片）
 	astronauts: 'astronauts.json',
+	// 启动页专用的轻量版：只有 inSpace 的十来条 + 卡片字段（实测 11 条 / 2.2KB）。
+	// 之前启动页拉 719KB 的全量库只为渲染 11 张卡片，是首屏最大的一笔浪费
+	astronautsInspace: 'astronauts-inspace.json',
+	// 搜索页专用的浅字段版：862 条，去掉 missions / evas / bio / wiki（实测 172.7KB，
+	// 是全量库的 1/4，其中一半是头像 URL）。搜索只需要能匹配、能显示、能跳转，
+	// 详情内容进详情页再按 id 拉
+	astronautsSearch: 'astronauts-search.json',
 	// 空间站（15 个，活性站 + 历史站），详情页展示乘组/远征队/对接史
 	spacestations: 'spacestations.json',
 	// 远征队（165 条，乘组 + 所属空间站），详情页乘组卡点宇航员跳转
@@ -134,6 +141,10 @@ const SOFT_TTL = {
 	cores: 12 * 60 * 60 * 1000,
 	// 宇航员库同上（在轨状态一天变一次足够）
 	astronauts: 12 * 60 * 60 * 1000,
+	// 两个派生版跟主库同源、同频率（CI 每天 07:10 UTC 一轮），同样 12 小时。
+	// 给短了只是让启动页/搜索页跟着多拉几遍 15KB，没有收益
+	astronautsInspace: 12 * 60 * 60 * 1000,
+	astronautsSearch: 12 * 60 * 60 * 1000,
 	spacestations: 12 * 60 * 60 * 1000,
 	expeditions: 12 * 60 * 60 * 1000,
 	dockings: 12 * 60 * 60 * 1000,
