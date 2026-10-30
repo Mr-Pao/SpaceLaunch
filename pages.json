@@ -8,7 +8,12 @@
 			"style": {
 				"navigationBarTitleText": "今日",
 				"enablePullDownRefresh": true,
-				"backgroundTextStyle": "light"
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -16,7 +21,12 @@
 			"style": {
 				"navigationBarTitleText": "发射",
 				"enablePullDownRefresh": true,
-				"backgroundTextStyle": "light"
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -24,7 +34,12 @@
 			"style": {
 				"navigationBarTitleText": "运载火箭",
 				"enablePullDownRefresh": true,
-				"backgroundTextStyle": "light"
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -32,20 +47,35 @@
 			"style": {
 				"navigationBarTitleText": "活动",
 				"enablePullDownRefresh": true,
-				"backgroundTextStyle": "light"
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/event/eventInfo",
 			"style": {
 				"navigationBarTitleText": "活动详情",
-				"backgroundTextStyle": "light"
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/mine/mine",
 			"style": {
-				"navigationBarTitleText": "我的"
+				"navigationBarTitleText": "我的",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -53,14 +83,24 @@
 			"style": {
 				"navigationBarTitleText": "发射统计",
 				"enablePullDownRefresh": true,
-				"backgroundTextStyle": "light"
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/gallery/gallery",
 			"style": {
 				"navigationBarTitleText": "图库",
-				"backgroundTextStyle": "light"
+				"backgroundTextStyle": "light",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -68,7 +108,12 @@
 			"style": {
 				"navigationBarTitleText": "全部图片",
 				"backgroundTextStyle": "light",
-				"onReachBottomDistance": 300
+				"onReachBottomDistance": 300,
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -77,73 +122,130 @@
 				"navigationBarTitleText": "每日天文",
 				"navigationBarBackgroundColor": "#0a0e17",
 				"navigationBarTextStyle": "white",
-				"backgroundColor": "#0a0e17"
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17"
 			}
 		},
 		{
 			"path": "pages/launch/launchInfo",
 			"style": {
-				"navigationBarTitleText": "发射任务详情"
+				"navigationBarTitleText": "发射任务详情",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/rocket/rocket",
 			"style": {
-				"navigationBarTitleText": "运载火箭"
+				"navigationBarTitleText": "运载火箭",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/agencies/agencies",
 			"style": {
-				"navigationBarTitleText": "机构信息"
+				"navigationBarTitleText": "机构信息",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/search/search",
 			"style": {
-				"navigationBarTitleText": "搜索"
+				"navigationBarTitleText": "搜索",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/pad/pad",
 			"style": {
-				"navigationBarTitleText": "发射工位"
+				"navigationBarTitleText": "发射工位",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/astronaut/astronaut",
 			"style": {
-				"navigationBarTitleText": "航天员"
+				"navigationBarTitleText": "航天员",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/stations/stations",
 			"style": {
-				"navigationBarTitleText": "空间站"
+				"navigationBarTitleText": "空间站",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/station/station",
 			"style": {
-				"navigationBarTitleText": "空间站详情"
+				"navigationBarTitleText": "空间站详情",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/expedition/expedition",
 			"style": {
-				"navigationBarTitleText": "远征队"
+				"navigationBarTitleText": "远征队",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/version/version",
 			"style": {
-				"navigationBarTitleText": "版本记录"
+				"navigationBarTitleText": "版本记录",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/media/media",
 			"style": {
-				"navigationBarTitleText": "图片库"
+				"navigationBarTitleText": "图片库",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -152,7 +254,12 @@
 				"navigationBarTitleText": "发射视频",
 				"enablePullDownRefresh": true,
 				"backgroundTextStyle": "light",
-				"onReachBottomDistance": 300
+				"onReachBottomDistance": 300,
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -161,46 +268,81 @@
 				"navigationBarTitleText": "NASA 影像",
 				"enablePullDownRefresh": true,
 				"backgroundTextStyle": "light",
-				"onReachBottomDistance": 300
+				"onReachBottomDistance": 300,
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/catalog/catalog",
 			"style": {
 				"navigationBarTitleText": "航天器 / 卫星百科",
-				"onReachBottomDistance": 400
+				"onReachBottomDistance": 400,
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/orbit/orbit",
 			"style": {
-				"navigationBarTitleText": "全球在轨资产"
+				"navigationBarTitleText": "全球在轨资产",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/neo/neo",
 			"style": {
-				"navigationBarTitleText": "近地天体"
+				"navigationBarTitleText": "近地天体",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/space-assets/space-assets",
 			"style": {
 				"navigationBarTitleText": "太空资产",
-				"enablePullDownRefresh": true
+				"enablePullDownRefresh": true,
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/environment/environment",
 			"style": {
-				"navigationBarTitleText": "太空环境"
+				"navigationBarTitleText": "太空环境",
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
 			"path": "pages/debris/debris",
 			"style": {
 				"navigationBarTitleText": "解体 / 再入",
-				"onReachBottomDistance": 200
+				"onReachBottomDistance": 200,
+				"backgroundColor": "#0a0e17",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		},
 		{
@@ -210,7 +352,11 @@
 				"onReachBottomDistance": 300,
 				"enablePullDownRefresh": true,
 				"backgroundTextStyle": "light",
-				"backgroundColor": "#04060a"
+				"backgroundColor": "#04060a",
+				"backgroundColorTop": "#0a0e17",
+				"backgroundColorBottom": "#0a0e17",
+				"navigationBarBackgroundColor": "#0a0e17",
+				"navigationBarTextStyle": "white"
 			}
 		}
 	],
@@ -259,6 +405,8 @@
 		"navigationStyle": "custom",
 		"navigationBarBackgroundColor": "#0a0e17",
 		"navigationBarTitleText": "太空发射任务",
-		"navigationBarTextStyle": "white"
+		"navigationBarTextStyle": "white",
+		"backgroundColorTop": "#0a0e17",
+		"backgroundColorBottom": "#0a0e17"
 	}
 }
