@@ -56,6 +56,24 @@
 						</view>
 					</view>
 				</view>
+
+				<view class="band band-w">
+					<view class="track t7">
+						<view class="cell wide" v-for="(img, i) in row7" :key="'g' + i" @click="preview(6, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
+							<view class="cell-veil"></view>
+						</view>
+					</view>
+				</view>
+
+				<view class="band band-t">
+					<view class="track t8">
+						<view class="cell tall" v-for="(img, i) in row8" :key="'h' + i" @click="preview(7, i)">
+							<image class="cell-img" :src="img.thumb" mode="aspectFill" :style="{ animationDelay: (i % 12) * 45 + 'ms' }"></image>
+							<view class="cell-veil"></view>
+						</view>
+					</view>
+				</view>
 			</view>
 
 			<!-- 四面渐隐：左右让图淡入淡出，上下把墙压进背景，不给硬边 -->
@@ -112,11 +130,11 @@
  *
  * 为什么每行只放 12 张再复制一份：
  *   无缝循环靠 track 复制内容 + translateX(-50%)。如果 800 张全塞进去，
- *   首屏要渲染 1600 个 image 节点，滑动直接卡死。12 × 4 行 = 48 张原图
- *   （渲染 96 个节点）已经能把屏幕铺满，看起来是「看不完的墙」。
+ *   首屏要渲染 1600 个 image 节点，滑动直接卡死。12 × 8 行 = 96 张原图
+ *   （渲染 192 个节点）已经能把屏幕铺满，看起来是「看不完的墙」。
  *
- * 为什么是 4 行而不是 3 行：三行 132px 高的大图铺不满一屏，上下各留一大块空白，
- * 看着像「三个相框」而不是「墙」。4 行、行高交替，才真的密不透风。
+ * 为什么是 8 行：行数少了只能靠 flex 把每行拉高来填满整屏，单行一高图就裁得狠；
+ *   8 行宽窄交替，每行高度接近原始设计值，铺满的同时露出更多画面。
  *
  * 为什么不要标题：这一页要的是「一扇窗」而不是「一个列表页」，
  * 顶部只留一行 HUD 标识（不占布局），墙面从状态栏下一直铺到底部 tabBar。
@@ -128,9 +146,10 @@ import navMixin from '@/utils/nav-mixin.js'
 
 // 每行取多少张（复制后翻倍就是这个数 ×2 的节点数）
 const PER_ROW = 12
-// 行数：6 行（3 宽 3 窄）才真的铺满一屏。
-// 之前 4 行只有约 400px，屏幕下半截空出一大块，提示被迫浮在空白里。
-const ROWS = 6
+// 行数：8 行（4 宽 4 窄）。
+// 6 行时靠 flex 拉伸才铺满整屏，宽行被拉到约 309rpx（原设计 232rpx），
+// 图裁得偏狠；8 行后每行回到接近原始高度，同样铺满但露出的画面更多。
+const ROWS = 8
 
 /** Fisher-Yates 洗牌。图池近千张，每次进图库都重新打散，看到的墙不重样 */
 function shuffle(arr) {
@@ -155,7 +174,7 @@ export default {
 			// 和 images.length 不是一回事：images 是实际拉到的图池，不是全量
 			total: 0,
 			// 各行原始图（渲染时再拼一份副本）
-			raw: [[], [], [], [], [], []]
+			raw: Array.from({ length: ROWS }, () => [])
 		}
 	},
 
@@ -178,6 +197,12 @@ export default {
 		},
 		row6() {
 			return this.raw[5].concat(this.raw[5])
+		},
+		row7() {
+			return this.raw[6].concat(this.raw[6])
+		},
+		row8() {
+			return this.raw[7].concat(this.raw[7])
 		},
 		// 模板里判断有没有内容，随便挑一行看
 		rowsA() {
@@ -311,7 +336,7 @@ export default {
 		const picked = shuffle(pool).slice(0, PER_ROW * ROWS)
 
 		// 各行交错分配：i % ROWS，这样相近来源的图不会挤在同一行
-		const buckets = [[], [], [], [], [], []]
+		const buckets = Array.from({ length: ROWS }, () => [])
 		picked.forEach((x, i) => {
 			buckets[i % ROWS].push(x)
 		})
@@ -481,6 +506,14 @@ export default {
 
 .t6 {
 	animation: marqueeR 40s linear infinite;
+}
+
+.t7 {
+	animation: marqueeL 58s linear infinite;
+}
+
+.t8 {
+	animation: marqueeR 46s linear infinite;
 }
 
 @keyframes marqueeL {
