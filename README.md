@@ -17,6 +17,15 @@
 详情覆盖发射、火箭、机构、工位、航天员、空间站、远征队、太空资产（在轨 / 卫星目录 /
 解体）、近地天体、资讯、活动；全局搜索覆盖发射、火箭、航天员、工位、机构。
 
+## 截图
+
+<p>
+<img src="docs/screenshots/launch.jpg" width="180" alt="发射">
+<img src="docs/screenshots/gallery.jpg" width="180" alt="图库">
+<img src="docs/screenshots/rockets.jpg" width="180" alt="火箭">
+<img src="docs/screenshots/mine.jpg" width="180" alt="我的">
+</p>
+
 ## 架构
 
 ```
