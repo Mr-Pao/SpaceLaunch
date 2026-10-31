@@ -42,7 +42,6 @@ GitHub Actions                         COS + CDN
 | `custom-tab-bar/` | 悬浮胶囊 tabBar（原生 wxml/wxss/js，非 .vue） |
 | `utils/` | 数据层、格式化、搜索匹配、收藏、分享 |
 | `scripts/` | 抓取生成脚本 + `lib/` + 校验脚本 |
-| `docs/` | [部署说明](docs/部署说明.md)、API 调研、代码评审记录 |
 | `.github/workflows/` | 11 条流水线（9 定时 + 2 手动） |
 | `dist/` | 生成的 JSON 快照（不入库） |
 
