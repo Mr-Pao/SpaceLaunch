@@ -36,19 +36,6 @@ GitHub Actions                         COS + CDN
 
 大集合分片传输（卫星目录两万余条，按 `chunks` 切片，触底增量拉取）。
 
-## 数据源
-
-| 来源 | 用途 |
-|---|---|
-| [The Space Devs LL2](https://thespacedevs.com/llapi) | 发射、火箭、机构、工位、航天员、空间站、事件 |
-| [SNAPI](https://spaceflightnewsapi.net/) | 航天资讯 |
-| NASA [APOD](https://api.nasa.gov/) / [EPIC](https://epic.gsfc.nasa.gov/) / [Image Library](https://images-api.nasa.gov/) | 每日天文、每日地球、主题影像 |
-| NASA [NeoWs](https://api.nasa.gov/) | 近地天体 |
-| [GCAT](https://planet4589.org/space/gcat/) | 卫星目录、在轨统计、解体与再入（CC-BY） |
-
-译文四层：专名白名单 → 人工覆盖 → 术语纠错 → 机翻（Google 优先，限流降级 MyMemory），
-全部在 CI 落盘，小程序端不发起翻译。
-
 ## 目录
 
 | 路径 | 说明 |
@@ -58,16 +45,9 @@ GitHub Actions                         COS + CDN
 | `custom-tab-bar/` | 悬浮胶囊 tabBar（原生 wxml/wxss/js，非 .vue） |
 | `utils/` | 数据层、格式化、搜索匹配、收藏、分享 |
 | `scripts/` | 抓取生成脚本 + `lib/` + 校验脚本 |
+| `docs/` | [部署说明](docs/部署说明.md)、API 调研、代码评审记录 |
 | `.github/workflows/` | 11 条流水线（9 定时 + 2 手动） |
 | `dist/` | 生成的 JSON 快照（不入库） |
-
-## 约定
-
-- `DATA_VERSION` 在 `utils/data.js`、`scripts/sync.js`、`scripts/images.js` 三处必须一致
-  （当前 `14`），改结构一起 +1。
-- 改完跑校验（零依赖）：`node scripts/verify-pure.js`、`verify-config.js`、`verify-slim.js`。
-- 本地：HBuilderX 打开项目运行，产物在 `unpackage/dist/dev/mp-weixin`。
-  数据脚本见 `scripts/`，`--base=dev` 走开发端点不耗配额。详见 [`docs/部署说明.md`](docs/部署说明.md)。
 
 ## 署名
 
