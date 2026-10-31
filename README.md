@@ -23,7 +23,6 @@
 <img src="docs/screenshots/launch.jpg" width="180" alt="发射">
 <img src="docs/screenshots/gallery.jpg" width="180" alt="图库">
 <img src="docs/screenshots/rockets.jpg" width="180" alt="火箭">
-<img src="docs/screenshots/mine.jpg" width="180" alt="我的">
 </p>
 
 ## 架构
