@@ -409,6 +409,8 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	padding: 24rpx 28rpx 24rpx;
+	padding: 24rpx 28rpx calc(24rpx + constant(safe-area-inset-bottom));
 	padding: 24rpx 28rpx calc(24rpx + env(safe-area-inset-bottom));
 	box-sizing: border-box;
 	background: linear-gradient(to top, rgba(4, 6, 10, 0.9) 0%, rgba(4, 6, 10, 0) 100%);

@@ -58,6 +58,13 @@ function pickVersionIn(text) {
 const vFront = pickVersionIn(readText('utils/data.js'))
 const vSync = pickVersionIn(readText('scripts/sync.js'))
 const vImages = pickVersionIn(readText('scripts/images.js'))
+// 以下 5 个脚本同样声明 DATA_VERSION 并写进各自产物，历史上只有上面三处在对拍，
+// 漏掉的这几个改了不会报警（nasa-images 还曾硬编码 `v: 14`），一并纳入。
+const vGcat = pickVersionIn(readText('scripts/gcat.js'))
+const vNasaDaily = pickVersionIn(readText('scripts/nasa-daily.js'))
+const vNasaImages = pickVersionIn(readText('scripts/nasa-images.js'))
+const vNeo = pickVersionIn(readText('scripts/neo.js'))
+const vNews = pickVersionIn(readText('scripts/news.js'))
 
 // videos.js / timeline.js 在 payload 里用 `v: <n>` 标记数据集版本，须与 DATA_VERSION 同步，
 // 之前硬编码过 13（P2-12 漂移），纳入对拍防止下次再漂。
@@ -68,10 +75,16 @@ function pickPayloadVersionIn(text) {
 const vVideos = pickPayloadVersionIn(readText('scripts/videos.js'))
 const vTimeline = pickPayloadVersionIn(readText('scripts/timeline.js'))
 
+const allVersions = [
+	vFront, vSync, vImages, vGcat, vNasaDaily, vNasaImages, vNeo, vNews, vVideos, vTimeline
+]
+
 eq(
-	vFront === vSync && vSync === vImages && vImages === vVideos && vVideos === vTimeline && vTimeline === vFront,
+	allVersions.every((v) => v !== null && v === vFront),
 	true,
-	`DATA_VERSION 五处一致（front=${vFront} sync=${vSync} images=${vImages} videos=${vVideos} timeline=${vTimeline}）`
+	`DATA_VERSION 十处一致（front=${vFront} sync=${vSync} images=${vImages} gcat=${vGcat} ` +
+		`nasaDaily=${vNasaDaily} nasaImages=${vNasaImages} neo=${vNeo} news=${vNews} ` +
+		`videos=${vVideos} timeline=${vTimeline}）`
 )
 
 const manifest = readText('manifest.json')

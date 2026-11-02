@@ -83,10 +83,9 @@ export default {
 
 			const um = uni.getUpdateManager()
 
-			um.onCheckForUpdate((res) => {
-				// hasUpdate 只表示有新版本，还要等下载完才能重启
-				if (res.hasUpdate) console.log('[update] 发现新版本，后台下载中')
-			})
+			// hasUpdate 只表示有新版本，还要等下载完才能重启；
+			// 后台会自动下载，这里无需提示（原先的 console.log 只是调试残留）
+			um.onCheckForUpdate(() => {})
 
 			um.onUpdateReady(() => {
 				uni.showModal({

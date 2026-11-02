@@ -441,7 +441,10 @@ export default {
 		// 没到期就是读缓存，不会每次都打 CDN）
 		const news = this.$refs.news
 		if (news && news.reload) news.reload()
-		this.loadAll(true).then(() => uni.stopPullDownRefresh())
+		// 失败也要收动画，否则转圈一直转到超时
+		this.loadAll(true)
+			.then(() => uni.stopPullDownRefresh())
+			.catch(() => uni.stopPullDownRefresh())
 	},
 
 	/**

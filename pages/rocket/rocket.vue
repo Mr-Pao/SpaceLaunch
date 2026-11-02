@@ -758,9 +758,12 @@ export default {
 			return
 		}
 
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-		})
+		// catch 兜底：失败按非审核态继续（本页主体是参数查询，不该被开关拖死）
+		getConfig()
+			.catch(() => null)
+			.then((c) => {
+				this.reviewMode = Boolean(c && c.review)
+			})
 
 		await this.loadConfig()
 		await this.loadRecords()

@@ -323,11 +323,13 @@ export default {
 	},
 
 	onLoad() {
-		// 审核态不拉任何数据
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-			if (!this.reviewMode) this.getData()
-		})
+		// 审核态不拉任何数据。catch 兜底：失败按非审核态继续
+		getConfig()
+			.catch(() => null)
+			.then((c) => {
+				this.reviewMode = Boolean(c && c.review)
+				if (!this.reviewMode) this.getData()
+			})
 	},
 
 	onPullDownRefresh() {
@@ -335,7 +337,10 @@ export default {
 			uni.stopPullDownRefresh()
 			return
 		}
-		this.getData(true).then(() => uni.stopPullDownRefresh())
+		// 失败也要收动画，否则转圈一直转到超时
+		this.getData(true)
+			.then(() => uni.stopPullDownRefresh())
+			.catch(() => uni.stopPullDownRefresh())
 	},
 
 	// 标题带年份与当年发射次数：只写「数据统计」的话，转发出去看不出是哪一年

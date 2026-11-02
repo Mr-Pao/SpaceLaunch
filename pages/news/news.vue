@@ -127,7 +127,10 @@ export default {
 	// 资讯是全站唯一「会变」的内容源，用户看到旧数据的可能性最大，
 	// 必须给一个手动拉新的手势（getData(true) 绕过 TTL 直接打 CDN）
 	onPullDownRefresh() {
-		this.getData(true).then(() => uni.stopPullDownRefresh())
+		// 失败也要收动画，否则转圈一直转到超时
+		this.getData(true)
+			.then(() => uni.stopPullDownRefresh())
+			.catch(() => uni.stopPullDownRefresh())
 	},
 
 	/**

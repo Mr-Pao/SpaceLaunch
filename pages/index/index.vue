@@ -442,7 +442,10 @@ export default {
 			this.index = null
 			tasks.push(this.prepareArchive(true))
 		}
-		Promise.all(tasks).then(() => uni.stopPullDownRefresh())
+		// 任一任务失败也要收动画，否则下拉转圈一直转到超时
+		Promise.all(tasks)
+			.then(() => uni.stopPullDownRefresh())
+			.catch(() => uni.stopPullDownRefresh())
 	},
 
 	onReachBottom() {

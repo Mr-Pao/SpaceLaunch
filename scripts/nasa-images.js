@@ -30,6 +30,11 @@ const OUT_DIR = path.resolve(__dirname, '..', 'dist')
 const FILE = 'nasa-images.json'
 const KEY = 'space-data/nasa-images.json'
 
+// 必须与 utils/data.js / scripts/sync.js / scripts/images.js 的 DATA_VERSION 一致。
+// 以前这里是硬编码的 `v: 14`，verify-pure 也没覆盖本文件 —— 与 videos/timeline
+// 曾硬编码 13 漂移是同一类风险，故改成常量并纳入 verify-pure 对拍。
+const DATA_VERSION = 14
+
 // 固定主题：精选而非全量。q 用 NASA 站内检索词，挑最能出好图的表述
 // 目前只保留「星云」；其余主题（阿波罗 / 哈勃 / 韦伯 / 火星 / 地球）按需加回即可
 const THEMES = [
@@ -191,8 +196,8 @@ async function runNasaImages() {
 	})).filter((t) => t.count > 0)
 
 	const payload = {
-		// 须与 DATA_VERSION(=14) 同步
-		v: 14,
+		// 须与 DATA_VERSION 同步（见文件头常量）
+		v: DATA_VERSION,
 		dataset: 'nasaImages',
 		generatedAt: new Date().toISOString(),
 		count: collected.length,

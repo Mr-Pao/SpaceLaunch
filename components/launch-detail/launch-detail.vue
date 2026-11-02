@@ -266,9 +266,12 @@ export default {
 		// 页面壳在 onShow 里还会再调一次：navigateBack 回来时实例被复用、不会重新
 		// mounted，开关要是切过，长文该跟着变
 		refreshReview() {
-			getConfig().then((c) => {
-				this.reviewMode = Boolean(c && c.review)
-			})
+			// catch 兜底：失败按非审核态（详情页主体本来就该正常显示）
+			getConfig()
+				.catch(() => null)
+				.then((c) => {
+					this.reviewMode = Boolean(c && c.review)
+				})
 		},
 
 		/**

@@ -95,11 +95,14 @@ export default {
 	},
 
 	onLoad() {
-		// 开关先回来再决定拉不拉数据：审核态整页只剩空态，一次请求都不发
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-			if (!this.reviewMode) this.getData()
-		})
+		// 开关先回来再决定拉不拉数据：审核态整页只剩空态，一次请求都不发。
+		// catch 兜底：万一 reject，按「非审核态」继续，宁可多拉一次也别留空白页
+		getConfig()
+			.catch(() => null)
+			.then((c) => {
+				this.reviewMode = Boolean(c && c.review)
+				if (!this.reviewMode) this.getData()
+			})
 	},
 
 	onPullDownRefresh() {
@@ -108,7 +111,10 @@ export default {
 			return
 		}
 		this.resetPaging()
-		this.getData(true).then(() => uni.stopPullDownRefresh())
+		// catch 也要收动画：失败时没人收，转圈会一直转到超时
+		this.getData(true)
+			.then(() => uni.stopPullDownRefresh())
+			.catch(() => uni.stopPullDownRefresh())
 	},
 
 	onReachBottom() {

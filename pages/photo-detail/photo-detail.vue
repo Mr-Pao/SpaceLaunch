@@ -167,6 +167,7 @@ export default {
 	flex-shrink: 0;
 	padding: 26rpx 32rpx 30rpx;
 	background: #000000;
+	padding-bottom: calc(30rpx + constant(safe-area-inset-bottom));
 	padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
 }
 

@@ -225,6 +225,8 @@ export default {
 	border-radius: 28rpx 28rpx 0 0;
 	z-index: 61;
 	overflow: hidden;
+	padding-bottom: 0;
+	padding-bottom: constant(safe-area-inset-bottom);
 	padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -342,6 +344,8 @@ export default {
 	border-radius: 28rpx 28rpx 0 0;
 	z-index: 63;
 	overflow: hidden;
+	padding-bottom: 0;
+	padding-bottom: constant(safe-area-inset-bottom);
 	padding-bottom: env(safe-area-inset-bottom);
 }
 

@@ -274,7 +274,7 @@ export function createListMixin({ dataset, pageSize = 12, favorite = false, filt
 					this.pageIndex = 0
 				} catch (e) {
 					// 归档还没跑过 / 还没生成索引，属于正常情况，只显示快照那 100 条
-					console.log('[' + conf.dataset + '] 暂无历史归档索引', e && e.message)
+					console.warn('[' + conf.dataset + '] 暂无历史归档索引', e && e.message)
 					this.index = null
 				}
 			},

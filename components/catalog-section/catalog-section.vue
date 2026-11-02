@@ -397,6 +397,8 @@ export default {
 	background: #2a3344;
 }
 .sheet-body {
+	padding: 16rpx 36rpx 30rpx;
+	padding: 16rpx 36rpx calc(30rpx + constant(safe-area-inset-bottom));
 	padding: 16rpx 36rpx calc(30rpx + env(safe-area-inset-bottom));
 	overflow-y: auto;
 }

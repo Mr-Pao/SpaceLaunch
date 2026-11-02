@@ -503,7 +503,11 @@ export default {
 		async loadVideos() {
 			this.videoLoading = true
 			try {
-				const d = await spaceData.load('videos').catch(() => null)
+				// 注意：这里**不能**写 .catch(() => null)。data.js 在无缓存且网络失败时
+				// 是 reject 的，一旦吞成 null，下面的 videoLoaded=true 照样执行，
+				// 该 tab 就会永久空着（本页没有下拉刷新），必须让异常落到外层 catch，
+				// 由它保持标志为 false，下次切回自动重试。
+				const d = await spaceData.load('videos')
 				const list = (d && d.list) || []
 				const flat = []
 				for (const row of list) {
@@ -554,11 +558,12 @@ export default {
 			try {
 				// 接 onUpdate：命中旧缓存时先渲染缓存，后台刷新到新数据再自动回填。
 				// 不接就永远停在旧结果上（EPIC 从 4 张扩到 13 张时，页面一直显示 4 张）
+				// 同上：不吞异常，失败时 epicLoaded 保持 false，下次切回重试
 				const d = await spaceData.load('epic', {
 					onUpdate: (fresh) => {
 						this.epicList = this.epicToList(fresh)
 					}
-				}).catch(() => null)
+				})
 				this.epicList = this.epicToList(d)
 				this.epicLoaded = true
 			} catch (e) {
@@ -613,11 +618,12 @@ export default {
 			try {
 				// 传 onUpdate：命中旧缓存时 load 会先返回缓存、后台再刷。
 				// 不接这个回调，页面就永远停在旧结果上（缓存 TTL 12h，等不起）
+				// 同上：不吞异常，失败时 apodLoaded 保持 false，下次切回重试
 				const d = await spaceData.load('apod', {
 					onUpdate: (fresh) => {
 						this.apodList = this.apodToList(fresh)
 					}
-				}).catch(() => null)
+				})
 				this.apodList = this.apodToList(d)
 				this.apodLoaded = true
 			} catch (e) {
@@ -635,7 +641,7 @@ export default {
 			try {
 				const d = await spaceData.load('apod', { force: true }).catch(() => null)
 				this.apodList = this.apodToList(d)
-				console.log('[gallery-all] APOD 重试结果', d && d.count)
+				console.warn('[gallery-all] APOD 重试结果', d && d.count)
 			} catch (e) {
 				console.warn('[gallery-all] APOD 重试失败', e)
 			} finally {
@@ -646,7 +652,8 @@ export default {
 		async loadNasa() {
 			this.nasaLoading = true
 			try {
-				let d = await spaceData.load('nasaImages').catch(() => null)
+				// 同上：不吞异常，失败时 nasaLoaded 保持 false，下次切回重试
+				let d = await spaceData.load('nasaImages')
 				// 老缓存的缓存对象里没有 themes（早期 data.js 白名单漏了这个字段），
 				// 强行回源一次把主题清单补齐，否则标签栏永远是空的
 				if (d && !(d.themes && d.themes.length)) {
@@ -960,6 +967,8 @@ export default {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	padding: 24rpx 28rpx 24rpx;
+	padding: 24rpx 28rpx calc(24rpx + constant(safe-area-inset-bottom));
 	padding: 24rpx 28rpx calc(24rpx + env(safe-area-inset-bottom));
 	box-sizing: border-box;
 	background: linear-gradient(to top, rgba(4, 6, 10, 0.9) 0%, rgba(4, 6, 10, 0) 100%);

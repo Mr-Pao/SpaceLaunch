@@ -446,7 +446,10 @@ export default {
 
 	onPullDownRefresh() {
 		this.listNum = STEP
-		this.getData(true).then(() => uni.stopPullDownRefresh())
+		// 失败也要收动画，否则转圈一直转到超时
+		this.getData(true)
+			.then(() => uni.stopPullDownRefresh())
+			.catch(() => uni.stopPullDownRefresh())
 	},
 
 	onReachBottom() {

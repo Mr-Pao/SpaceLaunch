@@ -160,10 +160,12 @@ export default {
 		this.padId = (query && query.id) || ''
 		// 名字兜底：新工位可能还没进库，只有 id 查不到时用名字对一遍
 		const qname = (query && query.name) ? decodeURIComponent(query.name) : ''
-		// 展示开关：审核态下外部资料整块隐藏
-		getConfig().then((c) => {
-			this.reviewMode = Boolean(c && c.review)
-		})
+		// 展示开关：审核态下外部资料整块隐藏（catch 兜底同其他页：失败按非审核态）
+		getConfig()
+			.catch(() => null)
+			.then((c) => {
+				this.reviewMode = Boolean(c && c.review)
+			})
 		try {
 			let found = this.padId ? await spaceData.getById('pads', this.padId) : null
 			if (!found && qname) {

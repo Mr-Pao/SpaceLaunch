@@ -255,6 +255,7 @@ export default {
 	align-items: flex-end;
 	justify-content: space-between;
 	padding: 40rpx 44rpx 56rpx;
+	padding-bottom: calc(56rpx + constant(safe-area-inset-bottom));
 	padding-bottom: calc(56rpx + env(safe-area-inset-bottom));
 	background: linear-gradient(180deg, rgba(4, 6, 10, 0) 0%, rgba(4, 6, 10, 0.82) 100%);
 }

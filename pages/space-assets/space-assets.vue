@@ -78,7 +78,11 @@ export default {
 
 	onPullDownRefresh() {
 		if (this.tab === 'orbit' && this.$refs.orbitSec) {
-			this.$refs.orbitSec.refresh(true).then(() => uni.stopPullDownRefresh())
+			// 失败也要收动画，否则转圈一直转到超时
+			this.$refs.orbitSec
+				.refresh(true)
+				.then(() => uni.stopPullDownRefresh())
+				.catch(() => uni.stopPullDownRefresh())
 		} else {
 			uni.stopPullDownRefresh()
 		}
