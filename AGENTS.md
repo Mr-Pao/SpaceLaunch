@@ -141,9 +141,11 @@ uni-app (Vue 3) 微信小程序：航天发射跟踪。五 tab（今日 / 发射
 4. 机翻（`scripts/lib/translate.js`）：默认 `auto` = 先 Google 免费端点、失败降级 MyMemory；CI 用 `google`。
    失败静默留空，前端回退英文。并发 2 + 350ms 间隔（3 并发/200ms 会吃 429）。
 - **别直接改 COS 上的数据文件**——全是 CI 产物，下一轮就被覆盖。改数据只能改脚本或人工表再 push。
-- `astronauts.json` 862 条里**没有 `nameZh` / `nationZh` 键**（字段名叫 `agencyName`），
-  中文名全靠 `format.js` 的 `CHINA_ASTRO_ZH` 查表（覆盖中国籍 30 人 + 香港黎家盈）。
-  要彻底解决得在 CI 侧给 862 条补中文转写。
+- `astronauts.json` **有 `nameZh`**（2026-11-02 实测纠正：862 条中 830 条非空，
+  由 `scripts/sync.js:287` 的 `fillAstronautNames()` 由 CI 回填）。
+  早期结论「862 条里没有 nameZh、中文名全靠 `format.js` 的 `CHINA_ASTRO_ZH` 查表」**已过时**。
+  `CHINA_ASTRO_ZH` 仍在，作为未回填那 32 条与老缓存的兜底。
+  派生集 `astronauts-inspace` / `astronauts-search` 也带 `nameZh`。
 - 翻译缓存 `dist/translation-cache.json` 随数据同步到 COS，CI 每轮先下载再增量翻，真实翻译量每天个位数。
 - 星云曾整页中文全空：Google 限流时不要死磕，达阈值就降级 MyMemory，失败阈值按批量放大，标题优先。
 
@@ -288,12 +290,26 @@ uni-app (Vue 3) 微信小程序：航天发射跟踪。五 tab（今日 / 发射
   过时的事实就地改掉，别让新旧两条并存。写之前自问：新开对话的人只读这一份，能不能接着干？
 - `.workbuddy/memory/` 是旧工具 WorkBuddy 的目录，**DSH 完全不读**，只作历史档案；
   本文件才是项目记忆的权威来源。那份 `MEMORY.md` 的版本主线（1.0 → 3.3.1）想看细节再去翻日期日志。
-- 待办（截至 2026-11-01）：
-  1. 3.3.1 提审中；过审发布后立刻把 `scripts/app-config.json` 清回 `[]` 并 push。
+- 待办（截至 2026-11-02）：
+  1. 3.3.1 **已过审发布**，`scripts/app-config.json` 已清回 `[]`（commit `f60c6ff`）。
   2. 白闪修复仍待真机复核（若仍闪 → 详情页根容器最外层加不透明底）。
   3. `satellites/26.json` ~ `41.json` 是**孤儿分片**：`gcat.js` 写完新分片后应按 `chunks` 反查删除多余片（未做）。
   4. EPIC 停更（上游 DSCOVR 无新帧）、APOD 视频日被 `media_type !== 'image'` 跳过 —— 方案已给，用户未选。
-  5. 宇航员中文名剩余约 123 条，靠 CI 每日 UTC 23:10 自动跑（`ASTRO_NAME_LIMIT=280/轮`）。
-  6. 2026-10-31 那批 21 个文件的修复（gallery-all 空 tab、DATA_VERSION 扩到十处、
-     iOS `constant()` 补齐、`console.log` 清理、`.catch` 补齐）**仍留在工作区未提交**，
-     随 3.3.2 发布；别忘了先在 CI 跑守卫再提。
+  5. 宇航员中文名靠 CI 每日 UTC 23:10 自动跑（`ASTRO_NAME_LIMIT=280/轮`）。
+  6. **3.3.2 提审前需改三处版本**（`manifest.json` 的 `versionName` + `versionCode`、
+     `utils/changelog.js` 末条），并把 `scripts/app-config.json` 写回 `["3.3.2"]`。
+     3.3.2 的代码改动已于 2026-11-02 提交（`1d12509`，24 文件 / +285 −41），**但四个守卫仍未跑**。
+
+## 七、鸿蒙原生版已拆为独立仓库（2026-11-02）
+
+鸿蒙版**不在本仓库**，见 `../SpaceLaunchHarmony`（GitHub: `Mr-Pao/SpaceLaunchHarmony`）。
+
+- 原因：两个工程根互斥（HBuilderX 会扫 `.ets`、DevEco 会扫 `.vue`）、`.gitignore` 互相侵入、
+  构建产物污染、提交频率差一个数量级。**代码零复用**（ArkTS vs Vue3，0 行可共用），
+  分支方案等于"一个仓库放两个不相关工程"，永不合并。
+- 数据不通过 git 共享：两边都只读 COS 上的静态 JSON，是运行时解耦。
+  鸿蒙仓库不需要 `scripts/` 也不需要 `.github/workflows/`。
+- 若改了 `scripts/lib/slim.js` 的字段结构或升了 `DATA_VERSION`，**要去鸿蒙仓库同步**
+  `constants/Dataset.ets` 与 `model/*.ets`。契约文档在那边 `DATA_CONTRACT.md`。
+- 本仓库曾短暂存在过 `harmony/` 目录（提交 `34b482c` / `6c2c46c`），已在 `e08d7c9` 中删除，
+  `.gitignore` 恢复 12 行原样。历史记录里仍能看到那两个提交，属正常。
