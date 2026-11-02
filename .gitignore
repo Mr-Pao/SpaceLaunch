@@ -10,18 +10,3 @@ node_modules/
 minitool/
 .skill/
 project.private.config.json
-
-# HarmonyOS 构建产物
-harmony/**/build/
-harmony/**/.cxx/
-harmony/oh_modules/
-harmony/entry/oh_modules/
-harmony/.hvigor/
-harmony/.idea/
-harmony/local.properties
-harmony/**/oh-package-lock.json5
-harmony/.clangd
-harmony/.clang-format
-harmony/.clang-tidy
-!harmony/entry/src/main/**/*.ets
-
