@@ -566,10 +566,10 @@ export class Repository {
    * 后台刷新。失败必须静默 —— 用户手里已经有数据了，后台刷新失败不值得影响页面。
    * 只有 generatedAt 变了才回调 onUpdate：没变说明线上还没更新，不必打扰页面。
    */
-  private refreshInBackground(
+  private refreshInBackground<T>(
     name: DatasetName,
     oldGeneratedAt: string | undefined,
-    onUpdate: ((data: DataSet) => void) | undefined,
+    onUpdate: ((data: T) => void) | undefined,
     timeoutMs?: number
   ): void {
     const key: string = String(name);
@@ -582,7 +582,8 @@ export class Repository {
     this.fetchShared(name, true, timeoutMs)
       .then((fresh: DataSet) => {
         if (onUpdate !== undefined && fresh.generatedAt !== oldGeneratedAt) {
-          onUpdate(fresh);
+          // 与 load() 相同的三段断言：DataSet 是结构基线，由调用方断言成具体 payload
+          onUpdate(fresh as Object as T);
         }
       })
       .catch((e: Error) => {

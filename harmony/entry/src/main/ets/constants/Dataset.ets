@@ -102,7 +102,7 @@ export type ChunkName = 'gallery' | 'satellites';
  *   previous → launches-previous.json / nasaImages → nasa-images.json
  * 其余 17 个是「键名 + .json」。
  */
-const FILES_ENTRIES: Array<[DatasetName, string]> = [
+export const FILES: Map<DatasetName, string> = new Map<DatasetName, string>([
   ['upcoming', 'launches-upcoming.json'],
   // 即将发射的第 100 条之后（每天更新一次，首页翻到底时加载）
   ['upcomingMore', 'launches-upcoming-more.json'],
@@ -153,9 +153,7 @@ const FILES_ENTRIES: Array<[DatasetName, string]> = [
   ['epic', 'epic.json'],
   // NASA Image Library 主题精选
   ['nasaImages', 'nasa-images.json']
-];
-
-export const FILES: Map<DatasetName, string> = new Map<DatasetName, string>(FILES_ENTRIES);
+]);
 
 // ============ SOFT_TTL（27 项，全覆盖） ============
 
@@ -166,7 +164,7 @@ export const FILES: Map<DatasetName, string> = new Map<DatasetName, string>(FILE
  * 实测 data.js 的 SOFT_TTL **27 个键一个不缺**，所以 getSoftTTL() 的兜底值
  * 实际上永远不会命中 —— 但函数仍然保留兜底，防止将来加数据集时漏登记。
  */
-const SOFT_TTL_ENTRIES: Array<[DatasetName, number]> = [
+export const SOFT_TTL: Map<DatasetName, number> = new Map<DatasetName, number>([
   ['upcoming', 15 * MINUTE],
   ['previous', 60 * MINUTE],
   ['events', 30 * MINUTE],
@@ -201,9 +199,7 @@ const SOFT_TTL_ENTRIES: Array<[DatasetName, number]> = [
   ['apod', 60 * MINUTE],
   ['epic', 60 * MINUTE],
   ['nasaImages', 2 * HOUR]
-];
-
-export const SOFT_TTL: Map<DatasetName, number> = new Map<DatasetName, number>(SOFT_TTL_ENTRIES);
+]);
 
 /**
  * 取软 TTL。等价于 data.js 的 `SOFT_TTL[name] || 15 * 60 * 1000`，

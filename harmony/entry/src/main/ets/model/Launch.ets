@@ -16,15 +16,16 @@ import { BasePayload, LaunchSummary } from './Common';
 /**
  * 转发 LaunchSummary。
  *
- * 为什么不在这里重新声明一遍：两个文件各写一份 interface 会立刻产生漂移
- * （改字段只改一边，另一个文件静默不同步）。定义放 Common.ets，这里只转发，
- * 让 `import { LaunchSummary } from '../model/Launch'` 与从 Common 导入等价。
+ * 为什么不在这里重新声明一遍：两个文件各写一份同名 interface 会立刻产生漂移
+ * （改字段只改一边，另一个文件静默不同步，编译器也不会报）。定义放 Common.ets，
+ * 这里只做 re-export，让 `import { LaunchSummary } from '../model/Launch'`
+ * 与从 './Common' 导入完全等价。
  *
- * 注意用的是「先 import 再 export 具名列表」而不是 `export { X } from './Common'`
- * 那种 re-export 写法 —— 后者在部分 ArkTS 版本上不被支持，前者是最保守的写法。
- * 若编译器仍然挑刺，调用方改成从 './Common' 导入即可，本文件删掉这一行不影响别的定义。
+ * 万一某版本的 ArkTS 不接受 re-export 这种写法，退路只有一条：
+ * 调用方改成从 './Common' 直接导入，然后删掉这一行 ——
+ * 本文件其余定义全部依赖上面那条 import，删掉 re-export 不影响编译。
  */
-export { LaunchSummary };
+export { LaunchSummary } from './Common';
 
 // ============ 载荷 ============
 

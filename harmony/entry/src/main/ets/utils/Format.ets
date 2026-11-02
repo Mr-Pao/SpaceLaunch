@@ -141,11 +141,15 @@ export function relativeTime(value: string): string {
  * 所以这里一个 Date 都不构造，纯字符串匹配。
  */
 export function dayOf(iso: string): string {
-  const m = /^(\d{4}-\d{2}-\d{2})/.exec(strOf(iso));
-  if (m === null) {
+  const s: string = strOf(iso);
+  // 原实现是 /^(\d{4}-\d{2}-\d{2})/.exec(...) 取捕获组；
+  // 这里改成「先 test 再 substring(0, 10)」，语义完全等价，
+  // 但避开了对 RegExpExecArray 取下标（ArkTS 对下标访问更挑剔）。
+  const re: RegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}');
+  if (s.length < 10 || !re.test(s)) {
     return '';
   }
-  return m[1];
+  return s.substring(0, 10);
 }
 
 /**

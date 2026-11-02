@@ -99,6 +99,15 @@ export interface LaunchSummary {
   // ---- 发射方 ----
   launch_service_provider?: LaunchProvider;
 
+  /**
+   * 发射工位（对应 slim.js:145 的 pad 对象）。
+   *
+   * upcoming / previous 带全套（含镜像后的 image / map_image）；
+   * upcomingMore 不镜像图片，但对象键仍然存在。所以语义是「键必有、
+   * 图片字段可能缺」。
+   */
+  pad?: LaunchPad;
+
   // ---- 发射窗口 ----
   /** 窗口起点。窗口可能有几小时，只给 net 会让用户以为整点发射 */
   window_start?: string;
